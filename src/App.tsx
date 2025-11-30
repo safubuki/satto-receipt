@@ -118,45 +118,52 @@ const Pill = ({ children }: { children: ReactNode }) => (
   </span>
 )
 
-// スマホ判定カスタムフック
-// 方法1: 画面幅 (768px未満)
-// 方法2: タッチデバイス判定
-// 方法3: User-Agentによるモバイル判定
-const useIsMobile = () => {
-  const [isMobile, setIsMobile] = useState(() => {
-    if (typeof window === 'undefined') return false
+// スマホ判定ヘルパー関数（安全に判定）
+const detectMobile = (): boolean => {
+  try {
+    if (typeof window === 'undefined') return true // SSR時はスマホ扱い
     
-    // タッチデバイスかどうか
-    const hasTouch = 'ontouchstart' in window || navigator.maxTouchPoints > 0
-    // User-Agentでモバイル判定
-    const mobileUA = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)
-    // 画面幅判定
+    // 画面幅判定 (最も確実)
     const narrowScreen = window.innerWidth < 768
+    if (narrowScreen) return true
     
-    // デバッグ用（本番では削除可能）
-    console.log('[Mobile Detection]', {
-      innerWidth: window.innerWidth,
-      innerHeight: window.innerHeight,
-      devicePixelRatio: window.devicePixelRatio,
-      hasTouch,
-      mobileUA,
-      narrowScreen,
-    })
+    // タッチデバイス判定
+    let hasTouch = false
+    try {
+      hasTouch = 'ontouchstart' in window || (navigator && navigator.maxTouchPoints > 0)
+    } catch {
+      // ignore
+    }
+    if (hasTouch) return true
     
-    // タッチデバイス または モバイルUA または 狭い画面 → スマホ扱い
-    return hasTouch || mobileUA || narrowScreen
-  })
+    // User-Agent判定
+    let mobileUA = false
+    try {
+      if (navigator && navigator.userAgent) {
+        mobileUA = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)
+      }
+    } catch {
+      // ignore
+    }
+    
+    return mobileUA
+  } catch {
+    // 何かエラーがあったらスマホ扱い（安全側）
+    return true
+  }
+}
+
+// スマホ判定カスタムフック
+const useIsMobile = () => {
+  const [isMobile, setIsMobile] = useState(detectMobile)
   
   useEffect(() => {
-    const checkMobile = () => {
-      const hasTouch = 'ontouchstart' in window || navigator.maxTouchPoints > 0
-      const mobileUA = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)
-      const narrowScreen = window.innerWidth < 768
-      setIsMobile(hasTouch || mobileUA || narrowScreen)
-    }
-    checkMobile()
-    window.addEventListener('resize', checkMobile)
-    return () => window.removeEventListener('resize', checkMobile)
+    // マウント後に再判定
+    setIsMobile(detectMobile())
+    
+    const handleResize = () => setIsMobile(detectMobile())
+    window.addEventListener('resize', handleResize)
+    return () => window.removeEventListener('resize', handleResize)
   }, [])
   
   return isMobile
@@ -1335,23 +1342,13 @@ const UnlockPanel = ({
   error: string | null
 }) => {
   const [value, setValue] = useState("")
-  // スマホ判定 (タッチ + UA + 画面幅)
-  const [isMobile, setIsMobile] = useState(() => {
-    if (typeof window === 'undefined') return false
-    const hasTouch = 'ontouchstart' in window || navigator.maxTouchPoints > 0
-    const mobileUA = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)
-    const narrowScreen = window.innerWidth < 768
-    return hasTouch || mobileUA || narrowScreen
-  })
+  // スマホ判定 (安全なヘルパー関数を使用)
+  const [isMobile, setIsMobile] = useState(detectMobile)
   useEffect(() => {
-    const checkMobile = () => {
-      const hasTouch = 'ontouchstart' in window || navigator.maxTouchPoints > 0
-      const mobileUA = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)
-      const narrowScreen = window.innerWidth < 768
-      setIsMobile(hasTouch || mobileUA || narrowScreen)
-    }
-    window.addEventListener('resize', checkMobile)
-    return () => window.removeEventListener('resize', checkMobile)
+    setIsMobile(detectMobile())
+    const handleResize = () => setIsMobile(detectMobile())
+    window.addEventListener('resize', handleResize)
+    return () => window.removeEventListener('resize', handleResize)
   }, [])
 
   if (isMobile) {
