@@ -3,6 +3,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { clsx } from "clsx"
 import { downloadCsv, toCsv } from "./lib/csv"
 import { runOcr } from "./lib/ocr"
+import { analyzeReceiptWithGemini, saveApiKey, clearApiKey, hasApiKey } from "./lib/geminiOcr"
 import { decryptVault, deriveKey, encryptVault, getOrCreateSalt } from "./lib/crypto"
 import { clearVault, loadVault, saveVault } from "./lib/db"
 import type { Category, LineItem, Receipt, Vault } from "./lib/types"
@@ -188,6 +189,12 @@ function App() {
   const [cameraActive, setCameraActive] = useState(false)
   const [cameraError, setCameraError] = useState<string | null>(null)
   const [cameraReady, setCameraReady] = useState(false)
+  const [cameraPaused, setCameraPaused] = useState(false)  // 撮影後の一時停止
+  const [capturedImage, setCapturedImage] = useState<string | null>(null)  // 撮影した画像
+  const [isProcessing, setIsProcessing] = useState(false)  // OCR処理中
+  const [useGemini, setUseGemini] = useState(true)  // Gemini APIを使うか
+  const [showApiKeyModal, setShowApiKeyModal] = useState(false)  // APIキー設定モーダル
+  const [apiKeyInput, setApiKeyInput] = useState("")  // APIキー入力
   const isMobile = useIsMobile()
 
   // ビデオ要素にストリームを接続する処理
@@ -290,16 +297,35 @@ function App() {
     setOcrProgress(0)
     setLastUploadedName(file.name)
     try {
-      const [text, preview] = await Promise.all([runOcr(file, setOcrProgress), compressImage(file)])
-
-      setOcrText(text)
-      const parsed = parseReceiptText(text)
-      setDraft({
-        ...initialDraft(categories),
-        storeName: parsed.store ?? "",
-        total: parsed.total ?? "",
-        imageData: preview,
-      })
+      const preview = await compressImage(file)
+      
+      // Gemini APIを使うか、従来のOCRを使うか
+      if (useGemini && hasApiKey()) {
+        // Gemini API
+        const result = await analyzeReceiptWithGemini(file, setOcrProgress)
+        setOcrText(result.rawText)
+        setDraft({
+          ...initialDraft(categories),
+          storeName: result.storeName || "",
+          visitedAt: result.date || new Date().toISOString().slice(0, 10),
+          total: result.total || "",
+          imageData: preview,
+        })
+      } else {
+        // 従来のTesseract OCR
+        const text = await runOcr(file, setOcrProgress)
+        setOcrText(text)
+        const parsed = parseReceiptText(text)
+        setDraft({
+          ...initialDraft(categories),
+          storeName: parsed.store ?? "",
+          total: parsed.total ?? "",
+          imageData: preview,
+        })
+      }
+    } catch (error) {
+      console.error("OCR error:", error)
+      setCameraError(error instanceof Error ? error.message : "OCR処理に失敗しました")
     } finally {
       setOcrProgress(null)
       if (input) input.value = ""
@@ -422,6 +448,25 @@ function App() {
     setCameraActive(false)
     setCameraError(null)
     setCameraReady(false)
+    setCameraPaused(false)
+    setCapturedImage(null)
+  }
+
+  // カメラを一時停止
+  const pauseCamera = () => {
+    if (videoRef.current) {
+      videoRef.current.pause()
+      setCameraPaused(true)
+    }
+  }
+
+  // カメラを再開
+  const resumeCamera = () => {
+    if (videoRef.current) {
+      videoRef.current.play()
+      setCameraPaused(false)
+      setCapturedImage(null)
+    }
   }
 
   useEffect(() => {
@@ -440,18 +485,45 @@ function App() {
       setCameraError("カメラ映像が準備できていません。数秒待つか再起動してください。")
       return
     }
+    
     const video = videoRef.current
+    
+    // 1. カメラを一時停止（撮影した瞬間を固定）
+    pauseCamera()
+    setIsProcessing(true)
+    
+    // 2. キャンバスで撮影
     const canvas = document.createElement("canvas")
     canvas.width = video.videoWidth
     canvas.height = video.videoHeight
     const ctx = canvas.getContext("2d")
     if (ctx) ctx.drawImage(video, 0, 0, canvas.width, canvas.height)
+    
+    // 3. 撮影画像を保存（プレビュー用）
+    const previewDataUrl = canvas.toDataURL("image/jpeg", 0.8)
+    setCapturedImage(previewDataUrl)
+    
     const blob = await new Promise<Blob | null>((resolve) =>
       canvas.toBlob((b) => resolve(b), "image/jpeg", 0.8),
     )
-    if (!blob) return
+    if (!blob) {
+      setIsProcessing(false)
+      resumeCamera()
+      return
+    }
+    
     const file = new File([blob], `capture-${Date.now()}.jpg`, { type: "image/jpeg" })
-    await handleOcr(file)
+    
+    // 4. OCR処理
+    try {
+      await handleOcr(file)
+    } finally {
+      setIsProcessing(false)
+      // 処理完了後、3秒待ってからカメラを再開
+      setTimeout(() => {
+        resumeCamera()
+      }, 3000)
+    }
   }
 
   const filteredReceipts = useMemo(() => {
@@ -520,12 +592,12 @@ function App() {
   // ========== スマホ専用UI ==========
   if (isMobile) {
     return (
-      <div className="min-h-screen bg-fog text-sand text-2xl">
+      <div className="min-h-screen bg-fog text-sand text-lg">
         {/* スマホ用ヘッダー */}
-        <header className="sticky top-0 z-20 border-b border-white/10 bg-fog/95 px-6 py-6 backdrop-blur-lg">
+        <header className="sticky top-0 z-20 border-b border-white/10 bg-fog/95 px-5 py-5 backdrop-blur-lg">
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <div className="h-20 w-20 rounded-full bg-gradient-to-r from-mint/60 to-mint/30 p-[2px]">
+            <div className="flex items-center gap-3">
+              <div className="h-14 w-14 rounded-full bg-gradient-to-r from-mint/60 to-mint/30 p-[2px]">
                 <div className="h-full w-full rounded-full bg-fog/90 p-[1px]">
                   <img
                     src={`${import.meta.env.BASE_URL}turtle_icon_receipt.png`}
@@ -534,12 +606,12 @@ function App() {
                   />
                 </div>
               </div>
-              <h1 className="text-5xl font-bold text-white">サッとレシート</h1>
+              <h1 className="text-3xl font-bold text-white">サッとレシート</h1>
             </div>
             {session && (
               <button
                 onClick={handleLock}
-                className="rounded-full border border-white/20 bg-white/10 px-7 py-5 text-4xl font-semibold text-white"
+                className="rounded-full border border-white/20 bg-white/10 px-5 py-4 text-3xl font-semibold text-white"
               >
                 🔒
               </button>
@@ -549,10 +621,10 @@ function App() {
 
         {!session ? (
           // ========== スマホ用ログイン画面 ==========
-          <div className="flex min-h-[80vh] flex-col items-center justify-center px-8">
-            <div className="w-full rounded-3xl border border-white/10 bg-white/5 p-12">
-              <div className="mb-12 text-center">
-                <div className="mx-auto mb-8 h-40 w-40 rounded-full bg-gradient-to-r from-mint/60 to-mint/30 p-[4px]">
+          <div className="flex min-h-[80vh] flex-col items-center justify-center px-6">
+            <div className="w-full rounded-3xl border border-white/10 bg-white/5 p-10">
+              <div className="mb-10 text-center">
+                <div className="mx-auto mb-6 h-28 w-28 rounded-full bg-gradient-to-r from-mint/60 to-mint/30 p-[3px]">
                   <div className="h-full w-full rounded-full bg-fog/90 p-[2px]">
                     <img
                       src={`${import.meta.env.BASE_URL}turtle_icon_receipt.png`}
@@ -561,17 +633,17 @@ function App() {
                     />
                   </div>
                 </div>
-                <h2 className="text-6xl font-bold text-white">サッとレシート</h2>
-                <p className="mt-6 text-3xl text-slate-400">買い物ごとにパシャと</p>
+                <h2 className="text-4xl font-bold text-white">サッとレシート</h2>
+                <p className="mt-4 text-xl text-slate-400">買い物ごとにパシャと</p>
               </div>
               <UnlockPanel onUnlock={handleUnlock} unlocking={unlocking} error={unlockError} />
-              <div className="mt-12 flex flex-wrap justify-center gap-5">
-                <span className="rounded-full bg-white/10 px-7 py-4 text-2xl text-slate-200">🔒 暗号化</span>
-                <span className="rounded-full bg-white/10 px-7 py-4 text-2xl text-slate-200">📴 オフライン</span>
+              <div className="mt-10 flex flex-wrap justify-center gap-4">
+                <span className="rounded-full bg-white/10 px-5 py-3 text-base text-slate-200">🔒 暗号化</span>
+                <span className="rounded-full bg-white/10 px-5 py-3 text-base text-slate-200">📴 オフライン</span>
               </div>
               <button
                 onClick={handleReset}
-                className="mt-12 w-full text-center text-3xl text-slate-500 underline"
+                className="mt-10 w-full text-center text-lg text-slate-500 underline"
               >
                 データを初期化
               </button>
@@ -580,10 +652,85 @@ function App() {
         ) : (
           // ========== スマホ用メイン画面 ==========
           <div className="pb-40">
+            {/* APIキー設定モーダル */}
+            {showApiKeyModal && (
+              <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 px-5">
+                <div className="w-full max-w-sm rounded-2xl border border-white/10 bg-fog p-6">
+                  <h3 className="text-2xl font-bold text-white">⚙️ API設定</h3>
+                  <p className="mt-3 text-base text-slate-400">
+                    Gemini APIキーを入力してください。キーは端末内にのみ保存されます。
+                  </p>
+                  <p className="mt-2 text-sm text-slate-500">
+                    <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener noreferrer" className="text-mint underline">Google AI Studio</a> から無料で取得できます
+                  </p>
+                  <input
+                    type="password"
+                    className="mt-4 w-full rounded-xl border border-white/10 bg-white/5 px-5 py-4 text-lg text-white placeholder-slate-500"
+                    placeholder="AIza..."
+                    value={apiKeyInput}
+                    onChange={(e) => setApiKeyInput(e.target.value)}
+                  />
+                  <div className="mt-5 flex gap-3">
+                    <button
+                      onClick={() => {
+                        if (apiKeyInput.trim()) {
+                          saveApiKey(apiKeyInput.trim())
+                          setApiKeyInput("")
+                        }
+                        setShowApiKeyModal(false)
+                      }}
+                      className="flex-1 rounded-xl bg-mint py-4 text-lg font-bold text-fog"
+                    >
+                      保存
+                    </button>
+                    <button
+                      onClick={() => {
+                        clearApiKey()
+                        setApiKeyInput("")
+                        setShowApiKeyModal(false)
+                      }}
+                      className="flex-1 rounded-xl border border-red-400/50 bg-red-400/10 py-4 text-lg font-bold text-red-300"
+                    >
+                      削除
+                    </button>
+                  </div>
+                  <button
+                    onClick={() => setShowApiKeyModal(false)}
+                    className="mt-4 w-full text-center text-base text-slate-500"
+                  >
+                    キャンセル
+                  </button>
+                </div>
+              </div>
+            )}
+
             {/* カメラプレビュー (大きく表示) */}
             {cameraActive && (
               <div className="px-4 pt-4">
-                <div className="overflow-hidden rounded-3xl border-2 border-mint/40 bg-black shadow-xl">
+                <div className="relative overflow-hidden rounded-3xl border-2 border-mint/40 bg-black shadow-xl">
+                  {/* 撮影した画像のオーバーレイ */}
+                  {capturedImage && cameraPaused && (
+                    <div className="absolute inset-0 z-10">
+                      <img
+                        src={capturedImage}
+                        alt="撮影画像"
+                        className="h-full w-full object-cover"
+                      />
+                      <div className="absolute inset-0 flex items-center justify-center bg-black/50">
+                        {isProcessing ? (
+                          <div className="text-center">
+                            <div className="mx-auto h-16 w-16 animate-spin rounded-full border-4 border-mint border-t-transparent" />
+                            <p className="mt-4 text-3xl font-bold text-white">📝 認識中...</p>
+                          </div>
+                        ) : (
+                          <div className="text-center">
+                            <p className="text-5xl">✅</p>
+                            <p className="mt-2 text-3xl font-bold text-mint">認識完了!</p>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
                   <video
                     ref={setVideoRef}
                     className="aspect-[3/4] w-full object-cover"
@@ -592,7 +739,7 @@ function App() {
                     muted
                     style={{ backgroundColor: "#0b1224" }}
                   />
-                  {!cameraReady && (
+                  {!cameraReady && !capturedImage && (
                     <p className="bg-white/5 px-4 py-3 text-center text-base text-slate-400">
                       📹 カメラ準備中...
                     </p>
@@ -620,45 +767,45 @@ function App() {
             )}
 
             {/* サマリーカード */}
-            <div className="mt-8 grid grid-cols-2 gap-6 px-6">
-              <div className="rounded-3xl border border-white/10 bg-white/10 p-8">
-                <p className="text-2xl text-slate-400">今月</p>
-                <p className="mt-4 text-6xl font-bold text-mint">{formatCurrency(monthlySpent ?? 0)}</p>
+            <div className="mt-5 grid grid-cols-2 gap-4 px-5">
+              <div className="rounded-2xl border border-white/10 bg-white/10 p-5">
+                <p className="text-base text-slate-400">今月</p>
+                <p className="mt-2 text-3xl font-bold text-mint">{formatCurrency(monthlySpent ?? 0)}</p>
               </div>
-              <div className="rounded-3xl border border-white/10 bg-white/5 p-8">
-                <p className="text-2xl text-slate-400">累計</p>
-                <p className="mt-4 text-6xl font-bold text-white">{formatCurrency(totalSpent ?? 0)}</p>
+              <div className="rounded-2xl border border-white/10 bg-white/5 p-5">
+                <p className="text-base text-slate-400">累計</p>
+                <p className="mt-2 text-3xl font-bold text-white">{formatCurrency(totalSpent ?? 0)}</p>
               </div>
             </div>
 
             {/* 入力フォーム（シンプル版）*/}
-            <div className="mt-8 space-y-8 px-6">
-              <div className="rounded-3xl border border-white/10 bg-white/5 p-8">
-                <h3 className="mb-6 text-4xl font-semibold text-white">📝 レシート入力</h3>
-                <div className="space-y-6">
+            <div className="mt-5 space-y-5 px-5">
+              <div className="rounded-2xl border border-white/10 bg-white/5 p-5">
+                <h3 className="mb-5 text-2xl font-semibold text-white">📝 レシート入力</h3>
+                <div className="space-y-4">
                   <input
-                    className="w-full rounded-2xl border border-white/10 bg-white/5 px-8 py-8 text-4xl text-white placeholder-slate-500"
+                    className="w-full rounded-xl border border-white/10 bg-white/5 px-5 py-4 text-xl text-white placeholder-slate-500"
                     value={draft.storeName}
                     onChange={(e) => setDraft((prev) => ({ ...prev, storeName: e.target.value }))}
                     placeholder="店名"
                   />
-                  <div className="flex gap-5">
+                  <div className="flex gap-3">
                     <input
                       type="date"
-                      className="flex-1 rounded-2xl border border-white/10 bg-white/5 px-6 py-8 text-3xl text-white"
+                      className="flex-1 rounded-xl border border-white/10 bg-white/5 px-4 py-4 text-lg text-white"
                       value={draft.visitedAt}
                       onChange={(e) => setDraft((prev) => ({ ...prev, visitedAt: e.target.value }))}
                     />
                     <input
                       inputMode="numeric"
-                      className="flex-1 rounded-2xl border-2 border-mint/50 bg-mint/10 px-6 py-8 text-5xl font-bold text-mint placeholder-mint/50"
+                      className="flex-1 rounded-xl border-2 border-mint/50 bg-mint/10 px-4 py-4 text-3xl font-bold text-mint placeholder-mint/50"
                       value={draft.total}
                       onChange={(e) => setDraft((prev) => ({ ...prev, total: e.target.value }))}
                       placeholder="¥"
                     />
                   </div>
                   <select
-                    className="w-full rounded-2xl border border-white/10 bg-white/5 px-8 py-8 text-4xl text-white"
+                    className="w-full rounded-xl border border-white/10 bg-white/5 px-5 py-4 text-xl text-white"
                     value={draft.category}
                     onChange={(e) => setDraft((prev) => ({ ...prev, category: e.target.value }))}
                   >
@@ -672,49 +819,83 @@ function App() {
               </div>
 
               {/* 画像保存オプション */}
-              <label className="flex items-center gap-6 px-4 text-3xl text-slate-300">
+              <label className="flex items-center gap-4 px-2 text-lg text-slate-300">
                 <input
                   type="checkbox"
                   checked={saveImage}
                   onChange={(e) => setSaveImage(e.target.checked)}
-                  className="h-10 w-10 rounded"
+                  className="h-6 w-6 rounded"
                 />
                 📷 画像も保存する
               </label>
+
+              {/* OCR設定 */}
+              <div className="rounded-2xl border border-white/10 bg-white/5 p-5">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <span className="text-2xl">🤖</span>
+                    <div>
+                      <p className="text-lg font-semibold text-white">Gemini AI認識</p>
+                      <p className="text-base text-slate-400">
+                        {hasApiKey() ? "✅ 設定済み" : "❌ 未設定"}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <button
+                      onClick={() => setUseGemini(!useGemini)}
+                      className={clsx(
+                        "rounded-full px-4 py-2 text-base font-semibold",
+                        useGemini
+                          ? "bg-mint text-fog"
+                          : "border border-white/20 bg-white/10 text-white"
+                      )}
+                    >
+                      {useGemini ? "ON" : "OFF"}
+                    </button>
+                    <button
+                      onClick={() => setShowApiKeyModal(true)}
+                      className="rounded-full border border-white/20 bg-white/10 px-4 py-2 text-base text-white"
+                    >
+                      ⚙️
+                    </button>
+                  </div>
+                </div>
+              </div>
             </div>
 
             {/* レシート一覧 */}
-            <div className="mt-10 px-6">
+            <div className="mt-6 px-5">
               <div className="flex items-center justify-between">
-                <h3 className="text-4xl font-semibold text-white">📋 レシート一覧</h3>
-                <span className="text-3xl text-slate-400">{session.vault.receipts.length}件</span>
+                <h3 className="text-2xl font-semibold text-white">📋 レシート一覧</h3>
+                <span className="text-lg text-slate-400">{session.vault.receipts.length}件</span>
               </div>
-              <div className="mt-6 space-y-6">
+              <div className="mt-4 space-y-4">
                 {session.vault.receipts.length === 0 ? (
-                  <p className="rounded-3xl bg-white/5 py-16 text-center text-3xl text-slate-400">
+                  <p className="rounded-2xl bg-white/5 py-10 text-center text-lg text-slate-400">
                     まだレシートがありません
                   </p>
                 ) : (
                   displayedReceipts.map((receipt) => (
                     <div
                       key={receipt.id}
-                      className="rounded-3xl border border-white/10 bg-white/5 p-8"
+                      className="rounded-2xl border border-white/10 bg-white/5 p-5"
                     >
                       <div className="flex items-center justify-between">
                         <div>
-                          <p className="text-2xl text-slate-400">{receipt.visitedAt}</p>
-                          <p className="text-4xl font-semibold text-white">{receipt.storeName}</p>
-                          <span className="mt-3 inline-block rounded-full bg-white/10 px-5 py-3 text-2xl text-slate-300">
+                          <p className="text-base text-slate-400">{receipt.visitedAt}</p>
+                          <p className="text-xl font-semibold text-white">{receipt.storeName}</p>
+                          <span className="mt-2 inline-block rounded-full bg-white/10 px-4 py-1.5 text-sm text-slate-300">
                             {receipt.category}
                           </span>
                         </div>
                         <div className="text-right">
-                          <p className="text-6xl font-bold text-mint">
+                          <p className="text-3xl font-bold text-mint">
                             {formatCurrency(receipt.total)}
                           </p>
                           <button
                             onClick={() => handleDeleteReceipt(receipt.id)}
-                            className="mt-4 text-3xl text-red-400"
+                            className="mt-2 text-base text-red-400"
                           >
                             削除
                           </button>
@@ -726,7 +907,7 @@ function App() {
                 {filteredReceipts.length > visibleCount && (
                   <button
                     onClick={() => setVisibleCount((v) => v + 20)}
-                    className="w-full rounded-2xl border border-white/10 bg-white/5 py-7 text-3xl font-semibold text-white"
+                    className="w-full rounded-xl border border-white/10 bg-white/5 py-4 text-lg font-semibold text-white"
                   >
                     もっと見る
                   </button>
@@ -735,15 +916,15 @@ function App() {
             </div>
 
             {/* エクスポート */}
-            <div className="mt-10 px-6 pb-8">
-              <div className="flex gap-6">
+            <div className="mt-6 px-5 pb-8">
+              <div className="flex gap-4">
                 <button
                   onClick={handleExport}
-                  className="flex-1 rounded-2xl border border-white/15 bg-white/10 py-7 text-3xl font-semibold text-white"
+                  className="flex-1 rounded-xl border border-white/15 bg-white/10 py-4 text-lg font-semibold text-white"
                 >
                   📤 CSV保存
                 </button>
-                <label className="flex flex-1 cursor-pointer items-center justify-center rounded-2xl border border-white/15 bg-white/10 py-7 text-3xl font-semibold text-white">
+                <label className="flex flex-1 cursor-pointer items-center justify-center rounded-xl border border-white/15 bg-white/10 py-4 text-lg font-semibold text-white">
                   📥 CSV読込
                   <input
                     type="file"
@@ -764,12 +945,12 @@ function App() {
 
         {/* スマホ用固定フッター */}
         {session && (
-          <div className="fixed inset-x-0 bottom-0 z-30 border-t border-white/10 bg-fog/95 px-6 py-8 backdrop-blur-lg">
-            <div className="flex items-center gap-6">
+          <div className="fixed inset-x-0 bottom-0 z-30 border-t border-white/10 bg-fog/95 px-5 py-5 backdrop-blur-lg">
+            <div className="flex items-center gap-4">
               <button
                 onClick={cameraActive ? stopCamera : startCamera}
                 className={clsx(
-                  "flex-1 rounded-2xl py-10 text-4xl font-bold",
+                  "flex-1 rounded-xl py-5 text-xl font-bold",
                   cameraActive
                     ? "border border-white/20 bg-white/10 text-white"
                     : "border-2 border-mint/60 bg-mint/20 text-mint"
@@ -779,14 +960,19 @@ function App() {
               </button>
               <button
                 onClick={captureFromCamera}
-                disabled={!cameraActive}
-                className="flex-[1.5] rounded-2xl border-2 border-mint bg-mint py-10 text-5xl font-bold text-fog shadow-lg disabled:opacity-50"
+                disabled={!cameraActive || isProcessing}
+                className={clsx(
+                  "flex-[1.5] rounded-xl border-2 py-5 text-3xl font-bold shadow-lg disabled:opacity-50",
+                  isProcessing
+                    ? "animate-pulse border-yellow-400 bg-yellow-400/30 text-yellow-200"
+                    : "border-mint bg-mint text-fog"
+                )}
               >
-                📸 撮影
+                {isProcessing ? "⏳" : "📸 撮影"}
               </button>
               <button
                 onClick={handleSaveReceipt}
-                className="flex-1 rounded-2xl border border-white/20 bg-white/15 py-10 text-4xl font-bold text-white"
+                className="flex-1 rounded-xl border border-white/20 bg-white/15 py-5 text-xl font-bold text-white"
               >
                 💾 保存
               </button>
@@ -800,6 +986,58 @@ function App() {
   // ========== PC用UI (従来のレイアウト) ==========
   return (
     <div className="min-h-screen text-sand">
+      {/* PC用APIキー設定モーダル */}
+      {showApiKeyModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70">
+          <div className="w-full max-w-md rounded-2xl border border-white/10 bg-fog p-6">
+            <h3 className="text-xl font-bold text-white">⚙️ Gemini API設定</h3>
+            <p className="mt-3 text-sm text-slate-400">
+              Gemini APIキーを入力してください。キーは端末内（localStorage）にのみ保存され、サーバーには送信されません。
+            </p>
+            <p className="mt-2 text-xs text-slate-500">
+              APIキーは <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener noreferrer" className="text-mint underline">Google AI Studio</a> から無料で取得できます。
+            </p>
+            <input
+              type="password"
+              className="mt-4 w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-base text-white placeholder-slate-500"
+              placeholder="AIza..."
+              value={apiKeyInput}
+              onChange={(e) => setApiKeyInput(e.target.value)}
+            />
+            <div className="mt-4 flex gap-3">
+              <button
+                onClick={() => {
+                  if (apiKeyInput.trim()) {
+                    saveApiKey(apiKeyInput.trim())
+                    setApiKeyInput("")
+                  }
+                  setShowApiKeyModal(false)
+                }}
+                className="flex-1 rounded-xl bg-mint py-3 text-sm font-bold text-fog transition hover:bg-mint/80"
+              >
+                保存
+              </button>
+              <button
+                onClick={() => {
+                  clearApiKey()
+                  setApiKeyInput("")
+                  setShowApiKeyModal(false)
+                }}
+                className="flex-1 rounded-xl border border-red-400/50 bg-red-400/10 py-3 text-sm font-bold text-red-300 transition hover:bg-red-400/20"
+              >
+                削除
+              </button>
+            </div>
+            <button
+              onClick={() => setShowApiKeyModal(false)}
+              className="mt-3 w-full text-center text-sm text-slate-500 hover:text-slate-300"
+            >
+              キャンセル
+            </button>
+          </div>
+        </div>
+      )}
+
       <div className="mx-auto flex w-full max-w-6xl flex-col gap-8 px-6 pt-8 pb-8">
         <header className="flex items-center justify-between">
           <div className="flex items-center gap-4">
@@ -920,10 +1158,15 @@ function App() {
                         </button>
                         <button
                           onClick={captureFromCamera}
-                          disabled={!cameraActive}
-                          className="flex-1 rounded-xl border border-mint/60 bg-mint/10 px-4 py-2 text-sm font-semibold text-mint transition hover:bg-mint/20 disabled:opacity-50 disabled:cursor-not-allowed"
+                          disabled={!cameraActive || isProcessing}
+                          className={clsx(
+                            "flex-1 rounded-xl border px-4 py-2 text-sm font-semibold transition disabled:opacity-50 disabled:cursor-not-allowed",
+                            isProcessing
+                              ? "animate-pulse border-yellow-400/60 bg-yellow-400/20 text-yellow-200"
+                              : "border-mint/60 bg-mint/10 text-mint hover:bg-mint/20"
+                          )}
                         >
-                          シャッター
+                          {isProcessing ? "認識中..." : "シャッター"}
                         </button>
                       </div>
                       <label className="flex items-center gap-2">
@@ -934,6 +1177,35 @@ function App() {
                         />
                         圧縮画像を保存 (長辺1280px / JPEG 0.6)
                       </label>
+                      {/* Gemini AI設定 */}
+                      <div className="flex items-center justify-between rounded-xl border border-white/10 bg-white/5 px-3 py-2">
+                        <div className="flex items-center gap-2">
+                          <span>🤖</span>
+                          <span className="text-white">Gemini AI</span>
+                          <span className={hasApiKey() ? "text-mint" : "text-slate-500"}>
+                            {hasApiKey() ? "✅" : "❌"}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <button
+                            onClick={() => setUseGemini(!useGemini)}
+                            className={clsx(
+                              "rounded-full px-3 py-1 text-xs font-semibold",
+                              useGemini
+                                ? "bg-mint text-fog"
+                                : "border border-white/20 bg-white/10 text-white"
+                            )}
+                          >
+                            {useGemini ? "ON" : "OFF"}
+                          </button>
+                          <button
+                            onClick={() => setShowApiKeyModal(true)}
+                            className="rounded-full border border-white/20 bg-white/10 px-2 py-1 text-xs text-white hover:bg-white/20"
+                          >
+                            ⚙️
+                          </button>
+                        </div>
+                      </div>
                       <div className="flex gap-2">
                         <button
                           onClick={clearDraft}
@@ -1354,22 +1626,22 @@ const UnlockPanel = ({
   if (isMobile) {
     // スマホ用UI
     return (
-      <div className="flex flex-col gap-10">
-        <label className="text-4xl text-slate-200">
+      <div className="flex flex-col gap-5">
+        <label className="text-lg text-slate-200">
           🔑 パスフレーズ
           <input
             type="password"
-            className="mt-6 w-full rounded-2xl border border-white/10 bg-white/5 px-8 py-10 text-5xl text-white outline-none ring-mint/30 focus:ring-2"
+            className="mt-3 w-full rounded-xl border border-white/10 bg-white/5 px-5 py-5 text-xl text-white outline-none ring-mint/30 focus:ring-2"
             placeholder="パスフレーズを入力"
             value={value}
             onChange={(e) => setValue(e.target.value)}
           />
         </label>
-        {error && <p className="text-3xl text-red-300">{error}</p>}
+        {error && <p className="text-base text-red-300">{error}</p>}
         <button
           onClick={() => onUnlock(value)}
           disabled={unlocking || value.length < 4}
-          className="w-full rounded-2xl bg-gradient-to-r from-mint/70 to-mint px-8 py-12 text-5xl font-bold text-fog shadow-soft transition hover:translate-y-[-1px] disabled:cursor-not-allowed disabled:opacity-60"
+          className="w-full rounded-xl bg-gradient-to-r from-mint/70 to-mint px-5 py-5 text-xl font-bold text-fog shadow-soft transition hover:translate-y-[-1px] disabled:cursor-not-allowed disabled:opacity-60"
         >
           {unlocking ? "🔓 復号中..." : "🔐 データを開く"}
         </button>
