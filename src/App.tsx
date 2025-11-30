@@ -625,10 +625,10 @@ function App() {
     return (
       <div className="min-h-screen bg-fog text-sand text-lg">
         {/* スマホ用ヘッダー */}
-        <header className="sticky top-0 z-20 border-b border-white/10 bg-fog/95 backdrop-blur-lg" style={{ padding: '20px 24px' }}>
+        <header className="sticky top-0 z-20 border-b border-white/10 bg-fog/95 backdrop-blur-lg" style={{ padding: '24px 28px' }}>
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
-              <div className="rounded-full bg-gradient-to-r from-mint/60 to-mint/30 p-[2px]" style={{ width: '64px', height: '64px' }}>
+              <div className="rounded-full bg-gradient-to-r from-mint/60 to-mint/30 p-[2px]" style={{ width: '72px', height: '72px' }}>
                 <div className="h-full w-full rounded-full bg-fog/90 p-[1px]">
                   <img
                     src={`${import.meta.env.BASE_URL}turtle_icon_receipt.png`}
@@ -637,15 +637,15 @@ function App() {
                   />
                 </div>
               </div>
-              <h1 className="font-bold text-white" style={{ fontSize: '32px' }}>サッとレシート</h1>
+              <h1 className="font-bold text-white" style={{ fontSize: '40px' }}>サッとレシート</h1>
             </div>
             {session && (
               <button
                 onClick={handleLock}
                 className="rounded-full border border-white/20 bg-white/10 font-semibold text-white"
-                style={{ fontSize: '22px', padding: '16px 24px', minHeight: '60px' }}
+                style={{ fontSize: '28px', padding: '20px 28px', minHeight: '72px' }}
               >
-                🔒 ログアウト
+                ログアウト
               </button>
             )}
           </div>
@@ -799,28 +799,28 @@ function App() {
               </div>
             )}
 
-            {/* サマリーカード */}
-            <div className="mt-4 grid grid-cols-2 gap-3 px-4">
-              <div className="rounded-2xl border border-white/10 bg-white/10" style={{ padding: '24px' }}>
-                <p style={{ fontSize: '22px' }} className="text-slate-400">今月</p>
-                <p style={{ fontSize: '36px', marginTop: '10px' }} className="font-bold text-mint">{formatCurrency(monthlySpent ?? 0)}</p>
+            {/* サマリーカード - 1列レイアウト */}
+            <div className="mt-4 space-y-3 px-4">
+              <div className="rounded-2xl border border-white/10 bg-white/10" style={{ padding: '28px' }}>
+                <p style={{ fontSize: '32px' }} className="text-slate-400">今月</p>
+                <p style={{ fontSize: '56px', marginTop: '12px' }} className="font-bold text-mint">{formatCurrency(monthlySpent ?? 0)}</p>
               </div>
-              <div className="rounded-2xl border border-white/10 bg-white/5" style={{ padding: '24px' }}>
-                <p style={{ fontSize: '22px' }} className="text-slate-400">今年</p>
-                <p style={{ fontSize: '36px', marginTop: '10px' }} className="font-bold text-white">{formatCurrency(yearlySpent ?? 0)}</p>
+              <div className="rounded-2xl border border-white/10 bg-white/5" style={{ padding: '28px' }}>
+                <p style={{ fontSize: '32px' }} className="text-slate-400">今年</p>
+                <p style={{ fontSize: '56px', marginTop: '12px' }} className="font-bold text-white">{formatCurrency(yearlySpent ?? 0)}</p>
               </div>
             </div>
 
             {/* 月別合計 */}
             {monthlyTotals.length > 0 && (
               <div className="mt-3 px-4">
-                <div className="rounded-2xl border border-white/10 bg-white/5" style={{ padding: '24px' }}>
-                  <p className="font-semibold text-white" style={{ fontSize: '24px', marginBottom: '20px' }}>📅 月別合計</p>
-                  <div className="space-y-3">
+                <div className="rounded-2xl border border-white/10 bg-white/5" style={{ padding: '28px' }}>
+                  <p className="font-semibold text-white" style={{ fontSize: '36px', marginBottom: '24px' }}>月別合計</p>
+                  <div className="space-y-4">
                     {monthlyTotals.slice(0, 6).map((entry) => (
-                      <div key={entry.month} className="flex items-center justify-between" style={{ padding: '10px 0' }}>
-                        <span className="text-slate-300" style={{ fontSize: '24px' }}>{entry.month}</span>
-                        <span className="font-semibold text-mint" style={{ fontSize: '28px' }}>{formatCurrency(entry.total)}</span>
+                      <div key={entry.month} className="flex items-center justify-between" style={{ padding: '12px 0' }}>
+                        <span className="text-slate-300" style={{ fontSize: '36px' }}>{entry.month}</span>
+                        <span className="font-semibold text-mint" style={{ fontSize: '44px' }}>{formatCurrency(entry.total)}</span>
                       </div>
                     ))}
                   </div>
@@ -830,39 +830,39 @@ function App() {
 
             {/* 入力フォーム（シンプル版）*/}
             <div className="mt-4 space-y-4 px-4">
-              <div className="rounded-2xl border border-white/10 bg-white/5" style={{ padding: '24px' }}>
-                <h3 style={{ fontSize: '26px', marginBottom: '20px' }} className="font-semibold text-white">📝 レシート入力</h3>
+              <div className="rounded-2xl border border-white/10 bg-white/5" style={{ padding: '28px' }}>
+                <h3 style={{ fontSize: '40px', marginBottom: '24px' }} className="font-semibold text-white">レシート入力</h3>
                 <div className="space-y-4">
                   <input
                     className="w-full rounded-xl border border-white/10 bg-white/5 text-white placeholder-slate-500"
-                    style={{ fontSize: '24px', padding: '20px', minHeight: '68px' }}
+                    style={{ fontSize: '36px', padding: '24px', minHeight: '80px' }}
                     value={draft.storeName}
                     onChange={(e) => setDraft((prev) => ({ ...prev, storeName: e.target.value }))}
                     placeholder="店名"
                   />
-                  <div className="flex gap-3">
+                  {/* 日付 - 1列 */}
+                  <input
+                    type="date"
+                    className="w-full rounded-xl border border-white/10 bg-white/5 text-white"
+                    style={{ fontSize: '36px', padding: '24px', minHeight: '80px' }}
+                    value={draft.visitedAt}
+                    onChange={(e) => setDraft((prev) => ({ ...prev, visitedAt: e.target.value }))}
+                  />
+                  {/* 金額 - 1列 */}
+                  <div className="flex items-center rounded-xl border-2 border-mint/50 bg-mint/10" style={{ padding: '20px 24px', minHeight: '80px' }}>
+                    <span style={{ fontSize: '48px' }} className="font-bold text-mint/70">¥</span>
                     <input
-                      type="date"
-                      className="flex-1 rounded-xl border border-white/10 bg-white/5 text-white"
-                      style={{ fontSize: '22px', padding: '18px', minHeight: '68px' }}
-                      value={draft.visitedAt}
-                      onChange={(e) => setDraft((prev) => ({ ...prev, visitedAt: e.target.value }))}
+                      inputMode="numeric"
+                      className="w-full bg-transparent font-bold text-mint placeholder-mint/50 outline-none"
+                      style={{ fontSize: '48px' }}
+                      value={draft.total}
+                      onChange={(e) => setDraft((prev) => ({ ...prev, total: e.target.value }))}
+                      placeholder="0"
                     />
-                    <div className="flex flex-1 items-center rounded-xl border-2 border-mint/50 bg-mint/10" style={{ padding: '16px 20px', minHeight: '68px' }}>
-                      <span style={{ fontSize: '32px' }} className="font-bold text-mint/70">¥</span>
-                      <input
-                        inputMode="numeric"
-                        className="w-full bg-transparent font-bold text-mint placeholder-mint/50 outline-none"
-                        style={{ fontSize: '32px' }}
-                        value={draft.total}
-                        onChange={(e) => setDraft((prev) => ({ ...prev, total: e.target.value }))}
-                        placeholder="0"
-                      />
-                    </div>
                   </div>
                   <select
                     className="w-full rounded-xl border border-white/10 bg-white/5 text-white"
-                    style={{ fontSize: '24px', padding: '20px', minHeight: '68px' }}
+                    style={{ fontSize: '36px', padding: '24px', minHeight: '80px' }}
                     value={draft.category}
                     onChange={(e) => setDraft((prev) => ({ ...prev, category: e.target.value }))}
                   >
@@ -876,23 +876,23 @@ function App() {
               </div>
 
               {/* 画像保存オプション */}
-              <label className="flex items-center gap-4 px-2 text-slate-300" style={{ fontSize: '24px' }}>
+              <label className="flex items-center gap-4 px-2 text-slate-300" style={{ fontSize: '36px' }}>
                 <input
                   type="checkbox"
                   checked={saveImage}
                   onChange={(e) => setSaveImage(e.target.checked)}
                   className="rounded"
-                  style={{ width: '36px', height: '36px' }}
+                  style={{ width: '48px', height: '48px' }}
                 />
                 カメラ画像も保存する
               </label>
 
               {/* OCR設定 */}
-              <div className="rounded-2xl border border-white/10 bg-white/5" style={{ padding: '24px' }}>
+              <div className="rounded-2xl border border-white/10 bg-white/5" style={{ padding: '28px' }}>
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="font-semibold text-white" style={{ fontSize: '26px' }}>Gemini AI認識</p>
-                    <p className="text-slate-400" style={{ fontSize: '22px' }}>
+                    <p className="font-semibold text-white" style={{ fontSize: '36px' }}>Gemini AI認識</p>
+                    <p className="text-slate-400" style={{ fontSize: '32px', marginTop: '8px' }}>
                       {hasApiKey() ? "✅ 設定済み" : "❌ 未設定"}
                     </p>
                   </div>
@@ -905,14 +905,14 @@ function App() {
                           ? "bg-mint text-fog"
                           : "border border-white/20 bg-white/10 text-white"
                       )}
-                      style={{ fontSize: '24px', padding: '18px 28px', minHeight: '64px' }}
+                      style={{ fontSize: '36px', padding: '24px 36px', minHeight: '80px' }}
                     >
                       {useGemini ? "ON" : "OFF"}
                     </button>
                     <button
                       onClick={() => setShowApiKeyModal(true)}
                       className="rounded-full border border-white/20 bg-white/10 text-white"
-                      style={{ fontSize: '28px', padding: '16px 22px', minHeight: '64px' }}
+                      style={{ fontSize: '40px', padding: '20px 28px', minHeight: '80px' }}
                     >
                       ⚙️
                     </button>
@@ -924,12 +924,12 @@ function App() {
             {/* レシート一覧 */}
             <div className="mt-5 px-4">
               <div className="flex items-center justify-between">
-                <h3 className="font-semibold text-white" style={{ fontSize: '26px' }}>📋 レシート一覧</h3>
-                <span className="text-slate-400" style={{ fontSize: '24px' }}>{session.vault.receipts.length}件</span>
+                <h3 className="font-semibold text-white" style={{ fontSize: '40px' }}>レシート一覧</h3>
+                <span className="text-slate-400" style={{ fontSize: '36px' }}>{session.vault.receipts.length}件</span>
               </div>
-              <div className="mt-3 space-y-4">
+              <div className="mt-4 space-y-4">
                 {session.vault.receipts.length === 0 ? (
-                  <p className="rounded-2xl bg-white/5 text-center text-slate-400" style={{ fontSize: '24px', padding: '44px 24px' }}>
+                  <p className="rounded-2xl bg-white/5 text-center text-slate-400" style={{ fontSize: '36px', padding: '48px 24px' }}>
                     まだレシートがありません
                   </p>
                 ) : (
@@ -937,24 +937,24 @@ function App() {
                     <div
                       key={receipt.id}
                       className="rounded-2xl border border-white/10 bg-white/5"
-                      style={{ padding: '24px' }}
+                      style={{ padding: '28px' }}
                     >
                       <div className="flex items-center justify-between">
                         <div>
-                          <p className="text-slate-400" style={{ fontSize: '22px' }}>{receipt.visitedAt}</p>
-                          <p className="font-semibold text-white" style={{ fontSize: '26px', marginTop: '6px' }}>{receipt.storeName}</p>
-                          <span className="inline-block rounded-full bg-white/10 text-slate-300" style={{ fontSize: '20px', padding: '10px 20px', marginTop: '12px' }}>
+                          <p className="text-slate-400" style={{ fontSize: '32px' }}>{receipt.visitedAt}</p>
+                          <p className="font-semibold text-white" style={{ fontSize: '40px', marginTop: '8px' }}>{receipt.storeName}</p>
+                          <span className="inline-block rounded-full bg-white/10 text-slate-300" style={{ fontSize: '28px', padding: '12px 24px', marginTop: '14px' }}>
                             {receipt.category}
                           </span>
                         </div>
                         <div className="text-right">
-                          <p className="font-bold text-mint" style={{ fontSize: '36px' }}>
+                          <p className="font-bold text-mint" style={{ fontSize: '48px' }}>
                             {formatCurrency(receipt.total)}
                           </p>
                           <button
                             onClick={() => handleDeleteReceipt(receipt.id)}
                             className="text-red-400"
-                            style={{ fontSize: '22px', marginTop: '12px', padding: '8px 0' }}
+                            style={{ fontSize: '32px', marginTop: '14px', padding: '10px 0' }}
                           >
                             削除
                           </button>
@@ -967,7 +967,7 @@ function App() {
                   <button
                     onClick={() => setVisibleCount((v) => v + 20)}
                     className="w-full rounded-xl border border-white/10 bg-white/5 font-semibold text-white"
-                    style={{ fontSize: '24px', padding: '22px', minHeight: '72px' }}
+                    style={{ fontSize: '36px', padding: '28px', minHeight: '90px' }}
                   >
                     もっと見る
                   </button>
@@ -975,39 +975,37 @@ function App() {
               </div>
             </div>
 
-            {/* エクスポート */}
-            <div className="mt-5 px-4 pb-6">
-              <div className="flex gap-4">
-                <button
-                  onClick={handleExport}
-                  className="flex-1 rounded-xl border border-white/15 bg-white/10 font-semibold text-white"
-                  style={{ fontSize: '24px', padding: '24px', minHeight: '76px' }}
-                >
-                  📤 CSVを保存
-                </button>
-                <label className="flex flex-1 cursor-pointer items-center justify-center rounded-xl border border-white/15 bg-white/10 font-semibold text-white" style={{ fontSize: '24px', padding: '24px', minHeight: '76px' }}>
-                  📥 CSVを読込
-                  <input
-                    type="file"
-                    accept=".csv,text/csv"
-                    className="hidden"
-                    onChange={(e) => {
-                      const file = e.target.files?.[0]
-                      if (!file) return
-                      handleImportCsv(file)
-                      e.target.value = ""
-                    }}
-                  />
-                </label>
-              </div>
+            {/* エクスポート - 1列レイアウト */}
+            <div className="mt-5 px-4 pb-6 space-y-3">
+              <button
+                onClick={handleExport}
+                className="w-full rounded-xl border border-white/15 bg-white/10 font-semibold text-white"
+                style={{ fontSize: '36px', padding: '28px', minHeight: '90px' }}
+              >
+                CSVを保存
+              </button>
+              <label className="flex w-full cursor-pointer items-center justify-center rounded-xl border border-white/15 bg-white/10 font-semibold text-white" style={{ fontSize: '36px', padding: '28px', minHeight: '90px' }}>
+                CSVを読込
+                <input
+                  type="file"
+                  accept=".csv,text/csv"
+                  className="hidden"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0]
+                    if (!file) return
+                    handleImportCsv(file)
+                    e.target.value = ""
+                  }}
+                />
+              </label>
             </div>
           </div>
         )}
 
         {/* スマホ用固定フッター */}
         {session && (
-          <div className="fixed inset-x-0 bottom-0 z-30 border-t border-white/10 bg-fog/95 backdrop-blur-lg safe-area-pb" style={{ padding: '16px 20px' }}>
-            <div className="flex items-center gap-3">
+          <div className="fixed inset-x-0 bottom-0 z-30 border-t border-white/10 bg-fog/95 backdrop-blur-lg safe-area-pb" style={{ padding: '20px 24px' }}>
+            <div className="flex items-center gap-4">
               <button
                 onClick={cameraActive ? stopCamera : startCamera}
                 className={clsx(
@@ -1016,7 +1014,7 @@ function App() {
                     ? "border-2 border-white/30 bg-white/10 text-white"
                     : "border-2 border-mint/60 bg-mint/20 text-mint"
                 )}
-                style={{ minHeight: '76px', fontSize: '22px' }}
+                style={{ minHeight: '90px', fontSize: '32px' }}
               >
                 {cameraActive ? "カメラOFF" : "カメラON"}
               </button>
@@ -1029,14 +1027,14 @@ function App() {
                     ? "animate-pulse border-yellow-400 bg-yellow-400/30 text-yellow-200"
                     : "border-mint bg-mint text-fog"
                 )}
-                style={{ minHeight: '88px', fontSize: '26px' }}
+                style={{ minHeight: '100px', fontSize: '40px' }}
               >
                 {isProcessing ? "処理中..." : "撮影"}
               </button>
               <button
                 onClick={handleSaveReceipt}
                 className="flex-1 rounded-2xl border-2 border-white/30 bg-white/15 font-bold text-white"
-                style={{ minHeight: '76px', fontSize: '22px' }}
+                style={{ minHeight: '90px', fontSize: '32px' }}
               >
                 保存
               </button>
