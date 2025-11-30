@@ -1,5 +1,5 @@
 ﻿import type { ReactNode } from "react"
-import { useCallback, useMemo, useState } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { clsx } from "clsx"
 import { downloadCsv, toCsv } from "./lib/csv"
 import { runOcr } from "./lib/ocr"
@@ -7,7 +7,6 @@ import { decryptVault, deriveKey, encryptVault, getOrCreateSalt } from "./lib/cr
 import { clearVault, loadVault, saveVault } from "./lib/db"
 import type { Category, LineItem, Receipt, Vault } from "./lib/types"
 import { importCsvToReceipts } from "./lib/csvImport"
-import { useEffect, useRef } from "react"
 
 import "./index.css"
 
@@ -137,8 +136,6 @@ function App() {
   const [cameraActive, setCameraActive] = useState(false)
   const [cameraError, setCameraError] = useState<string | null>(null)
   const [cameraReady, setCameraReady] = useState(false)
-  const [videoDevices, setVideoDevices] = useState<MediaDeviceInfo[]>([])
-  const [selectedDeviceId, setSelectedDeviceId] = useState("")
 
   // ビデオ要素にストリームを接続する処理
   const attachStreamToVideo = useCallback((video: HTMLVideoElement, stream: MediaStream) => {
@@ -335,7 +332,7 @@ function App() {
     setCameraReady(false)
     setCameraError(null)
     const constraints: MediaStreamConstraints = {
-      video: selectedDeviceId ? { deviceId: { exact: selectedDeviceId } } : { facingMode: "environment" },
+      video: { facingMode: "environment", width: { ideal: 1280 }, height: { ideal: 720 } },
       audio: false,
     }
     try {
@@ -380,21 +377,6 @@ function App() {
     }
   }, [])
 
-  useEffect(() => {
-    const refreshDevices = async () => {
-      try {
-        const devices = await navigator.mediaDevices.enumerateDevices()
-        const videos = devices.filter((d) => d.kind === "videoinput")
-        setVideoDevices(videos)
-        if (videos.length && !selectedDeviceId) {
-          setSelectedDeviceId(videos[0].deviceId)
-        }
-      } catch (e) {
-        console.warn("enumerateDevices failed", e)
-      }
-    }
-    refreshDevices()
-  }, [selectedDeviceId])
 
   const captureFromCamera = async () => {
     if (!videoRef.current) {
@@ -483,16 +465,27 @@ function App() {
   const lastReceipt = session?.vault.receipts[0]
   return (
     <div className="min-h-screen text-sand">
-      <div className="mx-auto flex max-w-6xl flex-col gap-8 px-4 py-8">
-        <header className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.3em] text-mint">
-              Encrypted PWA ledger
-            </p>
-            <h1 className="mt-2 text-3xl font-bold text-white">Receipt Vault</h1>
-            <p className="text-slate-400">
-              GitHub Pages で配信しつつ、データは端末内で暗号化保存。
-            </p>
+      <div className="mx-auto flex max-w-6xl flex-col gap-8 px-4 pt-8 pb-28 lg:pb-8">
+        <header className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex items-center gap-4">
+            <div className="relative h-14 w-14 shrink-0 rounded-full bg-gradient-to-r from-mint/60 to-mint/30 p-[2px] shadow-soft">
+              <div className="h-full w-full rounded-full bg-fog/90 p-[1px]">
+                <img
+                  src={`${import.meta.env.BASE_URL}turtle_icon_receipt.png`}
+                  alt="サッとレシートアイコン"
+                  className="h-full w-full rounded-full object-cover"
+                />
+              </div>
+            </div>
+            <div className="leading-tight">
+              <p className="text-xs font-semibold uppercase tracking-[0.3em] text-mint">
+                Encrypted Offline Receipt Ledger
+              </p>
+              <h1 className="mt-1 text-3xl font-bold text-white">サッとレシート</h1>
+              <p className="text-slate-300">
+                買い物ごとにパシャと、端末に残す。ネット不要のレシートノート。
+              </p>
+            </div>
           </div>
           {session && (
             <div className="flex flex-wrap gap-2">
@@ -542,8 +535,8 @@ function App() {
             </div>
           </div>
         ) : (
-          <main className="grid gap-6 lg:grid-cols-[1.6fr_1fr]">
-            <section className="space-y-6">
+          <main className="grid gap-6 lg:auto-rows-min lg:grid-cols-[1.6fr_1fr]">
+            <section className="space-y-6 lg:col-start-1 lg:row-start-1 order-1">
               <div className="rounded-3xl border border-white/10 bg-white/5 p-6 shadow-soft space-y-4">
                 <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
                   <div>
@@ -596,30 +589,6 @@ function App() {
                           className="flex-1 rounded-xl border border-mint/60 bg-mint/10 px-4 py-2 text-sm font-semibold text-mint transition hover:bg-mint/20 disabled:opacity-50 disabled:cursor-not-allowed"
                         >
                           シャッター
-                        </button>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <select
-                          className="flex-1 rounded-xl border border-white/10 bg-white/10 px-3 py-2 text-white outline-none ring-mint/30 focus:ring-2"
-                          value={selectedDeviceId}
-                          onChange={(e) => setSelectedDeviceId(e.target.value)}
-                        >
-                          {videoDevices.map((d) => (
-                            <option key={d.deviceId} value={d.deviceId}>
-                              {d.label || "カメラ"}
-                            </option>
-                          ))}
-                          {videoDevices.length === 0 && <option value="">カメラが見つかりません</option>}
-                        </select>
-                        <button
-                          onClick={() => navigator.mediaDevices.enumerateDevices().then((devices) => {
-                            const videos = devices.filter((dev) => dev.kind === "videoinput")
-                            setVideoDevices(videos)
-                            if (videos.length && !selectedDeviceId) setSelectedDeviceId(videos[0].deviceId)
-                          })}
-                          className="rounded-xl border border-white/15 bg-white/5 px-3 py-2 text-xs font-semibold text-white transition hover:border-white/25 hover:bg-white/10"
-                        >
-                          更新
                         </button>
                       </div>
                       <label className="flex items-center gap-2">
@@ -781,144 +750,8 @@ function App() {
                 </div>
               </div>
 
-              <div className="rounded-3xl border border-white/10 bg-white/5 p-6">
-                <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-                  <div>
-                    <h2 className="text-xl font-semibold text-white">レシート一覧</h2>
-                    <p className="text-sm text-slate-400">検索とカテゴリフィルタで絞り込みできます。</p>
-                  </div>
-                <div className="flex flex-wrap gap-2">
-                  <input
-                    className="w-48 rounded-full border border-white/15 bg-white/10 px-3 py-2 text-sm text-white outline-none ring-mint/30 focus:ring-2"
-                    placeholder="店名・メモで検索"
-                    value={filters.query}
-                    onChange={(e) => setFilters((prev) => ({ ...prev, query: e.target.value }))}
-                  />
-                  <select
-                    className="rounded-full border border-white/15 bg-white/10 px-3 py-2 text-sm text-white outline-none ring-mint/30 focus:ring-2"
-                    value={filters.category}
-                    onChange={(e) => setFilters((prev) => ({ ...prev, category: e.target.value }))}
-                  >
-                    <option value="all">すべて</option>
-                    {categories.map((cat) => (
-                      <option key={cat.id} value={cat.name}>
-                        {cat.name}
-                      </option>
-                    ))}
-                  </select>
-                  {filteredReceipts.length > visibleCount && (
-                    <button
-                      onClick={() => setVisibleCount((v) => v + 20)}
-                      className="rounded-full border border-white/15 bg-white/10 px-3 py-2 text-sm font-semibold text-white hover:border-white/25 hover:bg-white/15"
-                    >
-                      もっと見る
-                    </button>
-                  )}
-                  {filteredReceipts.length > 0 && visibleCount > 20 && (
-                    <button
-                      onClick={() => setVisibleCount(20)}
-                      className="rounded-full border border-white/15 bg-white/10 px-3 py-2 text-sm font-semibold text-white hover:border-white/25 hover:bg-white/15"
-                    >
-                      先頭に戻す
-                    </button>
-                  )}
-                </div>
-              </div>
-
-              <div className="mt-4 space-y-4">
-                {filteredReceipts.length === 0 && (
-                  <p className="text-sm text-slate-400">まだレシートがありません。アップロードして保存してください。</p>
-                )}
-                {displayedReceipts.map((receipt) => (
-                  <article
-                    key={receipt.id}
-                    className="rounded-2xl border border-white/10 bg-white/5 p-4"
-                  >
-                    <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
-                        <div>
-                          <p className="text-sm uppercase tracking-[0.15em] text-slate-400">
-                            {receipt.visitedAt}
-                          </p>
-                          <h3 className="text-xl font-semibold text-white">
-                            {receipt.storeName}
-                          </h3>
-                          {receipt.category && (
-                            <span className="mt-1 inline-block rounded-full border border-white/15 bg-white/5 px-2 py-1 text-xs text-slate-200">
-                              {receipt.category}
-                            </span>
-                          )}
-                          <p className="text-slate-400">{receipt.note ?? "メモなし"}</p>
-                        </div>
-                        <div className="flex items-center gap-3">
-                          <div className="text-right">
-                            <p className="text-2xl font-bold text-mint">
-                              {formatCurrency(receipt.total)}
-                            </p>
-                            {receipt.category && (
-                              <p className="text-xs text-slate-400">{receipt.category}</p>
-                            )}
-                          </div>
-                          <button
-                            onClick={() => handleDeleteReceipt(receipt.id)}
-                            className="rounded-full border border-red-500/40 bg-red-500/10 px-3 py-2 text-xs font-semibold text-red-100 transition hover:bg-red-500/20"
-                          >
-                            削除
-                          </button>
-                        </div>
-                      </div>
-                      {receipt.imageData && (
-                        <div className="mt-3 overflow-hidden rounded-xl border border-white/10 bg-black/30">
-                          <div className="flex items-center justify-between px-3 py-2">
-                            <p className="text-sm text-slate-200">画像</p>
-                            <button
-                              onClick={() =>
-                                setExpandedImages((prev) => {
-                                  const next = new Set(prev)
-                                  if (next.has(receipt.id)) next.delete(receipt.id)
-                                  else next.add(receipt.id)
-                                  return next
-                                })
-                              }
-                              className="rounded-full border border-white/15 bg-white/5 px-3 py-1 text-xs font-semibold text-white hover:border-white/25 hover:bg-white/10"
-                            >
-                              {expandedImages.has(receipt.id) ? "閉じる" : "表示"}
-                            </button>
-                          </div>
-                          {expandedImages.has(receipt.id) && (
-                            <img
-                              src={receipt.imageData}
-                              alt="レシート画像"
-                              className="max-h-64 w-full object-contain"
-                            />
-                          )}
-                        </div>
-                      )}
-                      {receipt.lineItems.length > 0 && (
-                        <div className="mt-3 grid gap-2 md:grid-cols-2">
-                          {receipt.lineItems.map((line) => (
-                            <div
-                              key={line.id}
-                              className="flex items-center justify-between rounded-xl border border-white/10 bg-white/5 px-3 py-2"
-                            >
-                              <div>
-                                <p className="text-sm text-white">{line.name}</p>
-                                <p className="text-xs text-slate-400">
-                                  {line.category} / x{line.quantity}
-                                </p>
-                              </div>
-                              <p className="text-sm font-semibold text-mint">
-                                {formatCurrency(line.price * line.quantity)}
-                              </p>
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                    </article>
-                  ))}
-                </div>
-              </div>
             </section>
-            <aside className="space-y-4 rounded-3xl border border-white/10 bg-white/5 p-6">
+            <aside className="order-2 lg:order-none lg:col-start-2 lg:row-start-1 lg:row-span-2 space-y-4 rounded-3xl border border-white/10 bg-white/5 p-6">
               <div className="flex items-center justify-between">
                 <h2 className="text-lg font-semibold text-white">サマリー</h2>
                 <div className="flex gap-2">
@@ -1021,7 +854,173 @@ function App() {
                 </div>
               </div>
             </aside>
+            <section className="order-3 lg:order-none lg:col-start-1 lg:row-start-2 rounded-3xl border border-white/10 bg-white/5 p-6">
+              <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                <div>
+                  <h2 className="text-xl font-semibold text-white">レシート一覧</h2>
+                  <p className="text-sm text-slate-400">検索とカテゴリフィルタで絞り込みできます。</p>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  <input
+                    className="w-48 rounded-full border border-white/15 bg-white/10 px-3 py-2 text-sm text-white outline-none ring-mint/30 focus:ring-2"
+                    placeholder="店名・メモで検索"
+                    value={filters.query}
+                    onChange={(e) => setFilters((prev) => ({ ...prev, query: e.target.value }))}
+                  />
+                  <select
+                    className="rounded-full border border-white/15 bg-white/10 px-3 py-2 text-sm text-white outline-none ring-mint/30 focus:ring-2"
+                    value={filters.category}
+                    onChange={(e) => setFilters((prev) => ({ ...prev, category: e.target.value }))}
+                  >
+                    <option value="all">すべて</option>
+                    {categories.map((cat) => (
+                      <option key={cat.id} value={cat.name}>
+                        {cat.name}
+                      </option>
+                    ))}
+                  </select>
+                  {filteredReceipts.length > visibleCount && (
+                    <button
+                      onClick={() => setVisibleCount((v) => v + 20)}
+                      className="rounded-full border border-white/15 bg-white/10 px-3 py-2 text-sm font-semibold text-white hover:border-white/25 hover:bg-white/15"
+                    >
+                      もっと見る
+                    </button>
+                  )}
+                  {filteredReceipts.length > 0 && visibleCount > 20 && (
+                    <button
+                      onClick={() => setVisibleCount(20)}
+                      className="rounded-full border border-white/15 bg-white/10 px-3 py-2 text-sm font-semibold text-white hover:border-white/25 hover:bg-white/15"
+                    >
+                      先頭に戻す
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              <div className="mt-4 space-y-4">
+                {filteredReceipts.length === 0 && (
+                  <p className="text-sm text-slate-400">まだレシートがありません。アップロードして保存してください。</p>
+                )}
+                {displayedReceipts.map((receipt) => (
+                  <article
+                    key={receipt.id}
+                    className="rounded-2xl border border-white/10 bg-white/5 p-4"
+                  >
+                    <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+                      <div>
+                        <p className="text-sm uppercase tracking-[0.15em] text-slate-400">
+                          {receipt.visitedAt}
+                        </p>
+                        <h3 className="text-xl font-semibold text-white">
+                          {receipt.storeName}
+                        </h3>
+                        {receipt.category && (
+                          <span className="mt-1 inline-block rounded-full border border-white/15 bg-white/5 px-2 py-1 text-xs text-slate-200">
+                            {receipt.category}
+                          </span>
+                        )}
+                        <p className="text-slate-400">{receipt.note ?? "メモなし"}</p>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <div className="text-right">
+                          <p className="text-2xl font-bold text-mint">
+                            {formatCurrency(receipt.total)}
+                          </p>
+                          {receipt.category && (
+                            <p className="text-xs text-slate-400">{receipt.category}</p>
+                          )}
+                        </div>
+                        <button
+                          onClick={() => handleDeleteReceipt(receipt.id)}
+                          className="rounded-full border border-red-500/40 bg-red-500/10 px-3 py-2 text-xs font-semibold text-red-100 transition hover:bg-red-500/20"
+                        >
+                          削除
+                        </button>
+                      </div>
+                    </div>
+                    {receipt.imageData && (
+                      <div className="mt-3 overflow-hidden rounded-xl border border-white/10 bg-black/30">
+                        <div className="flex items-center justify-between px-3 py-2">
+                          <p className="text-sm text-slate-200">画像</p>
+                          <button
+                            onClick={() =>
+                              setExpandedImages((prev) => {
+                                const next = new Set(prev)
+                                if (next.has(receipt.id)) next.delete(receipt.id)
+                                else next.add(receipt.id)
+                                return next
+                              })
+                            }
+                            className="rounded-full border border-white/15 bg-white/5 px-3 py-1 text-xs font-semibold text-white hover:border-white/25 hover:bg-white/10"
+                          >
+                            {expandedImages.has(receipt.id) ? "閉じる" : "表示"}
+                          </button>
+                        </div>
+                        {expandedImages.has(receipt.id) && (
+                          <img
+                            src={receipt.imageData}
+                            alt="レシート画像"
+                            className="max-h-64 w-full object-contain"
+                          />
+                        )}
+                      </div>
+                    )}
+                    {receipt.lineItems.length > 0 && (
+                      <div className="mt-3 grid gap-2 md:grid-cols-2">
+                        {receipt.lineItems.map((line) => (
+                          <div
+                            key={line.id}
+                            className="flex items-center justify-between rounded-xl border border-white/10 bg-white/5 px-3 py-2"
+                          >
+                            <div>
+                              <p className="text-sm text-white">{line.name}</p>
+                              <p className="text-xs text-slate-400">
+                                {line.category} / x{line.quantity}
+                              </p>
+                            </div>
+                            <p className="text-sm font-semibold text-mint">
+                              {formatCurrency(line.price * line.quantity)}
+                            </p>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </article>
+                ))}
+              </div>
+            </section>
           </main>
+        )}
+        {session && (
+          <div className="fixed inset-x-0 bottom-0 z-30 border-t border-white/10 bg-fog/90 px-4 py-3 shadow-soft backdrop-blur lg:hidden">
+            <div className="mx-auto flex max-w-6xl items-center gap-2">
+              <button
+                onClick={cameraActive ? stopCamera : startCamera}
+                className={clsx(
+                  "flex-1 rounded-xl px-3 py-3 text-sm font-semibold",
+                  cameraActive
+                    ? "border border-white/15 bg-white/5 text-white"
+                    : "border border-mint/60 bg-mint/10 text-mint",
+                )}
+              >
+                {cameraActive ? "カメラ停止" : "カメラ起動"}
+              </button>
+              <button
+                onClick={captureFromCamera}
+                disabled={!cameraActive}
+                className="flex-1 rounded-xl border border-mint/60 bg-mint text-fog px-3 py-3 text-sm font-semibold shadow-soft transition hover:bg-mint/90 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                シャッター
+              </button>
+              <button
+                onClick={handleSaveReceipt}
+                className="flex-1 rounded-xl border border-white/15 bg-white/10 px-3 py-3 text-sm font-semibold text-white hover:border-white/25 hover:bg-white/15"
+              >
+                保存
+              </button>
+            </div>
+          </div>
         )}
       </div>
     </div>
@@ -1063,3 +1062,4 @@ const UnlockPanel = ({
 }
 
 export default App
+
