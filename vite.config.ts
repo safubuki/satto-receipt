@@ -10,8 +10,8 @@ export default defineConfig({
     VitePWA({
       registerType: 'autoUpdate',
       manifest: {
-        name: 'Receipt Vault',
-        short_name: 'ReceiptVault',
+        name: 'サッとレシート',
+        short_name: 'サッとレシート',
         start_url: '/satto-receipt/',
         display: 'standalone',
         theme_color: '#0b1224',
