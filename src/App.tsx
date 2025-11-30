@@ -799,15 +799,20 @@ function App() {
               </div>
             )}
 
-            {/* サマリーカード - 1列レイアウト */}
-            <div className="mt-4 space-y-3 px-4">
-              <div className="rounded-2xl border border-white/10 bg-white/10" style={{ padding: '28px' }}>
-                <p style={{ fontSize: '32px' }} className="text-slate-400">今月</p>
-                <p style={{ fontSize: '56px', marginTop: '12px' }} className="font-bold text-mint">{formatCurrency(monthlySpent ?? 0)}</p>
-              </div>
-              <div className="rounded-2xl border border-white/10 bg-white/5" style={{ padding: '28px' }}>
-                <p style={{ fontSize: '32px' }} className="text-slate-400">今年</p>
-                <p style={{ fontSize: '56px', marginTop: '12px' }} className="font-bold text-white">{formatCurrency(yearlySpent ?? 0)}</p>
+            {/* サマリー - 枠で囲んで2列レイアウト */}
+            <div className="mt-4 px-4">
+              <div className="rounded-2xl border border-white/10 bg-white/5" style={{ padding: '24px' }}>
+                <h3 style={{ fontSize: '36px', marginBottom: '20px' }} className="font-semibold text-white">サマリー</h3>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="rounded-xl border border-white/10 bg-white/10" style={{ padding: '20px' }}>
+                    <p style={{ fontSize: '28px' }} className="text-slate-400">今月</p>
+                    <p style={{ fontSize: '40px', marginTop: '8px' }} className="font-bold text-mint truncate">{formatCurrency(monthlySpent ?? 0)}</p>
+                  </div>
+                  <div className="rounded-xl border border-white/10 bg-white/5" style={{ padding: '20px' }}>
+                    <p style={{ fontSize: '28px' }} className="text-slate-400">今年</p>
+                    <p style={{ fontSize: '40px', marginTop: '8px' }} className="font-bold text-white truncate">{formatCurrency(yearlySpent ?? 0)}</p>
+                  </div>
+                </div>
               </div>
             </div>
 
@@ -872,51 +877,17 @@ function App() {
                       </option>
                     ))}
                   </select>
-                </div>
-              </div>
-
-              {/* 画像保存オプション */}
-              <label className="flex items-center gap-4 px-2 text-slate-300" style={{ fontSize: '36px' }}>
-                <input
-                  type="checkbox"
-                  checked={saveImage}
-                  onChange={(e) => setSaveImage(e.target.checked)}
-                  className="rounded"
-                  style={{ width: '48px', height: '48px' }}
-                />
-                カメラ画像も保存する
-              </label>
-
-              {/* OCR設定 */}
-              <div className="rounded-2xl border border-white/10 bg-white/5" style={{ padding: '28px' }}>
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="font-semibold text-white" style={{ fontSize: '36px' }}>Gemini AI認識</p>
-                    <p className="text-slate-400" style={{ fontSize: '32px', marginTop: '8px' }}>
-                      {hasApiKey() ? "✅ 設定済み" : "❌ 未設定"}
-                    </p>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <button
-                      onClick={() => setUseGemini(!useGemini)}
-                      className={clsx(
-                        "rounded-full font-semibold",
-                        useGemini
-                          ? "bg-mint text-fog"
-                          : "border border-white/20 bg-white/10 text-white"
-                      )}
-                      style={{ fontSize: '36px', padding: '24px 36px', minHeight: '80px' }}
-                    >
-                      {useGemini ? "ON" : "OFF"}
-                    </button>
-                    <button
-                      onClick={() => setShowApiKeyModal(true)}
-                      className="rounded-full border border-white/20 bg-white/10 text-white"
-                      style={{ fontSize: '40px', padding: '20px 28px', minHeight: '80px' }}
-                    >
-                      ⚙️
-                    </button>
-                  </div>
+                  {/* 画像保存オプション - レシート入力内に移動 */}
+                  <label className="flex items-center gap-4 text-slate-300" style={{ fontSize: '32px', marginTop: '8px' }}>
+                    <input
+                      type="checkbox"
+                      checked={saveImage}
+                      onChange={(e) => setSaveImage(e.target.checked)}
+                      className="rounded"
+                      style={{ width: '40px', height: '40px' }}
+                    />
+                    カメラ画像も保存する
+                  </label>
                 </div>
               </div>
             </div>
@@ -975,29 +946,66 @@ function App() {
               </div>
             </div>
 
-            {/* エクスポート - 1列レイアウト */}
-            <div className="mt-5 px-4 pb-6 space-y-3">
-              <button
-                onClick={handleExport}
-                className="w-full rounded-xl border border-white/15 bg-white/10 font-semibold text-white"
-                style={{ fontSize: '36px', padding: '28px', minHeight: '90px' }}
-              >
-                CSVを保存
-              </button>
-              <label className="flex w-full cursor-pointer items-center justify-center rounded-xl border border-white/15 bg-white/10 font-semibold text-white" style={{ fontSize: '36px', padding: '28px', minHeight: '90px' }}>
-                CSVを読込
-                <input
-                  type="file"
-                  accept=".csv,text/csv"
-                  className="hidden"
-                  onChange={(e) => {
-                    const file = e.target.files?.[0]
-                    if (!file) return
-                    handleImportCsv(file)
-                    e.target.value = ""
-                  }}
-                />
-              </label>
+            {/* CSV操作 - 2列レイアウト */}
+            <div className="mt-5 px-4">
+              <div className="grid grid-cols-2 gap-3">
+                <button
+                  onClick={handleExport}
+                  className="rounded-xl border border-white/15 bg-white/10 font-semibold text-white"
+                  style={{ fontSize: '32px', padding: '24px', minHeight: '80px' }}
+                >
+                  CSVを保存
+                </button>
+                <label className="flex cursor-pointer items-center justify-center rounded-xl border border-white/15 bg-white/10 font-semibold text-white" style={{ fontSize: '32px', padding: '24px', minHeight: '80px' }}>
+                  CSVを読込
+                  <input
+                    type="file"
+                    accept=".csv,text/csv"
+                    className="hidden"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0]
+                      if (!file) return
+                      handleImportCsv(file)
+                      e.target.value = ""
+                    }}
+                  />
+                </label>
+              </div>
+            </div>
+
+            {/* Gemini AI設定 - CSVボタンの下に移動 */}
+            <div className="mt-4 px-4 pb-6">
+              <div className="rounded-2xl border border-white/10 bg-white/5" style={{ padding: '24px' }}>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="font-semibold text-white" style={{ fontSize: '32px' }}>Gemini AI認識</p>
+                    <p className="text-slate-400" style={{ fontSize: '28px', marginTop: '6px' }}>
+                      {hasApiKey() ? "✅ 設定済み" : "❌ 未設定"}
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <button
+                      onClick={() => setUseGemini(!useGemini)}
+                      className={clsx(
+                        "rounded-full font-semibold",
+                        useGemini
+                          ? "bg-mint text-fog"
+                          : "border border-white/20 bg-white/10 text-white"
+                      )}
+                      style={{ fontSize: '32px', padding: '20px 32px', minHeight: '72px' }}
+                    >
+                      {useGemini ? "ON" : "OFF"}
+                    </button>
+                    <button
+                      onClick={() => setShowApiKeyModal(true)}
+                      className="rounded-full border border-white/20 bg-white/10 text-white"
+                      style={{ fontSize: '36px', padding: '18px 24px', minHeight: '72px' }}
+                    >
+                      ⚙️
+                    </button>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
         )}
