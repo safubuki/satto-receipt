@@ -1,73 +1,36 @@
-# React + TypeScript + Vite
+﻿# サッとレシート (satto-receipt)
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+ローカル暗号化・オフライン対応のレシート記録PWAです。GitHub Pages に静的配信してもデータは端末内（IndexedDB + AES-GCM）にのみ保存されます。OCRで店名・日付・合計を素早く入力し、CSVでバックアップ/復元も可能です。
 
-Currently, two official plugins are available:
+## 主な機能
+- ブラウザ内OCR（Tesseract.js）で店名/日付/合計を自動抽出
+- 端末内暗号化保存（パスフレーズ復号、サーバー送信なし）
+- 画像保存はデフォルトOFF。必要時のみ圧縮保存（長辺1280px / JPEG 0.6）＋画像クリーンアップボタン
+- カメラ撮影 or 画像アップロードから即OCR、オフラインでも動作
+- CSVエクスポート/インポートでバックアップ・復旧
+- 月別/店舗別の合計サマリー、レスポンシブ対応（スマホは1カラム + 下部アクションバー）
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
-
-## React Compiler
-
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
-
-## Expanding the ESLint configuration
-
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
-
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
-
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+## 開発・実行
+```bash
+npm install
+npm run dev   # 開発サーバー http://localhost:5173
+npm run build # 本番ビルド
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+## デプロイ（GitHub Pages の場合）
+- `vite.config.ts` の `base` と `manifest.start_url` を `/satto-receipt/` に設定済みです。リポジトリ名が異なる場合は書き換えてください。
+- `npm run build` 後、`dist/` を Pages に公開してください。
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+## 使い方
+1. 初回にパスフレーズを設定（復号に必須、サーバーには送信されません）。
+2. 画像を撮影/アップロード → OCRで店名・日付・合計が反映 → 必要ならメモ/分類を調整 → 保存。
+3. 画像保存が不要ならチェックは外したままでOK（デフォルトOFF）。圧縮保存したい場合のみチェック。
+4. CSVでエクスポートしておくと、ブラウザ初期化時でもCSVインポートで復旧できます。
+5. 画像容量が気になるときは「画像のみクリーンアップ」で画像だけ削除できます（テキストデータは保持）。
 
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
-```
+## パスや設定が変わる場所
+- 公開パス: `vite.config.ts` の `base` / `manifest.start_url`
+- favicon / アイコン: `public/turtle_icon_receipt.png` を使用
+
+## ライセンス
+このリポジトリ配下のコードに既定のライセンスがある場合はそれに従ってください。ない場合はご相談ください。

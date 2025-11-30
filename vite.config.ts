@@ -4,7 +4,7 @@ import { VitePWA } from 'vite-plugin-pwa'
 
 // https://vite.dev/config/
 export default defineConfig({
-  base: '/gpt-apps/',
+  base: '/satto-receipt/',
   plugins: [
     react(),
     VitePWA({
@@ -12,7 +12,7 @@ export default defineConfig({
       manifest: {
         name: 'Receipt Vault',
         short_name: 'ReceiptVault',
-        start_url: '/gpt-apps/',
+        start_url: '/satto-receipt/',
         display: 'standalone',
         theme_color: '#0b1224',
         background_color: '#0b1224',
