@@ -522,10 +522,10 @@ function App() {
     return (
       <div className="min-h-screen bg-fog text-sand">
         {/* スマホ用ヘッダー */}
-        <header className="sticky top-0 z-20 border-b border-white/10 bg-fog/95 px-4 py-3 backdrop-blur-lg">
+        <header className="sticky top-0 z-20 border-b border-white/10 bg-fog/95 px-5 py-4 backdrop-blur-lg">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <div className="h-10 w-10 rounded-full bg-gradient-to-r from-mint/60 to-mint/30 p-[2px]">
+              <div className="h-12 w-12 rounded-full bg-gradient-to-r from-mint/60 to-mint/30 p-[2px]">
                 <div className="h-full w-full rounded-full bg-fog/90 p-[1px]">
                   <img
                     src={`${import.meta.env.BASE_URL}turtle_icon_receipt.png`}
@@ -534,12 +534,12 @@ function App() {
                   />
                 </div>
               </div>
-              <h1 className="text-xl font-bold text-white">サッとレシート</h1>
+              <h1 className="text-2xl font-bold text-white">サッとレシート</h1>
             </div>
             {session && (
               <button
                 onClick={handleLock}
-                className="rounded-full border border-white/20 bg-white/10 px-4 py-2 text-sm font-semibold text-white"
+                className="rounded-full border border-white/20 bg-white/10 px-5 py-3 text-lg font-semibold text-white"
               >
                 🔒
               </button>
@@ -550,9 +550,9 @@ function App() {
         {!session ? (
           // ========== スマホ用ログイン画面 ==========
           <div className="flex min-h-[80vh] flex-col items-center justify-center px-6">
-            <div className="w-full max-w-sm rounded-3xl border border-white/10 bg-white/5 p-6">
-              <div className="mb-6 text-center">
-                <div className="mx-auto mb-4 h-20 w-20 rounded-full bg-gradient-to-r from-mint/60 to-mint/30 p-[3px]">
+            <div className="w-full max-w-md rounded-3xl border border-white/10 bg-white/5 p-8">
+              <div className="mb-8 text-center">
+                <div className="mx-auto mb-5 h-24 w-24 rounded-full bg-gradient-to-r from-mint/60 to-mint/30 p-[3px]">
                   <div className="h-full w-full rounded-full bg-fog/90 p-[2px]">
                     <img
                       src={`${import.meta.env.BASE_URL}turtle_icon_receipt.png`}
@@ -561,17 +561,17 @@ function App() {
                     />
                   </div>
                 </div>
-                <h2 className="text-2xl font-bold text-white">サッとレシート</h2>
-                <p className="mt-2 text-base text-slate-400">買い物ごとにパシャと</p>
+                <h2 className="text-3xl font-bold text-white">サッとレシート</h2>
+                <p className="mt-3 text-lg text-slate-400">買い物ごとにパシャと</p>
               </div>
               <UnlockPanel onUnlock={handleUnlock} unlocking={unlocking} error={unlockError} />
-              <div className="mt-6 flex flex-wrap justify-center gap-2">
-                <Pill>🔒 暗号化</Pill>
-                <Pill>📴 オフライン</Pill>
+              <div className="mt-8 flex flex-wrap justify-center gap-3">
+                <span className="rounded-full bg-white/10 px-4 py-2 text-sm text-slate-200">🔒 暗号化</span>
+                <span className="rounded-full bg-white/10 px-4 py-2 text-sm text-slate-200">📴 オフライン</span>
               </div>
               <button
                 onClick={handleReset}
-                className="mt-4 w-full text-center text-sm text-slate-500 underline"
+                className="mt-6 w-full text-center text-base text-slate-500 underline"
               >
                 データを初期化
               </button>
@@ -620,45 +620,45 @@ function App() {
             )}
 
             {/* サマリーカード */}
-            <div className="mt-4 grid grid-cols-2 gap-3 px-4">
-              <div className="rounded-2xl border border-white/10 bg-white/10 p-4">
-                <p className="text-xs text-slate-400">今月</p>
-                <p className="mt-1 text-2xl font-bold text-mint">{formatCurrency(monthlySpent ?? 0)}</p>
+            <div className="mt-5 grid grid-cols-2 gap-4 px-5">
+              <div className="rounded-2xl border border-white/10 bg-white/10 p-5">
+                <p className="text-sm text-slate-400">今月</p>
+                <p className="mt-2 text-3xl font-bold text-mint">{formatCurrency(monthlySpent ?? 0)}</p>
               </div>
-              <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
-                <p className="text-xs text-slate-400">累計</p>
-                <p className="mt-1 text-2xl font-bold text-white">{formatCurrency(totalSpent ?? 0)}</p>
+              <div className="rounded-2xl border border-white/10 bg-white/5 p-5">
+                <p className="text-sm text-slate-400">累計</p>
+                <p className="mt-2 text-3xl font-bold text-white">{formatCurrency(totalSpent ?? 0)}</p>
               </div>
             </div>
 
             {/* 入力フォーム（シンプル版）*/}
-            <div className="mt-4 space-y-4 px-4">
-              <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
-                <h3 className="mb-3 text-lg font-semibold text-white">📝 レシート入力</h3>
-                <div className="space-y-3">
+            <div className="mt-5 space-y-5 px-5">
+              <div className="rounded-2xl border border-white/10 bg-white/5 p-5">
+                <h3 className="mb-4 text-xl font-semibold text-white">📝 レシート入力</h3>
+                <div className="space-y-4">
                   <input
-                    className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-4 text-lg text-white placeholder-slate-500"
+                    className="w-full rounded-2xl border border-white/10 bg-white/5 px-5 py-5 text-xl text-white placeholder-slate-500"
                     value={draft.storeName}
                     onChange={(e) => setDraft((prev) => ({ ...prev, storeName: e.target.value }))}
                     placeholder="店名"
                   />
-                  <div className="flex gap-3">
+                  <div className="flex gap-4">
                     <input
                       type="date"
-                      className="flex-1 rounded-xl border border-white/10 bg-white/5 px-4 py-4 text-lg text-white"
+                      className="flex-1 rounded-2xl border border-white/10 bg-white/5 px-4 py-5 text-xl text-white"
                       value={draft.visitedAt}
                       onChange={(e) => setDraft((prev) => ({ ...prev, visitedAt: e.target.value }))}
                     />
                     <input
                       inputMode="numeric"
-                      className="flex-1 rounded-xl border border-mint/30 bg-mint/10 px-4 py-4 text-xl font-bold text-mint placeholder-mint/50"
+                      className="flex-1 rounded-2xl border-2 border-mint/40 bg-mint/10 px-4 py-5 text-2xl font-bold text-mint placeholder-mint/50"
                       value={draft.total}
                       onChange={(e) => setDraft((prev) => ({ ...prev, total: e.target.value }))}
                       placeholder="¥ 金額"
                     />
                   </div>
                   <select
-                    className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-4 text-lg text-white"
+                    className="w-full rounded-2xl border border-white/10 bg-white/5 px-5 py-5 text-xl text-white"
                     value={draft.category}
                     onChange={(e) => setDraft((prev) => ({ ...prev, category: e.target.value }))}
                   >
@@ -672,49 +672,49 @@ function App() {
               </div>
 
               {/* 画像保存オプション */}
-              <label className="flex items-center gap-3 px-2 text-base text-slate-300">
+              <label className="flex items-center gap-4 px-2 text-lg text-slate-300">
                 <input
                   type="checkbox"
                   checked={saveImage}
                   onChange={(e) => setSaveImage(e.target.checked)}
-                  className="h-6 w-6 rounded"
+                  className="h-7 w-7 rounded"
                 />
                 📷 画像も保存する
               </label>
             </div>
 
             {/* レシート一覧 */}
-            <div className="mt-6 px-4">
+            <div className="mt-6 px-5">
               <div className="flex items-center justify-between">
-                <h3 className="text-lg font-semibold text-white">📋 レシート一覧</h3>
-                <span className="text-sm text-slate-400">{session.vault.receipts.length}件</span>
+                <h3 className="text-xl font-semibold text-white">📋 レシート一覧</h3>
+                <span className="text-base text-slate-400">{session.vault.receipts.length}件</span>
               </div>
-              <div className="mt-3 space-y-3">
+              <div className="mt-4 space-y-4">
                 {session.vault.receipts.length === 0 ? (
-                  <p className="rounded-xl bg-white/5 py-8 text-center text-base text-slate-400">
+                  <p className="rounded-2xl bg-white/5 py-10 text-center text-lg text-slate-400">
                     まだレシートがありません
                   </p>
                 ) : (
                   displayedReceipts.map((receipt) => (
                     <div
                       key={receipt.id}
-                      className="rounded-2xl border border-white/10 bg-white/5 p-4"
+                      className="rounded-2xl border border-white/10 bg-white/5 p-5"
                     >
                       <div className="flex items-center justify-between">
                         <div>
-                          <p className="text-sm text-slate-400">{receipt.visitedAt}</p>
-                          <p className="text-lg font-semibold text-white">{receipt.storeName}</p>
-                          <span className="inline-block rounded-full bg-white/10 px-2 py-0.5 text-xs text-slate-300">
+                          <p className="text-base text-slate-400">{receipt.visitedAt}</p>
+                          <p className="text-xl font-semibold text-white">{receipt.storeName}</p>
+                          <span className="inline-block rounded-full bg-white/10 px-3 py-1 text-sm text-slate-300">
                             {receipt.category}
                           </span>
                         </div>
                         <div className="text-right">
-                          <p className="text-2xl font-bold text-mint">
+                          <p className="text-3xl font-bold text-mint">
                             {formatCurrency(receipt.total)}
                           </p>
                           <button
                             onClick={() => handleDeleteReceipt(receipt.id)}
-                            className="mt-1 text-sm text-red-400"
+                            className="mt-2 text-base text-red-400"
                           >
                             削除
                           </button>
@@ -726,7 +726,7 @@ function App() {
                 {filteredReceipts.length > visibleCount && (
                   <button
                     onClick={() => setVisibleCount((v) => v + 20)}
-                    className="w-full rounded-xl border border-white/10 bg-white/5 py-3 text-base font-semibold text-white"
+                    className="w-full rounded-2xl border border-white/10 bg-white/5 py-4 text-lg font-semibold text-white"
                   >
                     もっと見る
                   </button>
@@ -735,15 +735,15 @@ function App() {
             </div>
 
             {/* エクスポート */}
-            <div className="mt-6 px-4">
-              <div className="flex gap-3">
+            <div className="mt-6 px-5 pb-4">
+              <div className="flex gap-4">
                 <button
                   onClick={handleExport}
-                  className="flex-1 rounded-xl border border-white/15 bg-white/10 py-3 text-base font-semibold text-white"
+                  className="flex-1 rounded-2xl border border-white/15 bg-white/10 py-4 text-lg font-semibold text-white"
                 >
                   📤 CSV保存
                 </button>
-                <label className="flex flex-1 cursor-pointer items-center justify-center rounded-xl border border-white/15 bg-white/10 py-3 text-base font-semibold text-white">
+                <label className="flex flex-1 cursor-pointer items-center justify-center rounded-2xl border border-white/15 bg-white/10 py-4 text-lg font-semibold text-white">
                   📥 CSV読込
                   <input
                     type="file"
@@ -764,15 +764,15 @@ function App() {
 
         {/* スマホ用固定フッター */}
         {session && (
-          <div className="fixed inset-x-0 bottom-0 z-30 border-t border-white/10 bg-fog/95 px-4 py-4 backdrop-blur-lg">
-            <div className="flex items-center gap-3">
+          <div className="fixed inset-x-0 bottom-0 z-30 border-t border-white/10 bg-fog/95 px-5 py-5 backdrop-blur-lg">
+            <div className="flex items-center gap-4">
               <button
                 onClick={cameraActive ? stopCamera : startCamera}
                 className={clsx(
-                  "flex-1 rounded-xl py-5 text-lg font-bold",
+                  "flex-1 rounded-2xl py-6 text-xl font-bold",
                   cameraActive
                     ? "border border-white/20 bg-white/10 text-white"
-                    : "border border-mint/60 bg-mint/20 text-mint"
+                    : "border-2 border-mint/60 bg-mint/20 text-mint"
                 )}
               >
                 {cameraActive ? "⏹ 停止" : "📹 起動"}
@@ -780,13 +780,13 @@ function App() {
               <button
                 onClick={captureFromCamera}
                 disabled={!cameraActive}
-                className="flex-[1.5] rounded-xl border-2 border-mint bg-mint py-5 text-xl font-bold text-fog shadow-lg disabled:opacity-50"
+                className="flex-[1.5] rounded-2xl border-2 border-mint bg-mint py-6 text-2xl font-bold text-fog shadow-lg disabled:opacity-50"
               >
                 📸 撮影
               </button>
               <button
                 onClick={handleSaveReceipt}
-                className="flex-1 rounded-xl border border-white/20 bg-white/15 py-5 text-lg font-bold text-white"
+                className="flex-1 rounded-2xl border border-white/20 bg-white/15 py-6 text-xl font-bold text-white"
               >
                 💾 保存
               </button>
@@ -1354,22 +1354,22 @@ const UnlockPanel = ({
   if (isMobile) {
     // スマホ用UI
     return (
-      <div className="flex flex-col gap-4">
-        <label className="text-lg text-slate-200">
+      <div className="flex flex-col gap-5">
+        <label className="text-xl text-slate-200">
           🔑 パスフレーズ
           <input
             type="password"
-            className="mt-3 w-full rounded-2xl border border-white/10 bg-white/5 px-5 py-5 text-xl text-white outline-none ring-mint/30 focus:ring-2"
+            className="mt-4 w-full rounded-2xl border border-white/10 bg-white/5 px-6 py-6 text-2xl text-white outline-none ring-mint/30 focus:ring-2"
             placeholder="パスフレーズを入力"
             value={value}
             onChange={(e) => setValue(e.target.value)}
           />
         </label>
-        {error && <p className="text-lg text-red-300">{error}</p>}
+        {error && <p className="text-xl text-red-300">{error}</p>}
         <button
           onClick={() => onUnlock(value)}
           disabled={unlocking || value.length < 4}
-          className="w-full rounded-2xl bg-gradient-to-r from-mint/70 to-mint px-6 py-6 text-xl font-bold text-fog shadow-soft transition hover:translate-y-[-1px] disabled:cursor-not-allowed disabled:opacity-60"
+          className="w-full rounded-2xl bg-gradient-to-r from-mint/70 to-mint px-6 py-7 text-2xl font-bold text-fog shadow-soft transition hover:translate-y-[-1px] disabled:cursor-not-allowed disabled:opacity-60"
         >
           {unlocking ? "🔓 復号中..." : "🔐 データを開く"}
         </button>
