@@ -625,10 +625,10 @@ function App() {
     return (
       <div className="min-h-screen bg-fog text-sand text-lg">
         {/* スマホ用ヘッダー */}
-        <header className="sticky top-0 z-20 border-b border-white/10 bg-fog/95 backdrop-blur-lg" style={{ padding: '16px 20px' }}>
+        <header className="sticky top-0 z-20 border-b border-white/10 bg-fog/95 backdrop-blur-lg" style={{ padding: '20px 24px' }}>
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="rounded-full bg-gradient-to-r from-mint/60 to-mint/30 p-[2px]" style={{ width: '56px', height: '56px' }}>
+            <div className="flex items-center gap-4">
+              <div className="rounded-full bg-gradient-to-r from-mint/60 to-mint/30 p-[2px]" style={{ width: '64px', height: '64px' }}>
                 <div className="h-full w-full rounded-full bg-fog/90 p-[1px]">
                   <img
                     src={`${import.meta.env.BASE_URL}turtle_icon_receipt.png`}
@@ -637,13 +637,13 @@ function App() {
                   />
                 </div>
               </div>
-              <h1 className="font-bold text-white" style={{ fontSize: '28px' }}>サッとレシート</h1>
+              <h1 className="font-bold text-white" style={{ fontSize: '32px' }}>サッとレシート</h1>
             </div>
             {session && (
               <button
                 onClick={handleLock}
                 className="rounded-full border border-white/20 bg-white/10 font-semibold text-white"
-                style={{ fontSize: '18px', padding: '14px 20px', minHeight: '52px' }}
+                style={{ fontSize: '22px', padding: '16px 24px', minHeight: '60px' }}
               >
                 🔒 ログアウト
               </button>
@@ -654,9 +654,9 @@ function App() {
         {!session ? (
           // ========== スマホ用ログイン画面 ==========
           <div className="flex min-h-[80vh] flex-col items-center justify-center px-6">
-            <div className="w-full rounded-3xl border border-white/10 bg-white/5" style={{ padding: '36px' }}>
-              <div className="text-center" style={{ marginBottom: '36px' }}>
-                <div className="mx-auto rounded-full bg-gradient-to-r from-mint/60 to-mint/30 p-[3px]" style={{ width: '120px', height: '120px', marginBottom: '24px' }}>
+            <div className="w-full rounded-3xl border border-white/10 bg-white/5" style={{ padding: '40px' }}>
+              <div className="text-center" style={{ marginBottom: '40px' }}>
+                <div className="mx-auto rounded-full bg-gradient-to-r from-mint/60 to-mint/30 p-[3px]" style={{ width: '140px', height: '140px', marginBottom: '28px' }}>
                   <div className="h-full w-full rounded-full bg-fog/90 p-[2px]">
                     <img
                       src={`${import.meta.env.BASE_URL}turtle_icon_receipt.png`}
@@ -665,18 +665,14 @@ function App() {
                     />
                   </div>
                 </div>
-                <h2 className="font-bold text-white" style={{ fontSize: '36px' }}>サッとレシート</h2>
-                <p className="text-slate-400" style={{ fontSize: '22px', marginTop: '16px' }}>買い物ごとにパシャと</p>
+                <h2 className="font-bold text-white" style={{ fontSize: '40px' }}>サッとレシート</h2>
+                <p className="text-slate-400" style={{ fontSize: '26px', marginTop: '20px' }}>買い物ごとにパシャと</p>
               </div>
               <UnlockPanel onUnlock={handleUnlock} unlocking={unlocking} error={unlockError} />
-              <div className="flex flex-wrap justify-center gap-4" style={{ marginTop: '32px' }}>
-                <span className="rounded-full bg-white/10 text-slate-200" style={{ fontSize: '18px', padding: '14px 20px' }}>🔒 暗号化</span>
-                <span className="rounded-full bg-white/10 text-slate-200" style={{ fontSize: '18px', padding: '14px 20px' }}>📴 オフライン</span>
-              </div>
               <button
                 onClick={handleReset}
                 className="w-full text-center text-slate-500 underline"
-                style={{ fontSize: '18px', marginTop: '32px', padding: '12px' }}
+                style={{ fontSize: '22px', marginTop: '36px', padding: '16px' }}
               >
                 データを初期化
               </button>
@@ -688,22 +684,23 @@ function App() {
             {/* APIキー設定モーダル */}
             {showApiKeyModal && (
               <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 px-5">
-                <div className="w-full max-w-sm rounded-2xl border border-white/10 bg-fog p-6">
-                  <h3 className="text-2xl font-bold text-white">⚙️ API設定</h3>
-                  <p className="mt-3 text-base text-slate-400">
+                <div className="w-full max-w-md rounded-2xl border border-white/10 bg-fog" style={{ padding: '28px' }}>
+                  <h3 className="font-bold text-white" style={{ fontSize: '26px' }}>⚙️ API設定</h3>
+                  <p className="text-slate-400" style={{ fontSize: '18px', marginTop: '14px' }}>
                     Gemini APIキーを入力してください。キーは端末内にのみ保存されます。
                   </p>
-                  <p className="mt-2 text-sm text-slate-500">
+                  <p className="text-slate-500" style={{ fontSize: '16px', marginTop: '10px' }}>
                     <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener noreferrer" className="text-mint underline">Google AI Studio</a> から無料で取得できます
                   </p>
                   <input
                     type="password"
-                    className="mt-4 w-full rounded-xl border border-white/10 bg-white/5 px-5 py-4 text-lg text-white placeholder-slate-500"
+                    className="w-full rounded-xl border border-white/10 bg-white/5 text-white placeholder-slate-500"
+                    style={{ fontSize: '20px', padding: '18px', marginTop: '18px', minHeight: '60px' }}
                     placeholder="AIza..."
                     value={apiKeyInput}
                     onChange={(e) => setApiKeyInput(e.target.value)}
                   />
-                  <div className="mt-5 flex gap-3">
+                  <div className="flex gap-3" style={{ marginTop: '22px' }}>
                     <button
                       onClick={() => {
                         if (apiKeyInput.trim()) {
@@ -712,7 +709,8 @@ function App() {
                         }
                         setShowApiKeyModal(false)
                       }}
-                      className="flex-1 rounded-xl bg-mint py-4 text-lg font-bold text-fog"
+                      className="flex-1 rounded-xl bg-mint font-bold text-fog"
+                      style={{ fontSize: '20px', padding: '18px', minHeight: '60px' }}
                     >
                       保存
                     </button>
@@ -722,14 +720,16 @@ function App() {
                         setApiKeyInput("")
                         setShowApiKeyModal(false)
                       }}
-                      className="flex-1 rounded-xl border border-red-400/50 bg-red-400/10 py-4 text-lg font-bold text-red-300"
+                      className="flex-1 rounded-xl border border-red-400/50 bg-red-400/10 font-bold text-red-300"
+                      style={{ fontSize: '20px', padding: '18px', minHeight: '60px' }}
                     >
                       削除
                     </button>
                   </div>
                   <button
                     onClick={() => setShowApiKeyModal(false)}
-                    className="mt-4 w-full text-center text-base text-slate-500"
+                    className="w-full text-center text-slate-500"
+                    style={{ fontSize: '18px', marginTop: '18px', padding: '12px' }}
                   >
                     キャンセル
                   </button>
@@ -801,26 +801,26 @@ function App() {
 
             {/* サマリーカード */}
             <div className="mt-4 grid grid-cols-2 gap-3 px-4">
-              <div className="rounded-2xl border border-white/10 bg-white/10" style={{ padding: '20px' }}>
-                <p style={{ fontSize: '18px' }} className="text-slate-400">今月</p>
-                <p style={{ fontSize: '32px', marginTop: '8px' }} className="font-bold text-mint">{formatCurrency(monthlySpent ?? 0)}</p>
+              <div className="rounded-2xl border border-white/10 bg-white/10" style={{ padding: '24px' }}>
+                <p style={{ fontSize: '22px' }} className="text-slate-400">今月</p>
+                <p style={{ fontSize: '36px', marginTop: '10px' }} className="font-bold text-mint">{formatCurrency(monthlySpent ?? 0)}</p>
               </div>
-              <div className="rounded-2xl border border-white/10 bg-white/5" style={{ padding: '20px' }}>
-                <p style={{ fontSize: '18px' }} className="text-slate-400">今年</p>
-                <p style={{ fontSize: '32px', marginTop: '8px' }} className="font-bold text-white">{formatCurrency(yearlySpent ?? 0)}</p>
+              <div className="rounded-2xl border border-white/10 bg-white/5" style={{ padding: '24px' }}>
+                <p style={{ fontSize: '22px' }} className="text-slate-400">今年</p>
+                <p style={{ fontSize: '36px', marginTop: '10px' }} className="font-bold text-white">{formatCurrency(yearlySpent ?? 0)}</p>
               </div>
             </div>
 
             {/* 月別合計 */}
             {monthlyTotals.length > 0 && (
               <div className="mt-3 px-4">
-                <div className="rounded-2xl border border-white/10 bg-white/5" style={{ padding: '20px' }}>
-                  <p className="font-semibold text-white" style={{ fontSize: '20px', marginBottom: '16px' }}>📅 月別合計</p>
+                <div className="rounded-2xl border border-white/10 bg-white/5" style={{ padding: '24px' }}>
+                  <p className="font-semibold text-white" style={{ fontSize: '24px', marginBottom: '20px' }}>📅 月別合計</p>
                   <div className="space-y-3">
                     {monthlyTotals.slice(0, 6).map((entry) => (
-                      <div key={entry.month} className="flex items-center justify-between" style={{ padding: '8px 0' }}>
-                        <span className="text-slate-300" style={{ fontSize: '20px' }}>{entry.month}</span>
-                        <span className="font-semibold text-mint" style={{ fontSize: '24px' }}>{formatCurrency(entry.total)}</span>
+                      <div key={entry.month} className="flex items-center justify-between" style={{ padding: '10px 0' }}>
+                        <span className="text-slate-300" style={{ fontSize: '24px' }}>{entry.month}</span>
+                        <span className="font-semibold text-mint" style={{ fontSize: '28px' }}>{formatCurrency(entry.total)}</span>
                       </div>
                     ))}
                   </div>
@@ -830,30 +830,30 @@ function App() {
 
             {/* 入力フォーム（シンプル版）*/}
             <div className="mt-4 space-y-4 px-4">
-              <div className="rounded-2xl border border-white/10 bg-white/5" style={{ padding: '20px' }}>
-                <h3 style={{ fontSize: '22px', marginBottom: '16px' }} className="font-semibold text-white">📝 レシート入力</h3>
-                <div className="space-y-3">
+              <div className="rounded-2xl border border-white/10 bg-white/5" style={{ padding: '24px' }}>
+                <h3 style={{ fontSize: '26px', marginBottom: '20px' }} className="font-semibold text-white">📝 レシート入力</h3>
+                <div className="space-y-4">
                   <input
                     className="w-full rounded-xl border border-white/10 bg-white/5 text-white placeholder-slate-500"
-                    style={{ fontSize: '20px', padding: '16px', minHeight: '56px' }}
+                    style={{ fontSize: '24px', padding: '20px', minHeight: '68px' }}
                     value={draft.storeName}
                     onChange={(e) => setDraft((prev) => ({ ...prev, storeName: e.target.value }))}
                     placeholder="店名"
                   />
-                  <div className="flex gap-2">
+                  <div className="flex gap-3">
                     <input
                       type="date"
                       className="flex-1 rounded-xl border border-white/10 bg-white/5 text-white"
-                      style={{ fontSize: '18px', padding: '14px', minHeight: '56px' }}
+                      style={{ fontSize: '22px', padding: '18px', minHeight: '68px' }}
                       value={draft.visitedAt}
                       onChange={(e) => setDraft((prev) => ({ ...prev, visitedAt: e.target.value }))}
                     />
-                    <div className="flex flex-1 items-center rounded-xl border-2 border-mint/50 bg-mint/10" style={{ padding: '12px 16px', minHeight: '56px' }}>
-                      <span style={{ fontSize: '28px' }} className="font-bold text-mint/70">¥</span>
+                    <div className="flex flex-1 items-center rounded-xl border-2 border-mint/50 bg-mint/10" style={{ padding: '16px 20px', minHeight: '68px' }}>
+                      <span style={{ fontSize: '32px' }} className="font-bold text-mint/70">¥</span>
                       <input
                         inputMode="numeric"
                         className="w-full bg-transparent font-bold text-mint placeholder-mint/50 outline-none"
-                        style={{ fontSize: '28px' }}
+                        style={{ fontSize: '32px' }}
                         value={draft.total}
                         onChange={(e) => setDraft((prev) => ({ ...prev, total: e.target.value }))}
                         placeholder="0"
@@ -862,7 +862,7 @@ function App() {
                   </div>
                   <select
                     className="w-full rounded-xl border border-white/10 bg-white/5 text-white"
-                    style={{ fontSize: '20px', padding: '16px', minHeight: '56px' }}
+                    style={{ fontSize: '24px', padding: '20px', minHeight: '68px' }}
                     value={draft.category}
                     onChange={(e) => setDraft((prev) => ({ ...prev, category: e.target.value }))}
                   >
@@ -876,30 +876,27 @@ function App() {
               </div>
 
               {/* 画像保存オプション */}
-              <label className="flex items-center gap-4 px-2 text-slate-300" style={{ fontSize: '20px' }}>
+              <label className="flex items-center gap-4 px-2 text-slate-300" style={{ fontSize: '24px' }}>
                 <input
                   type="checkbox"
                   checked={saveImage}
                   onChange={(e) => setSaveImage(e.target.checked)}
                   className="rounded"
-                  style={{ width: '28px', height: '28px' }}
+                  style={{ width: '36px', height: '36px' }}
                 />
-                📷 画像も保存する
+                カメラ画像も保存する
               </label>
 
               {/* OCR設定 */}
-              <div className="rounded-2xl border border-white/10 bg-white/5" style={{ padding: '20px' }}>
+              <div className="rounded-2xl border border-white/10 bg-white/5" style={{ padding: '24px' }}>
                 <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <span style={{ fontSize: '36px' }}>🤖</span>
-                    <div>
-                      <p className="font-semibold text-white" style={{ fontSize: '22px' }}>Gemini AI認識</p>
-                      <p className="text-slate-400" style={{ fontSize: '18px' }}>
-                        {hasApiKey() ? "✅ 設定済み" : "❌ 未設定"}
-                      </p>
-                    </div>
+                  <div>
+                    <p className="font-semibold text-white" style={{ fontSize: '26px' }}>Gemini AI認識</p>
+                    <p className="text-slate-400" style={{ fontSize: '22px' }}>
+                      {hasApiKey() ? "✅ 設定済み" : "❌ 未設定"}
+                    </p>
                   </div>
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-3">
                     <button
                       onClick={() => setUseGemini(!useGemini)}
                       className={clsx(
@@ -908,14 +905,14 @@ function App() {
                           ? "bg-mint text-fog"
                           : "border border-white/20 bg-white/10 text-white"
                       )}
-                      style={{ fontSize: '20px', padding: '14px 24px', minHeight: '52px' }}
+                      style={{ fontSize: '24px', padding: '18px 28px', minHeight: '64px' }}
                     >
                       {useGemini ? "ON" : "OFF"}
                     </button>
                     <button
                       onClick={() => setShowApiKeyModal(true)}
                       className="rounded-full border border-white/20 bg-white/10 text-white"
-                      style={{ fontSize: '24px', padding: '12px 18px', minHeight: '52px' }}
+                      style={{ fontSize: '28px', padding: '16px 22px', minHeight: '64px' }}
                     >
                       ⚙️
                     </button>
@@ -927,12 +924,12 @@ function App() {
             {/* レシート一覧 */}
             <div className="mt-5 px-4">
               <div className="flex items-center justify-between">
-                <h3 className="font-semibold text-white" style={{ fontSize: '22px' }}>📋 レシート一覧</h3>
-                <span className="text-slate-400" style={{ fontSize: '20px' }}>{session.vault.receipts.length}件</span>
+                <h3 className="font-semibold text-white" style={{ fontSize: '26px' }}>📋 レシート一覧</h3>
+                <span className="text-slate-400" style={{ fontSize: '24px' }}>{session.vault.receipts.length}件</span>
               </div>
-              <div className="mt-3 space-y-3">
+              <div className="mt-3 space-y-4">
                 {session.vault.receipts.length === 0 ? (
-                  <p className="rounded-2xl bg-white/5 text-center text-slate-400" style={{ fontSize: '20px', padding: '36px 20px' }}>
+                  <p className="rounded-2xl bg-white/5 text-center text-slate-400" style={{ fontSize: '24px', padding: '44px 24px' }}>
                     まだレシートがありません
                   </p>
                 ) : (
@@ -940,24 +937,24 @@ function App() {
                     <div
                       key={receipt.id}
                       className="rounded-2xl border border-white/10 bg-white/5"
-                      style={{ padding: '20px' }}
+                      style={{ padding: '24px' }}
                     >
                       <div className="flex items-center justify-between">
                         <div>
-                          <p className="text-slate-400" style={{ fontSize: '18px' }}>{receipt.visitedAt}</p>
-                          <p className="font-semibold text-white" style={{ fontSize: '22px', marginTop: '4px' }}>{receipt.storeName}</p>
-                          <span className="inline-block rounded-full bg-white/10 text-slate-300" style={{ fontSize: '16px', padding: '8px 16px', marginTop: '10px' }}>
+                          <p className="text-slate-400" style={{ fontSize: '22px' }}>{receipt.visitedAt}</p>
+                          <p className="font-semibold text-white" style={{ fontSize: '26px', marginTop: '6px' }}>{receipt.storeName}</p>
+                          <span className="inline-block rounded-full bg-white/10 text-slate-300" style={{ fontSize: '20px', padding: '10px 20px', marginTop: '12px' }}>
                             {receipt.category}
                           </span>
                         </div>
                         <div className="text-right">
-                          <p className="font-bold text-mint" style={{ fontSize: '32px' }}>
+                          <p className="font-bold text-mint" style={{ fontSize: '36px' }}>
                             {formatCurrency(receipt.total)}
                           </p>
                           <button
                             onClick={() => handleDeleteReceipt(receipt.id)}
                             className="text-red-400"
-                            style={{ fontSize: '18px', marginTop: '10px', padding: '4px 0' }}
+                            style={{ fontSize: '22px', marginTop: '12px', padding: '8px 0' }}
                           >
                             削除
                           </button>
@@ -970,7 +967,7 @@ function App() {
                   <button
                     onClick={() => setVisibleCount((v) => v + 20)}
                     className="w-full rounded-xl border border-white/10 bg-white/5 font-semibold text-white"
-                    style={{ fontSize: '20px', padding: '18px', minHeight: '60px' }}
+                    style={{ fontSize: '24px', padding: '22px', minHeight: '72px' }}
                   >
                     もっと見る
                   </button>
@@ -980,15 +977,15 @@ function App() {
 
             {/* エクスポート */}
             <div className="mt-5 px-4 pb-6">
-              <div className="flex gap-3">
+              <div className="flex gap-4">
                 <button
                   onClick={handleExport}
                   className="flex-1 rounded-xl border border-white/15 bg-white/10 font-semibold text-white"
-                  style={{ fontSize: '20px', padding: '20px', minHeight: '64px' }}
+                  style={{ fontSize: '24px', padding: '24px', minHeight: '76px' }}
                 >
                   📤 CSVを保存
                 </button>
-                <label className="flex flex-1 cursor-pointer items-center justify-center rounded-xl border border-white/15 bg-white/10 font-semibold text-white" style={{ fontSize: '20px', padding: '20px', minHeight: '64px' }}>
+                <label className="flex flex-1 cursor-pointer items-center justify-center rounded-xl border border-white/15 bg-white/10 font-semibold text-white" style={{ fontSize: '24px', padding: '24px', minHeight: '76px' }}>
                   📥 CSVを読込
                   <input
                     type="file"
@@ -1009,8 +1006,8 @@ function App() {
 
         {/* スマホ用固定フッター */}
         {session && (
-          <div className="fixed inset-x-0 bottom-0 z-30 border-t border-white/10 bg-fog/95 px-3 py-3 backdrop-blur-lg safe-area-pb">
-            <div className="flex items-center gap-2">
+          <div className="fixed inset-x-0 bottom-0 z-30 border-t border-white/10 bg-fog/95 backdrop-blur-lg safe-area-pb" style={{ padding: '16px 20px' }}>
+            <div className="flex items-center gap-3">
               <button
                 onClick={cameraActive ? stopCamera : startCamera}
                 className={clsx(
@@ -1019,9 +1016,9 @@ function App() {
                     ? "border-2 border-white/30 bg-white/10 text-white"
                     : "border-2 border-mint/60 bg-mint/20 text-mint"
                 )}
-                style={{ minHeight: '60px', fontSize: '18px' }}
+                style={{ minHeight: '76px', fontSize: '22px' }}
               >
-                {cameraActive ? "📷 OFF" : "📷 ON"}
+                {cameraActive ? "カメラOFF" : "カメラON"}
               </button>
               <button
                 onClick={captureFromCamera}
@@ -1032,16 +1029,16 @@ function App() {
                     ? "animate-pulse border-yellow-400 bg-yellow-400/30 text-yellow-200"
                     : "border-mint bg-mint text-fog"
                 )}
-                style={{ minHeight: '70px', fontSize: '24px' }}
+                style={{ minHeight: '88px', fontSize: '26px' }}
               >
-                {isProcessing ? "⏳" : "📸 撮影"}
+                {isProcessing ? "処理中..." : "撮影"}
               </button>
               <button
                 onClick={handleSaveReceipt}
                 className="flex-1 rounded-2xl border-2 border-white/30 bg-white/15 font-bold text-white"
-                style={{ minHeight: '60px', fontSize: '18px' }}
+                style={{ minHeight: '76px', fontSize: '22px' }}
               >
-                💾 保存
+                保存
               </button>
             </div>
           </div>
@@ -1682,24 +1679,24 @@ const UnlockPanel = ({
   if (isMobile) {
     // スマホ用UI
     return (
-      <div className="flex flex-col gap-5">
-        <label className="text-slate-200" style={{ fontSize: '20px' }}>
+      <div className="flex flex-col gap-6">
+        <label className="text-slate-200" style={{ fontSize: '24px' }}>
           🔑 パスフレーズ
           <input
             type="password"
             className="w-full rounded-xl border border-white/10 bg-white/5 text-white outline-none ring-mint/30 focus:ring-2"
-            style={{ fontSize: '22px', padding: '20px', marginTop: '14px', minHeight: '64px' }}
+            style={{ fontSize: '26px', padding: '24px', marginTop: '16px', minHeight: '76px' }}
             placeholder="パスフレーズを入力"
             value={value}
             onChange={(e) => setValue(e.target.value)}
           />
         </label>
-        {error && <p className="text-red-300" style={{ fontSize: '18px' }}>{error}</p>}
+        {error && <p className="text-red-300" style={{ fontSize: '22px' }}>{error}</p>}
         <button
           onClick={() => onUnlock(value)}
           disabled={unlocking || value.length < 4}
           className="w-full rounded-xl bg-gradient-to-r from-mint/70 to-mint font-bold text-fog shadow-soft transition hover:translate-y-[-1px] disabled:cursor-not-allowed disabled:opacity-60"
-          style={{ fontSize: '24px', padding: '22px', minHeight: '70px' }}
+          style={{ fontSize: '28px', padding: '26px', minHeight: '84px' }}
         >
           {unlocking ? "🔓 復号中..." : "🔐 データを開く"}
         </button>

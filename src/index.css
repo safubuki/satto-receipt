@@ -14,12 +14,81 @@
 
 /* スマホ向け基本設定 */
 html {
-  font-size: 18px; /* 基本フォントサイズを大きく */
+  font-size: 16px;
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
 }
 
-@media (max-width: 640px) {
+/* ===========================================
+   スマホ向けスタイル (768px以下)
+   高DPIデバイス対応: vw単位を使って画面幅に比例させる
+   =========================================== */
+@media screen and (max-width: 768px) {
+  /* 基準フォントサイズ: 画面幅の5%程度 = 360px画面で18px相当 */
   html {
-    font-size: 20px; /* スマホではさらに大きく */
+    font-size: clamp(18px, 5vw, 24px);
+  }
+  
+  body {
+    font-size: clamp(18px, 5vw, 24px);
+    line-height: 1.5;
+  }
+  
+  /* ボタン系 - 最小48px、できれば画面幅の15%程度 */
+  button,
+  [role="button"],
+  .btn {
+    min-height: clamp(52px, 14vw, 70px);
+    font-size: clamp(18px, 5vw, 24px);
+    padding: clamp(14px, 4vw, 20px) clamp(18px, 5vw, 24px);
+  }
+  
+  /* 入力系 */
+  input,
+  textarea,
+  select {
+    min-height: clamp(52px, 14vw, 70px);
+    font-size: clamp(18px, 5vw, 24px);
+    padding: clamp(14px, 4vw, 20px);
+  }
+  
+  /* iOS zoom防止 - 16px以上必須 */
+  input[type="text"],
+  input[type="password"],
+  input[type="email"],
+  input[type="date"],
+  input[type="number"],
+  input[inputmode="numeric"] {
+    font-size: max(16px, clamp(18px, 5vw, 24px));
+  }
+  
+  /* チェックボックス */
+  input[type="checkbox"] {
+    width: clamp(28px, 8vw, 40px);
+    height: clamp(28px, 8vw, 40px);
+    min-width: clamp(28px, 8vw, 40px);
+    min-height: clamp(28px, 8vw, 40px);
+  }
+  
+  /* ラベル */
+  label {
+    font-size: clamp(18px, 5vw, 24px);
+  }
+  
+  /* 見出し - 画面幅に比例してスケール */
+  h1 { font-size: clamp(28px, 8vw, 40px); }
+  h2 { font-size: clamp(24px, 7vw, 36px); }
+  h3 { font-size: clamp(22px, 6vw, 32px); }
+  h4, h5, h6 { font-size: clamp(20px, 5.5vw, 28px); }
+  
+  /* 段落・テキスト - インラインスタイルを優先するため !important は使わない */
+  p {
+    font-size: clamp(18px, 5vw, 24px);
+  }
+  
+  /* span - 親からの継承を優先 */
+  span {
+    font-size: inherit;
   }
 }
 
@@ -29,28 +98,6 @@ body {
   background: radial-gradient(circle at 20% 20%, rgba(61, 224, 162, 0.09), transparent 30%),
     radial-gradient(circle at 80% 0%, rgba(255, 255, 255, 0.08), transparent 25%),
     #0b1224;
-}
-
-/* スマホ向けタッチターゲット最小サイズ */
-@media (max-width: 768px) {
-  button,
-  [role="button"],
-  input[type="checkbox"],
-  select {
-    min-height: 48px;
-    min-width: 48px;
-  }
-  
-  input[type="text"],
-  input[type="password"],
-  input[type="date"],
-  input[type="number"],
-  input[inputmode="numeric"],
-  textarea,
-  select {
-    font-size: 16px !important; /* iOS zoom防止 */
-    min-height: 52px;
-  }
 }
 
 a {
@@ -66,38 +113,4 @@ option {
 /* iPhone safe area対応 */
 .safe-area-pb {
   padding-bottom: max(12px, env(safe-area-inset-bottom));
-}
-
-/* スマホ向け大きなUI */
-@media (max-width: 768px) {
-  .mobile-btn {
-    min-height: 56px !important;
-    font-size: 18px !important;
-  }
-  
-  .mobile-input {
-    min-height: 56px !important;
-    font-size: 18px !important;
-    padding: 14px 16px !important;
-  }
-  
-  .mobile-card {
-    padding: 20px !important;
-  }
-  
-  .mobile-text-lg {
-    font-size: 20px !important;
-  }
-  
-  .mobile-text-xl {
-    font-size: 24px !important;
-  }
-  
-  .mobile-text-2xl {
-    font-size: 28px !important;
-  }
-  
-  .mobile-text-3xl {
-    font-size: 32px !important;
-  }
 }
