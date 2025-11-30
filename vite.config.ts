@@ -33,10 +33,21 @@ export default defineConfig({
       },
       workbox: {
         globPatterns: ['**/*.{js,css,html,svg,png,ico,webmanifest}'],
-        // キャッシュをクリアするためにskipWaitingを有効化
         skipWaiting: true,
         clientsClaim: true,
+        // 古いキャッシュを自動削除
+        cleanupOutdatedCaches: true,
       },
     }),
   ],
+  // ビルド時にファイル名にハッシュを付与してキャッシュバスティング
+  build: {
+    rollupOptions: {
+      output: {
+        entryFileNames: 'assets/[name]-[hash].js',
+        chunkFileNames: 'assets/[name]-[hash].js',
+        assetFileNames: 'assets/[name]-[hash].[ext]',
+      },
+    },
+  },
 })
