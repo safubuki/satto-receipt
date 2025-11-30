@@ -33,6 +33,9 @@ export default defineConfig({
       },
       workbox: {
         globPatterns: ['**/*.{js,css,html,svg,png,ico,webmanifest}'],
+        // キャッシュをクリアするためにskipWaitingを有効化
+        skipWaiting: true,
+        clientsClaim: true,
       },
     }),
   ],
