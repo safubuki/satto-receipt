@@ -23,10 +23,12 @@ export interface ReceiptOcrResult {
   storeName: string
   date: string
   total: string
+  category: string  // 店舗タイプ（AI自動判定）
   items: Array<{
     name: string
     price: number
     quantity: number
+    category?: string  // 品目カテゴリ
   }>
   rawText: string
 }
@@ -136,8 +138,9 @@ export const analyzeReceiptWithGemini = async (
   "storeName": "店舗名",
   "date": "YYYY-MM-DD形式の日付",
   "total": "合計金額（数字のみ）",
+  "category": "店舗タイプ（以下から選択: スーパー, コンビニ, ドラッグストア, 飲食店, 衣料品店, 家電・雑貨, 医療・薬局, 娯楽, その他）",
   "items": [
-    {"name": "商品名", "price": 金額, "quantity": 数量}
+    {"name": "商品名", "price": 金額, "quantity": 数量, "category": "品目カテゴリ（食品, 飲料, 日用品, 医薬品, 衣類, 雑貨, サービス, その他）"}
   ],
   "rawText": "レシートに記載されている全テキスト"
 }
@@ -146,6 +149,7 @@ export const analyzeReceiptWithGemini = async (
 - 日付が読み取れない場合は空文字にしてください
 - 合計金額が読み取れない場合は"0"にしてください
 - 商品が読み取れない場合はitemsは空配列にしてください
+- 店舗名から店舗タイプを推測してください（例: イオン→スーパー, セブンイレブン→コンビニ）
 - JSONのみを出力し、他の説明は不要です`
 
   // 5. Gemini APIを呼び出し
@@ -192,6 +196,7 @@ export const analyzeReceiptWithGemini = async (
         storeName: result.storeName || '',
         date: result.date || '',
         total: String(result.total || '0'),
+        category: result.category || 'その他',
         items: result.items || [],
         rawText: result.rawText || '',
       }
@@ -202,6 +207,7 @@ export const analyzeReceiptWithGemini = async (
         storeName: '',
         date: '',
         total: '0',
+        category: 'その他',
         items: [],
         rawText: text,
       }

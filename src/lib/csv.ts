@@ -12,19 +12,24 @@ export const toCsv = (receipts: Receipt[]): string => {
   const header = [
     'date',
     'store',
-    'item',
-    'category',
+    'store_category',
+    'item_name',
+    'item_category',
     'quantity',
-    'price',
+    'unit_price',
+    'subtotal',
     'receipt_total',
     'note',
   ]
   const rows = receipts.flatMap((receipt) => {
+    // 品目がない場合は1行で出力
     if (!receipt.lineItems.length) {
       return [
         [
           receipt.visitedAt,
           receipt.storeName,
+          receipt.category ?? '',
+          '',
           '',
           '',
           '',
@@ -35,13 +40,16 @@ export const toCsv = (receipts: Receipt[]): string => {
       ]
     }
 
+    // 品目ごとに1行ずつ出力
     return receipt.lineItems.map((line) => [
       receipt.visitedAt,
       receipt.storeName,
+      receipt.category ?? '',
       line.name,
       line.category,
       line.quantity,
       line.price,
+      line.price * line.quantity,
       receipt.total,
       receipt.note ?? '',
     ])
@@ -51,7 +59,9 @@ export const toCsv = (receipts: Receipt[]): string => {
 }
 
 export const downloadCsv = (csv: string, filename = 'receipts.csv') => {
-  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
+  // BOMを追加してExcelでの文字化けを防止
+  const bom = new Uint8Array([0xEF, 0xBB, 0xBF])
+  const blob = new Blob([bom, csv], { type: 'text/csv;charset=utf-8;' })
   const url = URL.createObjectURL(blob)
   const link = document.createElement('a')
   link.href = url

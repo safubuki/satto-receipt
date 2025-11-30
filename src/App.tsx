@@ -35,10 +35,14 @@ type ReceiptDraft = {
 }
 
 const defaultCategories: Category[] = [
-  { id: "groceries", name: "食料品", color: "#3de0a2" },
-  { id: "daily", name: "日用品", color: "#a78bfa" },
-  { id: "eatout", name: "外食", color: "#f59e0b" },
-  { id: "transport", name: "交通", color: "#38bdf8" },
+  { id: "supermarket", name: "スーパー", color: "#3de0a2" },
+  { id: "convenience", name: "コンビニ", color: "#f59e0b" },
+  { id: "drugstore", name: "ドラッグストア", color: "#a78bfa" },
+  { id: "restaurant", name: "飲食店", color: "#ef4444" },
+  { id: "clothing", name: "衣料品店", color: "#ec4899" },
+  { id: "electronics", name: "家電・雑貨", color: "#38bdf8" },
+  { id: "medical", name: "医療・薬局", color: "#14b8a6" },
+  { id: "entertainment", name: "娯楽", color: "#8b5cf6" },
   { id: "other", name: "その他", color: "#94a3b8" },
 ]
 
@@ -285,6 +289,11 @@ function App() {
   }
 
   const handleReset = async () => {
+    const confirmed = window.confirm(
+      '⚠️ これまで保存したすべてのデータ（レシート・設定）が完全に削除されます。\n\nこの操作は取り消しできません。\n本当に削除しますか？'
+    )
+    if (!confirmed) return
+    
     await clearVault()
     setSession(null)
     setDraft(initialDraft(defaultCategories))
@@ -304,12 +313,33 @@ function App() {
         // Gemini API
         const result = await analyzeReceiptWithGemini(file, setOcrProgress)
         setOcrText(result.rawText)
+        
+        // AIが判定したカテゴリを設定（存在する場合）
+        let selectedCategory = categories[0]?.name ?? "その他"
+        if (result.category) {
+          const found = categories.find(c => c.name === result.category)
+          if (found) {
+            selectedCategory = found.name
+          }
+        }
+        
+        // 品目データをLineItemDraft形式に変換
+        const lineItemDrafts: LineItemDraft[] = (result.items || []).map((item: { name: string; price: number; quantity?: number; category?: string }, idx: number) => ({
+          id: `item-${idx}-${Date.now()}`,
+          name: item.name,
+          category: item.category || selectedCategory,
+          price: String(item.price),
+          quantity: String(item.quantity || 1),
+        }))
+        
         setDraft({
           ...initialDraft(categories),
           storeName: result.storeName || "",
           visitedAt: result.date || new Date().toISOString().slice(0, 10),
           total: result.total || "",
+          category: selectedCategory,
           imageData: preview,
+          lineItems: lineItemDrafts,
         })
       } else {
         // 従来のTesseract OCR
@@ -342,7 +372,15 @@ function App() {
 
   const handleSaveReceipt = async () => {
     if (!session) return
-    const lineItems: LineItem[] = []
+    
+    // ドラフトの品目データをLineItem形式に変換
+    const lineItems: LineItem[] = draft.lineItems.map((item) => ({
+      id: item.id,
+      name: item.name,
+      category: item.category,
+      price: Number(item.price) || 0,
+      quantity: Number(item.quantity) || 1,
+    }))
 
     const computedTotal = Number(draft.total) || 0
 
@@ -545,22 +583,15 @@ function App() {
     [filteredReceipts, visibleCount],
   )
 
-  const totalSpent = session?.vault.receipts.reduce((sum, r) => sum + r.total, 0)
+  const currentYear = new Date().getFullYear().toString()
+  
+  const yearlySpent = session?.vault.receipts
+    .filter((r) => r.visitedAt.startsWith(currentYear))
+    .reduce((sum, r) => sum + r.total, 0)
 
   const monthlySpent = session?.vault.receipts
     .filter((r) => r.visitedAt.startsWith(new Date().toISOString().slice(0, 7)))
     .reduce((sum, r) => sum + r.total, 0)
-
-  const storeTotals = useMemo(() => {
-    const map = new Map<string, number>()
-    session?.vault.receipts.forEach((r) => {
-      const key = r.storeName || "(店名なし)"
-      map.set(key, (map.get(key) || 0) + r.total)
-    })
-    return Array.from(map.entries())
-      .map(([store, total]) => ({ store, total }))
-      .sort((a, b) => b.total - a.total)
-  }, [session])
 
   const monthlyTotals = useMemo(() => {
     const map = new Map<string, { total: number; count: number }>()
@@ -611,9 +642,9 @@ function App() {
             {session && (
               <button
                 onClick={handleLock}
-                className="rounded-full border border-white/20 bg-white/10 px-5 py-4 text-3xl font-semibold text-white"
+                className="rounded-full border border-white/20 bg-white/10 px-4 py-3 text-base font-semibold text-white"
               >
-                🔒
+                🔒 ログアウト
               </button>
             )}
           </div>
@@ -773,10 +804,27 @@ function App() {
                 <p className="mt-2 text-3xl font-bold text-mint">{formatCurrency(monthlySpent ?? 0)}</p>
               </div>
               <div className="rounded-2xl border border-white/10 bg-white/5 p-5">
-                <p className="text-base text-slate-400">累計</p>
-                <p className="mt-2 text-3xl font-bold text-white">{formatCurrency(totalSpent ?? 0)}</p>
+                <p className="text-base text-slate-400">今年</p>
+                <p className="mt-2 text-3xl font-bold text-white">{formatCurrency(yearlySpent ?? 0)}</p>
               </div>
             </div>
+
+            {/* 月別合計 */}
+            {monthlyTotals.length > 0 && (
+              <div className="mt-4 px-5">
+                <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
+                  <p className="text-base font-semibold text-white mb-3">📅 月別合計</p>
+                  <div className="space-y-2">
+                    {monthlyTotals.slice(0, 6).map((entry) => (
+                      <div key={entry.month} className="flex items-center justify-between">
+                        <span className="text-base text-slate-300">{entry.month}</span>
+                        <span className="text-lg font-semibold text-mint">{formatCurrency(entry.total)}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
 
             {/* 入力フォーム（シンプル版）*/}
             <div className="mt-5 space-y-5 px-5">
@@ -796,13 +844,16 @@ function App() {
                       value={draft.visitedAt}
                       onChange={(e) => setDraft((prev) => ({ ...prev, visitedAt: e.target.value }))}
                     />
-                    <input
-                      inputMode="numeric"
-                      className="flex-1 rounded-xl border-2 border-mint/50 bg-mint/10 px-4 py-4 text-3xl font-bold text-mint placeholder-mint/50"
-                      value={draft.total}
-                      onChange={(e) => setDraft((prev) => ({ ...prev, total: e.target.value }))}
-                      placeholder="¥"
-                    />
+                    <div className="flex flex-1 items-center rounded-xl border-2 border-mint/50 bg-mint/10 px-4 py-4">
+                      <span className="text-3xl font-bold text-mint/70">¥</span>
+                      <input
+                        inputMode="numeric"
+                        className="w-full bg-transparent text-3xl font-bold text-mint placeholder-mint/50 outline-none"
+                        value={draft.total}
+                        onChange={(e) => setDraft((prev) => ({ ...prev, total: e.target.value }))}
+                        placeholder="0"
+                      />
+                    </div>
                   </div>
                   <select
                     className="w-full rounded-xl border border-white/10 bg-white/5 px-5 py-4 text-xl text-white"
@@ -922,10 +973,10 @@ function App() {
                   onClick={handleExport}
                   className="flex-1 rounded-xl border border-white/15 bg-white/10 py-4 text-lg font-semibold text-white"
                 >
-                  📤 CSV保存
+                  📤 CSVを保存
                 </button>
                 <label className="flex flex-1 cursor-pointer items-center justify-center rounded-xl border border-white/15 bg-white/10 py-4 text-lg font-semibold text-white">
-                  📥 CSV読込
+                  📥 CSVを読込
                   <input
                     type="file"
                     accept=".csv,text/csv"
@@ -950,13 +1001,13 @@ function App() {
               <button
                 onClick={cameraActive ? stopCamera : startCamera}
                 className={clsx(
-                  "flex-1 rounded-xl py-5 text-xl font-bold",
+                  "flex-1 rounded-xl py-5 text-lg font-bold",
                   cameraActive
                     ? "border border-white/20 bg-white/10 text-white"
                     : "border-2 border-mint/60 bg-mint/20 text-mint"
                 )}
               >
-                {cameraActive ? "⏹ 停止" : "📹 起動"}
+                {cameraActive ? "📷 カメラOFF" : "📷 カメラON"}
               </button>
               <button
                 onClick={captureFromCamera}
@@ -1063,16 +1114,10 @@ function App() {
           {session && (
             <div className="flex flex-wrap gap-2">
               <button
-                onClick={handleExport}
-                className="rounded-full border border-mint/60 bg-mint/10 px-4 py-2 text-sm font-semibold text-mint transition hover:bg-mint/20"
-              >
-                CSV エクスポート
-              </button>
-              <button
                 onClick={handleLock}
                 className="rounded-full border border-white/15 bg-white/5 px-4 py-2 text-sm font-semibold text-white transition hover:border-white/25 hover:bg-white/10"
               >
-                ロック
+                🔒 ログアウト
               </button>
             </div>
           )}
@@ -1309,14 +1354,17 @@ function App() {
                     />
                   </label>
                   <label className="flex flex-col gap-2 text-sm text-slate-200">
-                    合計 (円)
-                    <input
-                      inputMode="numeric"
-                      className="w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-white outline-none ring-mint/30 focus:ring-2"
-                      value={draft.total}
-                      onChange={(e) => setDraft((prev) => ({ ...prev, total: e.target.value }))}
-                      placeholder="例: 2430"
-                    />
+                    合計
+                    <div className="flex items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-3 py-2">
+                      <span className="text-mint font-semibold">¥</span>
+                      <input
+                        inputMode="numeric"
+                        className="w-full bg-transparent text-white outline-none"
+                        value={draft.total}
+                        onChange={(e) => setDraft((prev) => ({ ...prev, total: e.target.value }))}
+                        placeholder="0"
+                      />
+                    </div>
                   </label>
                   <label className="flex flex-col gap-2 text-sm text-slate-200">
                     分類 (ドロップダウン)
@@ -1391,20 +1439,12 @@ function App() {
                 <>
                   <div className="grid gap-3 sm:grid-cols-2">
                     <StatCard label="今月の支出" value={formatCurrency(monthlySpent ?? 0)} accent />
-                    <StatCard label="累計" value={formatCurrency(totalSpent ?? 0)} />
-                    <StatCard label="レシート枚数" value={`${session.vault.receipts.length} 件`} />
-                    <StatCard label="最終更新" value={lastReceipt ? lastReceipt.visitedAt : "未登録"} />
+                    <StatCard label="今年の支出" value={formatCurrency(yearlySpent ?? 0)} />
                   </div>
-
-                  <div className="rounded-2xl border border-white/10 bg-white/5 p-4 text-sm text-slate-300">
-                    <p className="font-semibold text-white">店舗別 合計</p>
-                    {storeTotals.length === 0 && <p className="text-slate-400">まだありません</p>}
-                    {storeTotals.slice(0, 5).map((entry) => (
-                      <div key={entry.store} className="flex items-center justify-between py-1">
-                        <span className="text-white">{entry.store}</span>
-                        <span className="text-mint font-semibold">{formatCurrency(entry.total)}</span>
-                      </div>
-                    ))}
+                  
+                  <div className="rounded-2xl border border-white/10 bg-white/5 p-3">
+                    <p className="text-xs text-slate-400">最終更新</p>
+                    <p className="text-sm font-semibold text-white">{lastReceipt ? lastReceipt.visitedAt : "未登録"}</p>
                   </div>
 
                   <div className="rounded-2xl border border-white/10 bg-white/5 p-4 text-sm text-slate-300">
@@ -1435,7 +1475,7 @@ function App() {
               )}
 
               <div className="rounded-2xl border border-white/10 bg-white/5 p-4 text-sm text-slate-300">
-                <p className="font-semibold text-white">CSVエクスポート</p>
+                <p className="font-semibold text-white">CSV</p>
                 <p className="text-slate-400">暗号化解除済みデータを端末内でCSV化し、そのままダウンロードします。</p>
                 <div className="mt-3 grid gap-2 sm:grid-cols-2">
                   <button
@@ -1445,7 +1485,7 @@ function App() {
                     CSVを保存
                   </button>
                   <label className="flex cursor-pointer items-center justify-center rounded-xl border border-white/15 bg-white/10 px-4 py-2 text-sm font-semibold text-white hover:border-white/25 hover:bg-white/15">
-                    CSVから復元
+                    CSVを読込
                     <input
                       type="file"
                       accept=".csv,text/csv"
