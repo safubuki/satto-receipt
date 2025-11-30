@@ -465,7 +465,7 @@ function App() {
   const lastReceipt = session?.vault.receipts[0]
   return (
     <div className="min-h-screen text-sand">
-      <div className="mx-auto flex max-w-6xl flex-col gap-8 px-4 pt-8 pb-28 lg:pb-8">
+      <div className="mx-auto flex w-full max-w-6xl flex-col gap-8 px-3 pt-6 pb-32 text-[15px] sm:px-4 sm:pt-8 sm:pb-8 sm:text-base">
         <header className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-center gap-4">
             <div className="relative h-14 w-14 shrink-0 rounded-full bg-gradient-to-r from-mint/60 to-mint/30 p-[2px] shadow-soft">
@@ -620,7 +620,7 @@ function App() {
                     <div className="overflow-hidden rounded-2xl border border-white/10 bg-black/40">
                       <video
                         ref={setVideoRef}
-                        className="h-64 w-full object-contain"
+                        className="w-full object-contain h-80 sm:h-64"
                         autoPlay
                         playsInline
                         muted
