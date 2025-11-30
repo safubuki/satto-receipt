@@ -625,10 +625,10 @@ function App() {
     return (
       <div className="min-h-screen bg-fog text-sand text-lg">
         {/* スマホ用ヘッダー */}
-        <header className="sticky top-0 z-20 border-b border-white/10 bg-fog/95 px-5 py-5 backdrop-blur-lg">
+        <header className="sticky top-0 z-20 border-b border-white/10 bg-fog/95 px-5 py-4 backdrop-blur-lg">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <div className="h-14 w-14 rounded-full bg-gradient-to-r from-mint/60 to-mint/30 p-[2px]">
+              <div className="h-12 w-12 rounded-full bg-gradient-to-r from-mint/60 to-mint/30 p-[2px]">
                 <div className="h-full w-full rounded-full bg-fog/90 p-[1px]">
                   <img
                     src={`${import.meta.env.BASE_URL}turtle_icon_receipt.png`}
@@ -637,12 +637,12 @@ function App() {
                   />
                 </div>
               </div>
-              <h1 className="text-3xl font-bold text-white">サッとレシート</h1>
+              <h1 className="text-2xl font-bold text-white">サッとレシート</h1>
             </div>
             {session && (
               <button
                 onClick={handleLock}
-                className="rounded-full border border-white/20 bg-white/10 px-4 py-3 text-base font-semibold text-white"
+                className="rounded-full border border-white/20 bg-white/10 px-5 py-3 text-lg font-semibold text-white"
               >
                 🔒 ログアウト
               </button>
@@ -798,27 +798,27 @@ function App() {
             )}
 
             {/* サマリーカード */}
-            <div className="mt-5 grid grid-cols-2 gap-4 px-5">
-              <div className="rounded-2xl border border-white/10 bg-white/10 p-5">
-                <p className="text-base text-slate-400">今月</p>
-                <p className="mt-2 text-3xl font-bold text-mint">{formatCurrency(monthlySpent ?? 0)}</p>
+            <div className="mt-4 grid grid-cols-2 gap-3 px-4">
+              <div className="rounded-2xl border border-white/10 bg-white/10 p-4">
+                <p className="text-lg text-slate-400">今月</p>
+                <p className="mt-1 text-4xl font-bold text-mint">{formatCurrency(monthlySpent ?? 0)}</p>
               </div>
-              <div className="rounded-2xl border border-white/10 bg-white/5 p-5">
-                <p className="text-base text-slate-400">今年</p>
-                <p className="mt-2 text-3xl font-bold text-white">{formatCurrency(yearlySpent ?? 0)}</p>
+              <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
+                <p className="text-lg text-slate-400">今年</p>
+                <p className="mt-1 text-4xl font-bold text-white">{formatCurrency(yearlySpent ?? 0)}</p>
               </div>
             </div>
 
             {/* 月別合計 */}
             {monthlyTotals.length > 0 && (
-              <div className="mt-4 px-5">
+              <div className="mt-3 px-4">
                 <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
-                  <p className="text-base font-semibold text-white mb-3">📅 月別合計</p>
-                  <div className="space-y-2">
+                  <p className="text-lg font-semibold text-white mb-3">📅 月別合計</p>
+                  <div className="space-y-3">
                     {monthlyTotals.slice(0, 6).map((entry) => (
                       <div key={entry.month} className="flex items-center justify-between">
-                        <span className="text-base text-slate-300">{entry.month}</span>
-                        <span className="text-lg font-semibold text-mint">{formatCurrency(entry.total)}</span>
+                        <span className="text-lg text-slate-300">{entry.month}</span>
+                        <span className="text-xl font-semibold text-mint">{formatCurrency(entry.total)}</span>
                       </div>
                     ))}
                   </div>
@@ -827,24 +827,24 @@ function App() {
             )}
 
             {/* 入力フォーム（シンプル版）*/}
-            <div className="mt-5 space-y-5 px-5">
-              <div className="rounded-2xl border border-white/10 bg-white/5 p-5">
-                <h3 className="mb-5 text-2xl font-semibold text-white">📝 レシート入力</h3>
-                <div className="space-y-4">
+            <div className="mt-4 space-y-4 px-4">
+              <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
+                <h3 className="mb-4 text-xl font-semibold text-white">📝 レシート入力</h3>
+                <div className="space-y-3">
                   <input
-                    className="w-full rounded-xl border border-white/10 bg-white/5 px-5 py-4 text-xl text-white placeholder-slate-500"
+                    className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-4 text-xl text-white placeholder-slate-500"
                     value={draft.storeName}
                     onChange={(e) => setDraft((prev) => ({ ...prev, storeName: e.target.value }))}
                     placeholder="店名"
                   />
-                  <div className="flex gap-3">
+                  <div className="flex gap-2">
                     <input
                       type="date"
-                      className="flex-1 rounded-xl border border-white/10 bg-white/5 px-4 py-4 text-lg text-white"
+                      className="flex-1 rounded-xl border border-white/10 bg-white/5 px-3 py-4 text-lg text-white"
                       value={draft.visitedAt}
                       onChange={(e) => setDraft((prev) => ({ ...prev, visitedAt: e.target.value }))}
                     />
-                    <div className="flex flex-1 items-center rounded-xl border-2 border-mint/50 bg-mint/10 px-4 py-4">
+                    <div className="flex flex-1 items-center rounded-xl border-2 border-mint/50 bg-mint/10 px-3 py-3">
                       <span className="text-3xl font-bold text-mint/70">¥</span>
                       <input
                         inputMode="numeric"
@@ -856,7 +856,7 @@ function App() {
                     </div>
                   </div>
                   <select
-                    className="w-full rounded-xl border border-white/10 bg-white/5 px-5 py-4 text-xl text-white"
+                    className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-4 text-xl text-white"
                     value={draft.category}
                     onChange={(e) => setDraft((prev) => ({ ...prev, category: e.target.value }))}
                   >
@@ -870,33 +870,33 @@ function App() {
               </div>
 
               {/* 画像保存オプション */}
-              <label className="flex items-center gap-4 px-2 text-lg text-slate-300">
+              <label className="flex items-center gap-4 px-2 text-xl text-slate-300">
                 <input
                   type="checkbox"
                   checked={saveImage}
                   onChange={(e) => setSaveImage(e.target.checked)}
-                  className="h-6 w-6 rounded"
+                  className="h-7 w-7 rounded"
                 />
                 📷 画像も保存する
               </label>
 
               {/* OCR設定 */}
-              <div className="rounded-2xl border border-white/10 bg-white/5 p-5">
+              <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
-                    <span className="text-2xl">🤖</span>
+                    <span className="text-3xl">🤖</span>
                     <div>
-                      <p className="text-lg font-semibold text-white">Gemini AI認識</p>
-                      <p className="text-base text-slate-400">
+                      <p className="text-xl font-semibold text-white">Gemini AI認識</p>
+                      <p className="text-lg text-slate-400">
                         {hasApiKey() ? "✅ 設定済み" : "❌ 未設定"}
                       </p>
                     </div>
                   </div>
-                  <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-2">
                     <button
                       onClick={() => setUseGemini(!useGemini)}
                       className={clsx(
-                        "rounded-full px-4 py-2 text-base font-semibold",
+                        "rounded-full px-5 py-3 text-lg font-semibold",
                         useGemini
                           ? "bg-mint text-fog"
                           : "border border-white/20 bg-white/10 text-white"
@@ -906,7 +906,7 @@ function App() {
                     </button>
                     <button
                       onClick={() => setShowApiKeyModal(true)}
-                      className="rounded-full border border-white/20 bg-white/10 px-4 py-2 text-base text-white"
+                      className="rounded-full border border-white/20 bg-white/10 px-4 py-3 text-xl text-white"
                     >
                       ⚙️
                     </button>
@@ -916,27 +916,27 @@ function App() {
             </div>
 
             {/* レシート一覧 */}
-            <div className="mt-6 px-5">
+            <div className="mt-5 px-4">
               <div className="flex items-center justify-between">
-                <h3 className="text-2xl font-semibold text-white">📋 レシート一覧</h3>
-                <span className="text-lg text-slate-400">{session.vault.receipts.length}件</span>
+                <h3 className="text-xl font-semibold text-white">📋 レシート一覧</h3>
+                <span className="text-xl text-slate-400">{session.vault.receipts.length}件</span>
               </div>
-              <div className="mt-4 space-y-4">
+              <div className="mt-3 space-y-3">
                 {session.vault.receipts.length === 0 ? (
-                  <p className="rounded-2xl bg-white/5 py-10 text-center text-lg text-slate-400">
+                  <p className="rounded-2xl bg-white/5 py-8 text-center text-xl text-slate-400">
                     まだレシートがありません
                   </p>
                 ) : (
                   displayedReceipts.map((receipt) => (
                     <div
                       key={receipt.id}
-                      className="rounded-2xl border border-white/10 bg-white/5 p-5"
+                      className="rounded-2xl border border-white/10 bg-white/5 p-4"
                     >
                       <div className="flex items-center justify-between">
                         <div>
-                          <p className="text-base text-slate-400">{receipt.visitedAt}</p>
+                          <p className="text-lg text-slate-400">{receipt.visitedAt}</p>
                           <p className="text-xl font-semibold text-white">{receipt.storeName}</p>
-                          <span className="mt-2 inline-block rounded-full bg-white/10 px-4 py-1.5 text-sm text-slate-300">
+                          <span className="mt-2 inline-block rounded-full bg-white/10 px-4 py-2 text-base text-slate-300">
                             {receipt.category}
                           </span>
                         </div>
@@ -946,7 +946,7 @@ function App() {
                           </p>
                           <button
                             onClick={() => handleDeleteReceipt(receipt.id)}
-                            className="mt-2 text-base text-red-400"
+                            className="mt-2 text-lg text-red-400"
                           >
                             削除
                           </button>
@@ -967,15 +967,15 @@ function App() {
             </div>
 
             {/* エクスポート */}
-            <div className="mt-6 px-5 pb-8">
-              <div className="flex gap-4">
+            <div className="mt-5 px-4 pb-6">
+              <div className="flex gap-3">
                 <button
                   onClick={handleExport}
-                  className="flex-1 rounded-xl border border-white/15 bg-white/10 py-4 text-lg font-semibold text-white"
+                  className="flex-1 rounded-xl border border-white/15 bg-white/10 py-5 text-xl font-semibold text-white"
                 >
                   📤 CSVを保存
                 </button>
-                <label className="flex flex-1 cursor-pointer items-center justify-center rounded-xl border border-white/15 bg-white/10 py-4 text-lg font-semibold text-white">
+                <label className="flex flex-1 cursor-pointer items-center justify-center rounded-xl border border-white/15 bg-white/10 py-5 text-xl font-semibold text-white">
                   📥 CSVを読込
                   <input
                     type="file"
@@ -996,24 +996,24 @@ function App() {
 
         {/* スマホ用固定フッター */}
         {session && (
-          <div className="fixed inset-x-0 bottom-0 z-30 border-t border-white/10 bg-fog/95 px-5 py-5 backdrop-blur-lg">
-            <div className="flex items-center gap-4">
+          <div className="fixed inset-x-0 bottom-0 z-30 border-t border-white/10 bg-fog/95 px-4 py-4 backdrop-blur-lg">
+            <div className="flex items-center gap-3">
               <button
                 onClick={cameraActive ? stopCamera : startCamera}
                 className={clsx(
-                  "flex-1 rounded-xl py-5 text-lg font-bold",
+                  "flex-1 rounded-xl py-4 text-base font-bold",
                   cameraActive
                     ? "border border-white/20 bg-white/10 text-white"
                     : "border-2 border-mint/60 bg-mint/20 text-mint"
                 )}
               >
-                {cameraActive ? "📷 カメラOFF" : "📷 カメラON"}
+                {cameraActive ? "📷 OFF" : "📷 ON"}
               </button>
               <button
                 onClick={captureFromCamera}
                 disabled={!cameraActive || isProcessing}
                 className={clsx(
-                  "flex-[1.5] rounded-xl border-2 py-5 text-3xl font-bold shadow-lg disabled:opacity-50",
+                  "flex-[1.8] rounded-xl border-2 py-5 text-2xl font-bold shadow-lg disabled:opacity-50",
                   isProcessing
                     ? "animate-pulse border-yellow-400 bg-yellow-400/30 text-yellow-200"
                     : "border-mint bg-mint text-fog"
@@ -1023,7 +1023,7 @@ function App() {
               </button>
               <button
                 onClick={handleSaveReceipt}
-                className="flex-1 rounded-xl border border-white/20 bg-white/15 py-5 text-xl font-bold text-white"
+                className="flex-1 rounded-xl border border-white/20 bg-white/15 py-4 text-base font-bold text-white"
               >
                 💾 保存
               </button>
