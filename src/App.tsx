@@ -118,14 +118,42 @@ const Pill = ({ children }: { children: ReactNode }) => (
   </span>
 )
 
-// スマホ判定カスタムフック (768px未満をスマホとみなす)
+// スマホ判定カスタムフック
+// 方法1: 画面幅 (768px未満)
+// 方法2: タッチデバイス判定
+// 方法3: User-Agentによるモバイル判定
 const useIsMobile = () => {
-  const [isMobile, setIsMobile] = useState(() => 
-    typeof window !== 'undefined' ? window.innerWidth < 768 : false
-  )
+  const [isMobile, setIsMobile] = useState(() => {
+    if (typeof window === 'undefined') return false
+    
+    // タッチデバイスかどうか
+    const hasTouch = 'ontouchstart' in window || navigator.maxTouchPoints > 0
+    // User-Agentでモバイル判定
+    const mobileUA = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)
+    // 画面幅判定
+    const narrowScreen = window.innerWidth < 768
+    
+    // デバッグ用（本番では削除可能）
+    console.log('[Mobile Detection]', {
+      innerWidth: window.innerWidth,
+      innerHeight: window.innerHeight,
+      devicePixelRatio: window.devicePixelRatio,
+      hasTouch,
+      mobileUA,
+      narrowScreen,
+    })
+    
+    // タッチデバイス または モバイルUA または 狭い画面 → スマホ扱い
+    return hasTouch || mobileUA || narrowScreen
+  })
   
   useEffect(() => {
-    const checkMobile = () => setIsMobile(window.innerWidth < 768)
+    const checkMobile = () => {
+      const hasTouch = 'ontouchstart' in window || navigator.maxTouchPoints > 0
+      const mobileUA = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)
+      const narrowScreen = window.innerWidth < 768
+      setIsMobile(hasTouch || mobileUA || narrowScreen)
+    }
     checkMobile()
     window.addEventListener('resize', checkMobile)
     return () => window.removeEventListener('resize', checkMobile)
@@ -1307,12 +1335,21 @@ const UnlockPanel = ({
   error: string | null
 }) => {
   const [value, setValue] = useState("")
-  // スマホ判定 (コンポーネント内で独自に判定)
-  const [isMobile, setIsMobile] = useState(() => 
-    typeof window !== 'undefined' ? window.innerWidth < 768 : false
-  )
+  // スマホ判定 (タッチ + UA + 画面幅)
+  const [isMobile, setIsMobile] = useState(() => {
+    if (typeof window === 'undefined') return false
+    const hasTouch = 'ontouchstart' in window || navigator.maxTouchPoints > 0
+    const mobileUA = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)
+    const narrowScreen = window.innerWidth < 768
+    return hasTouch || mobileUA || narrowScreen
+  })
   useEffect(() => {
-    const checkMobile = () => setIsMobile(window.innerWidth < 768)
+    const checkMobile = () => {
+      const hasTouch = 'ontouchstart' in window || navigator.maxTouchPoints > 0
+      const mobileUA = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)
+      const narrowScreen = window.innerWidth < 768
+      setIsMobile(hasTouch || mobileUA || narrowScreen)
+    }
     window.addEventListener('resize', checkMobile)
     return () => window.removeEventListener('resize', checkMobile)
   }, [])
