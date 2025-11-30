@@ -465,10 +465,10 @@ function App() {
   const lastReceipt = session?.vault.receipts[0]
   return (
     <div className="min-h-screen text-sand">
-      <div className="mx-auto flex w-full max-w-6xl flex-col gap-8 px-3 pt-6 pb-32 text-[15px] sm:px-4 sm:pt-8 sm:pb-8 sm:text-base">
+      <div className="mx-auto flex w-full max-w-6xl flex-col gap-6 px-4 pt-4 pb-36 text-base sm:gap-8 sm:px-6 sm:pt-8 sm:pb-8 lg:text-base">
         <header className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-          <div className="flex items-center gap-4">
-            <div className="relative h-14 w-14 shrink-0 rounded-full bg-gradient-to-r from-mint/60 to-mint/30 p-[2px] shadow-soft">
+          <div className="flex items-center gap-3 sm:gap-4">
+            <div className="relative h-16 w-16 shrink-0 rounded-full bg-gradient-to-r from-mint/60 to-mint/30 p-[2px] shadow-soft sm:h-14 sm:w-14">
               <div className="h-full w-full rounded-full bg-fog/90 p-[1px]">
                 <img
                   src={`${import.meta.env.BASE_URL}turtle_icon_receipt.png`}
@@ -478,12 +478,12 @@ function App() {
               </div>
             </div>
             <div className="leading-tight">
-              <p className="text-xs font-semibold uppercase tracking-[0.3em] text-mint">
+              <p className="hidden text-xs font-semibold uppercase tracking-[0.3em] text-mint sm:block">
                 Encrypted Offline Receipt Ledger
               </p>
-              <h1 className="mt-1 text-3xl font-bold text-white">サッとレシート</h1>
-              <p className="text-slate-300">
-                買い物ごとにパシャと、端末に残す。ネット不要のレシートノート。
+              <h1 className="text-2xl font-bold text-white sm:mt-1 sm:text-3xl">サッとレシート</h1>
+              <p className="text-sm text-slate-300 sm:text-base">
+                買い物ごとにパシャと、端末に残す。
               </p>
             </div>
           </div>
@@ -507,28 +507,26 @@ function App() {
 
         {!session ? (
           <div className="grid gap-6 lg:grid-cols-[1.2fr_1fr]">
-            <div className="rounded-3xl border border-white/10 bg-white/5 p-8 shadow-soft">
-              <p className="text-sm text-slate-300">
-                端末に保存したデータを開くためのパスフレーズを設定・入力してください。
-                サーバーには送信せず、WebCrypto + IndexedDB で暗号化されます。
+            <div className="rounded-2xl border border-white/10 bg-white/5 p-5 shadow-soft sm:rounded-3xl sm:p-8">
+              <p className="text-base text-slate-300 sm:text-sm">
+                端末に保存したデータを開くためのパスフレーズを入力してください。
               </p>
               <UnlockPanel onUnlock={handleUnlock} unlocking={unlocking} error={unlockError} />
               <div className="mt-6 flex flex-wrap items-center gap-2 text-xs text-slate-400">
-                <Pill>ローカル暗号化</Pill>
-                <Pill>オフライン動作</Pill>
-                <Pill>GitHub Pages 配信想定</Pill>
+                <Pill>🔒 ローカル暗号化</Pill>
+                <Pill>📴 オフライン動作</Pill>
               </div>
             </div>
-            <div className="space-y-3 rounded-3xl border border-white/10 bg-white/5 p-6">
-              <p className="text-sm text-slate-200">運用のヒント</p>
-              <ul className="list-disc space-y-2 pl-4 text-sm text-slate-400">
-                <li>パスフレーズを忘れると復元できません。安全な場所に控えてください。</li>
-                <li>ブラウザを閉じてもデータは端末内に残ります（IndexedDB）。</li>
-                <li>CSV エクスポートでバックアップをとれます。</li>
+            <div className="space-y-3 rounded-2xl border border-white/10 bg-white/5 p-5 sm:rounded-3xl sm:p-6">
+              <p className="text-base font-semibold text-slate-200 sm:text-sm">💡 運用のヒント</p>
+              <ul className="list-disc space-y-2 pl-4 text-base text-slate-400 sm:text-sm">
+                <li>パスフレーズを忘れると復元できません</li>
+                <li>ブラウザを閉じてもデータは端末内に残ります</li>
+                <li>CSVエクスポートでバックアップ可能</li>
               </ul>
               <button
                 onClick={handleReset}
-                className="text-left text-xs text-slate-400 underline hover:text-slate-200"
+                className="text-left text-sm text-slate-400 underline hover:text-slate-200"
               >
                 データを初期化する
               </button>
@@ -537,19 +535,18 @@ function App() {
         ) : (
           <main className="grid gap-6 lg:auto-rows-min lg:grid-cols-[1.6fr_1fr]">
             <section className="space-y-6 lg:col-start-1 lg:row-start-1 order-1">
-              <div className="rounded-3xl border border-white/10 bg-white/5 p-6 shadow-soft space-y-4">
-                <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+              <div className="rounded-2xl border border-white/10 bg-white/5 p-4 shadow-soft space-y-4 sm:rounded-3xl sm:p-6">
+                <div className="flex flex-col gap-2">
                   <div>
-                    <h2 className="text-xl font-semibold text-white">撮影 / アップロード</h2>
+                    <h2 className="text-lg font-semibold text-white sm:text-xl">📷 撮影 / アップロード</h2>
                     <p className="text-sm text-slate-400">
-                      まずここから。画像を選ぶとOCRして下の入力欄に自動反映します。
+                      画像を選ぶとOCRして自動反映します
                     </p>
                   </div>
-                      <div className="flex flex-wrap items-center gap-2 text-xs text-slate-300">
-                        {lastUploadedName && <Pill>選択中: {lastUploadedName}</Pill>}
-                        <Pill>プレビュー日付: {draft.visitedAt || "未設定"}</Pill>
-                      </div>
-                    </div>
+                  <div className="flex flex-wrap items-center gap-2 text-xs text-slate-300">
+                    <Pill>日付: {draft.visitedAt || "未設定"}</Pill>
+                  </div>
+                </div>
 
                 <div className="flex flex-col gap-4">
                   <div className="grid gap-4 md:grid-cols-2">
@@ -575,52 +572,53 @@ function App() {
                         </div>
                       )}
                     </label>
-                    <div className="flex flex-col gap-2 text-sm text-slate-200">
-                      <div className="flex gap-2">
+                    <div className="flex flex-col gap-3 text-base text-slate-200">
+                      <div className="flex gap-3">
                         <button
                           onClick={cameraActive ? stopCamera : startCamera}
-                          className="flex-1 rounded-xl border border-white/15 bg-white/5 px-4 py-2 text-sm font-semibold text-white transition hover:border-white/25 hover:bg-white/10"
+                          className="flex-1 rounded-xl border border-white/15 bg-white/5 px-4 py-4 text-base font-semibold text-white transition hover:border-white/25 hover:bg-white/10 sm:py-3 sm:text-sm"
                         >
-                          {cameraActive ? "カメラ停止" : "カメラを起動"}
+                          {cameraActive ? "⏹ 停止" : "📹 カメラ起動"}
                         </button>
                         <button
                           onClick={captureFromCamera}
                           disabled={!cameraActive}
-                          className="flex-1 rounded-xl border border-mint/60 bg-mint/10 px-4 py-2 text-sm font-semibold text-mint transition hover:bg-mint/20 disabled:opacity-50 disabled:cursor-not-allowed"
+                          className="flex-1 rounded-xl border border-mint/60 bg-mint/20 px-4 py-4 text-base font-semibold text-mint transition hover:bg-mint/30 disabled:opacity-50 disabled:cursor-not-allowed sm:py-3 sm:text-sm"
                         >
-                          シャッター
+                          📸 シャッター
                         </button>
                       </div>
-                      <label className="flex items-center gap-2">
+                      <label className="flex items-center gap-3 text-base sm:text-sm">
                         <input
                           type="checkbox"
                           checked={saveImage}
                           onChange={(e) => setSaveImage(e.target.checked)}
+                          className="h-5 w-5 sm:h-4 sm:w-4"
                         />
-                        圧縮画像を保存 (長辺1280px / JPEG 0.6)
+                        圧縮画像を保存
                       </label>
                       <div className="flex gap-2">
                         <button
                           onClick={clearDraft}
-                          className="flex-1 rounded-xl border border-white/15 bg-white/5 px-4 py-2 text-sm font-semibold text-white transition hover:border-white/25 hover:bg-white/10"
+                          className="flex-1 rounded-xl border border-white/15 bg-white/5 px-3 py-3 text-sm font-semibold text-white transition hover:border-white/25 hover:bg-white/10"
                         >
-                          プレビューをクリア
+                          クリア
                         </button>
                         <button
                           onClick={handleCleanupImages}
-                          className="flex-1 rounded-xl border border-white/15 bg-white/5 px-4 py-2 text-sm font-semibold text-white transition hover:border-white/25 hover:bg-white/10"
+                          className="flex-1 rounded-xl border border-white/15 bg-white/5 px-3 py-3 text-sm font-semibold text-white transition hover:border-white/25 hover:bg-white/10"
                         >
-                          画像のみクリーンアップ
+                          画像削除
                         </button>
                       </div>
                     </div>
                   </div>
 
                   {cameraActive && (
-                    <div className="overflow-hidden rounded-2xl border border-white/10 bg-black/40">
+                    <div className="overflow-hidden rounded-2xl border-2 border-mint/30 bg-black/40 shadow-lg">
                       <video
                         ref={setVideoRef}
-                        className="w-full object-contain h-80 sm:h-64"
+                        className="w-full object-cover aspect-[3/4] sm:aspect-video sm:h-72"
                         autoPlay
                         playsInline
                         muted
@@ -628,13 +626,13 @@ function App() {
                         style={{ backgroundColor: "#0b1224" }}
                       />
                       {!cameraReady && (
-                        <p className="px-3 py-2 text-xs text-slate-400 bg-white/5 border-t border-white/10">
-                          カメラ準備中...
+                        <p className="px-4 py-3 text-sm text-slate-400 bg-white/5 border-t border-white/10">
+                          📹 カメラ準備中...
                         </p>
                       )}
                       {cameraError && (
-                        <p className="px-3 py-2 text-xs text-red-200 bg-red-500/10 border-t border-white/10">
-                          {cameraError}
+                        <p className="px-4 py-3 text-sm text-red-200 bg-red-500/10 border-t border-white/10">
+                          ⚠️ {cameraError}
                         </p>
                       )}
                     </div>
@@ -644,23 +642,23 @@ function App() {
                   )}
                 </div>
 
-                <div className="grid gap-3 sm:grid-cols-3">
-                  <div className="rounded-xl bg-white/5 p-3">
+                <div className="grid grid-cols-3 gap-2 sm:gap-3">
+                  <div className="rounded-xl bg-white/5 p-3 sm:p-4">
                     <p className="text-xs text-slate-400">店名</p>
-                    <p className="text-sm font-semibold text-white">
+                    <p className="text-sm font-semibold text-white truncate sm:text-base">
                       {draft.storeName || "未設定"}
                     </p>
                   </div>
-                  <div className="rounded-xl bg-white/5 p-3">
+                  <div className="rounded-xl bg-white/5 p-3 sm:p-4">
                     <p className="text-xs text-slate-400">日付</p>
-                    <p className="text-sm font-semibold text-white">
+                    <p className="text-sm font-semibold text-white sm:text-base">
                       {draft.visitedAt || "未設定"}
                     </p>
                   </div>
-                  <div className="rounded-xl bg-white/5 p-3">
+                  <div className="rounded-xl bg-white/10 p-3 sm:p-4">
                     <p className="text-xs text-slate-400">合計</p>
-                    <p className="text-sm font-semibold text-mint">
-                      {draft.total ? `${draft.total} 円` : "未設定"}
+                    <p className="text-base font-bold text-mint sm:text-lg">
+                      {draft.total ? `¥${draft.total}` : "--"}
                     </p>
                   </div>
                 </div>
@@ -679,42 +677,42 @@ function App() {
                 )}
               </div>
 
-              <div className="rounded-3xl border border-white/10 bg-white/5 p-6">
-                <h2 className="text-xl font-semibold text-white">レシート詳細・編集</h2>
-                <p className="text-sm text-slate-400">店名・日付・合計を確認し、必要に応じてメモを追加。</p>
-                <div className="mt-4 grid gap-4 md:grid-cols-2">
-                  <label className="flex flex-col gap-2 text-sm text-slate-200">
+              <div className="rounded-2xl border border-white/10 bg-white/5 p-4 sm:rounded-3xl sm:p-6">
+                <h2 className="text-lg font-semibold text-white sm:text-xl">✏️ レシート詳細</h2>
+                <p className="text-sm text-slate-400">店名・日付・合計を確認・編集</p>
+                <div className="mt-4 grid gap-4 sm:grid-cols-2">
+                  <label className="flex flex-col gap-2 text-base text-slate-200 sm:text-sm">
                     店名
                     <input
-                      className="w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-white outline-none ring-mint/30 focus:ring-2"
+                      className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-lg text-white outline-none ring-mint/30 focus:ring-2 sm:px-3 sm:py-2 sm:text-base"
                       value={draft.storeName}
                       onChange={(e) => setDraft((prev) => ({ ...prev, storeName: e.target.value }))}
                       placeholder="スーパーABC"
                     />
                   </label>
-                  <label className="flex flex-col gap-2 text-sm text-slate-200">
+                  <label className="flex flex-col gap-2 text-base text-slate-200 sm:text-sm">
                     日付
                     <input
                       type="date"
-                      className="w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-white outline-none ring-mint/30 focus:ring-2"
+                      className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-lg text-white outline-none ring-mint/30 focus:ring-2 sm:px-3 sm:py-2 sm:text-base"
                       value={draft.visitedAt}
                       onChange={(e) => setDraft((prev) => ({ ...prev, visitedAt: e.target.value }))}
                     />
                   </label>
-                  <label className="flex flex-col gap-2 text-sm text-slate-200">
+                  <label className="flex flex-col gap-2 text-base text-slate-200 sm:text-sm">
                     合計 (円)
                     <input
                       inputMode="numeric"
-                      className="w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-white outline-none ring-mint/30 focus:ring-2"
+                      className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-xl font-bold text-mint outline-none ring-mint/30 focus:ring-2 sm:px-3 sm:py-2 sm:text-base sm:font-normal sm:text-white"
                       value={draft.total}
                       onChange={(e) => setDraft((prev) => ({ ...prev, total: e.target.value }))}
                       placeholder="例: 2430"
                     />
                   </label>
-                  <label className="flex flex-col gap-2 text-sm text-slate-200">
-                    分類 (ドロップダウン)
+                  <label className="flex flex-col gap-2 text-base text-slate-200 sm:text-sm">
+                    分類
                     <select
-                      className="w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-white outline-none ring-mint/30 focus:ring-2"
+                      className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-lg text-white outline-none ring-mint/30 focus:ring-2 sm:px-3 sm:py-2 sm:text-base"
                       value={draft.category}
                       onChange={(e) => setDraft((prev) => ({ ...prev, category: e.target.value }))}
                     >
@@ -728,24 +726,24 @@ function App() {
                 </div>
 
                 <div className="mt-4">
-                  <label className="flex flex-col gap-2 text-sm text-slate-200">
+                  <label className="flex flex-col gap-2 text-base text-slate-200 sm:text-sm">
                     メモ (任意)
                     <textarea
-                      rows={3}
-                      className="w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-white outline-none ring-mint/30 focus:ring-2"
+                      rows={2}
+                      className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-base text-white outline-none ring-mint/30 focus:ring-2 sm:px-3 sm:py-2"
                       value={draft.note}
                       onChange={(e) => setDraft((prev) => ({ ...prev, note: e.target.value }))}
-                      placeholder="メモやタグを追加"
+                      placeholder="メモを追加"
                     />
                   </label>
                 </div>
 
-                <div className="mt-6 flex flex-wrap gap-3">
+                <div className="mt-4 sm:mt-6">
                   <button
                     onClick={handleSaveReceipt}
-                    className="rounded-2xl bg-gradient-to-r from-mint/80 to-mint px-5 py-3 text-sm font-semibold text-fog shadow-soft transition hover:translate-y-[-1px]"
+                    className="w-full rounded-2xl bg-gradient-to-r from-mint/80 to-mint px-6 py-4 text-lg font-bold text-fog shadow-soft transition hover:translate-y-[-1px] sm:w-auto sm:px-5 sm:py-3 sm:text-sm sm:font-semibold"
                   >
-                    保存する
+                    💾 保存する
                   </button>
                 </div>
               </div>
@@ -993,31 +991,31 @@ function App() {
           </main>
         )}
         {session && (
-          <div className="fixed inset-x-0 bottom-0 z-30 border-t border-white/10 bg-fog/90 px-4 py-3 shadow-soft backdrop-blur lg:hidden">
-            <div className="mx-auto flex max-w-6xl items-center gap-2">
+          <div className="fixed inset-x-0 bottom-0 z-30 border-t border-white/10 bg-fog/95 px-4 py-4 shadow-lg backdrop-blur-lg lg:hidden">
+            <div className="mx-auto flex max-w-6xl items-center gap-3">
               <button
                 onClick={cameraActive ? stopCamera : startCamera}
                 className={clsx(
-                  "flex-1 rounded-xl px-3 py-3 text-sm font-semibold",
+                  "flex-1 rounded-xl px-3 py-4 text-base font-bold",
                   cameraActive
                     ? "border border-white/15 bg-white/5 text-white"
                     : "border border-mint/60 bg-mint/10 text-mint",
                 )}
               >
-                {cameraActive ? "カメラ停止" : "カメラ起動"}
+                {cameraActive ? "⏹ 停止" : "📹 起動"}
               </button>
               <button
                 onClick={captureFromCamera}
                 disabled={!cameraActive}
-                className="flex-1 rounded-xl border border-mint/60 bg-mint text-fog px-3 py-3 text-sm font-semibold shadow-soft transition hover:bg-mint/90 disabled:cursor-not-allowed disabled:opacity-60"
+                className="flex-[1.5] rounded-xl border-2 border-mint bg-mint text-fog px-4 py-4 text-lg font-bold shadow-lg transition hover:bg-mint/90 disabled:cursor-not-allowed disabled:opacity-60"
               >
-                シャッター
+                📸 撮影
               </button>
               <button
                 onClick={handleSaveReceipt}
-                className="flex-1 rounded-xl border border-white/15 bg-white/10 px-3 py-3 text-sm font-semibold text-white hover:border-white/25 hover:bg-white/15"
+                className="flex-1 rounded-xl border border-white/15 bg-white/10 px-3 py-4 text-base font-bold text-white hover:border-white/25 hover:bg-white/15"
               >
-                保存
+                💾 保存
               </button>
             </div>
           </div>
@@ -1038,24 +1036,24 @@ const UnlockPanel = ({
 }) => {
   const [value, setValue] = useState("")
   return (
-    <div className="mt-6 flex flex-col gap-3">
-      <label className="text-sm text-slate-200">
-        パスフレーズ
+    <div className="mt-6 flex flex-col gap-4">
+      <label className="text-base text-slate-200 sm:text-sm">
+        🔑 パスフレーズ
         <input
           type="password"
-          className="mt-2 w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-white outline-none ring-mint/30 focus:ring-2"
-          placeholder="8文字以上で設定してください"
+          className="mt-2 w-full rounded-xl border border-white/10 bg-white/5 px-4 py-4 text-lg text-white outline-none ring-mint/30 focus:ring-2 sm:px-3 sm:py-2 sm:text-base"
+          placeholder="パスフレーズを入力"
           value={value}
           onChange={(e) => setValue(e.target.value)}
         />
       </label>
-      {error && <p className="text-sm text-red-300">{error}</p>}
+      {error && <p className="text-base text-red-300 sm:text-sm">{error}</p>}
       <button
         onClick={() => onUnlock(value)}
         disabled={unlocking || value.length < 4}
-        className="rounded-2xl bg-gradient-to-r from-mint/70 to-mint px-4 py-3 text-sm font-semibold text-fog shadow-soft transition hover:translate-y-[-1px] disabled:cursor-not-allowed disabled:opacity-60"
+        className="w-full rounded-2xl bg-gradient-to-r from-mint/70 to-mint px-6 py-5 text-lg font-bold text-fog shadow-soft transition hover:translate-y-[-1px] disabled:cursor-not-allowed disabled:opacity-60 sm:px-4 sm:py-3 sm:text-sm sm:font-semibold"
       >
-        {unlocking ? "復号しています..." : "データを開く / 新規作成"}
+        {unlocking ? "🔓 復号中..." : "🔐 データを開く"}
       </button>
     </div>
   )
