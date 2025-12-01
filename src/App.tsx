@@ -190,7 +190,8 @@ function App() {
   const [expandedImages, setExpandedImages] = useState<Set<string>>(new Set())
   const [selectedReceipt, setSelectedReceipt] = useState<Receipt | null>(null)
   const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null)
-  const categories = session?.vault.categories ?? defaultCategories
+  // 常に最新のdefaultCategoriesを使用（古いvaultデータとの互換性のため）
+  const categories = defaultCategories
   const videoRef = useRef<HTMLVideoElement | null>(null)
   const streamRef = useRef<MediaStream | null>(null)
   const [cameraActive, setCameraActive] = useState(false)
