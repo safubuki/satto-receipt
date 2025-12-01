@@ -899,7 +899,7 @@ function App() {
                   <h3 className="font-semibold text-white" style={{ fontSize: '40px' }}>レシート一覧</h3>
                   <span className="text-slate-400" style={{ fontSize: '36px' }}>{session.vault.receipts.length}件</span>
                 </div>
-              <div className="mt-4 space-y-4">
+                <div className="mt-4 space-y-4">
                 {session.vault.receipts.length === 0 ? (
                   <p className="rounded-2xl bg-white/5 text-center text-slate-400" style={{ fontSize: '36px', padding: '48px 24px' }}>
                     まだレシートがありません
@@ -968,7 +968,7 @@ function App() {
                     />
                   </label>
                 </div>
-              </div>
+                </div>
               </div>
             </div>
 
