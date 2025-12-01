@@ -468,7 +468,9 @@ function App() {
 
   const handleExport = () => {
     if (!session) return
-    const csv = toCsv(session.vault.receipts)
+    // 日付降順（新しい順）でソートしてからエクスポート
+    const sorted = [...session.vault.receipts].sort((a, b) => b.visitedAt.localeCompare(a.visitedAt))
+    const csv = toCsv(sorted)
     downloadCsv(csv)
   }
 
@@ -485,9 +487,7 @@ function App() {
 
   const handleCleanupImages = async () => {
     if (!session) return
-    // 日付降順（新しい順）でソートしてからエクスポート
-    const sorted = [...session.vault.receipts].sort((a, b) => b.visitedAt.localeCompare(a.visitedAt))
-    const cleaned = sorted.map((r) => ({ ...r, imageData: undefined }))
+    const cleaned = session.vault.receipts.map((r) => ({ ...r, imageData: undefined }))
     await persistVault({ ...session.vault, receipts: cleaned }, session.key)
     setExpandedImages(new Set())
   }
