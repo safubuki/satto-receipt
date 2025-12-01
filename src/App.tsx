@@ -506,7 +506,7 @@ function App() {
       const track = stream.getVideoTracks()[0]
       if (track) {
         try {
-          await track.applyConstraints({ width: 1280, height: 720 })
+          await track.applyConstraints({ width: 1280, height: 720, frameRate: { ideal: 30, max: 30 } })
         } catch {
           // ignore
         }
@@ -1861,8 +1861,6 @@ const UnlockPanel = ({
           onClick={() => {
             if (confirm("すべてのデータを削除して初期化しますか？")) {
               onReset()
-              setValue("")
-              setRememberMe(false)
             }
           }}
           className="text-slate-500 underline"
