@@ -842,7 +842,7 @@ function App() {
             {/* 入力フォーム（シンプル版）*/}
             <div className="mt-4 space-y-4 px-4">
               <div className="rounded-2xl border border-white/10 bg-white/5" style={{ padding: '28px' }}>
-                <h3 style={{ fontSize: '40px', marginBottom: '24px' }} className="font-semibold text-white">レシート入力</h3>
+                <h3 style={{ fontSize: '40px', marginBottom: '24px' }} className="font-semibold text-white">レシート情報</h3>
                 <div className="space-y-4">
                   <input
                     className="w-full rounded-xl border border-white/10 bg-white/5 text-white placeholder-slate-500"
@@ -884,7 +884,7 @@ function App() {
                       </option>
                     ))}
                   </select>
-                  {/* 画像保存オプション - レシート入力内に移動 */}
+                  {/* 画像保存オプション - レシート情報内に移動 */}
                   <label className="flex items-center gap-4 text-slate-300" style={{ fontSize: '32px', marginTop: '8px' }}>
                     <input
                       type="checkbox"
@@ -1099,7 +1099,7 @@ function App() {
                     ? "border-2 border-white/30 bg-white/10 text-white"
                     : "border-2 border-mint/60 bg-mint/20 text-mint"
                 )}
-                style={{ minHeight: '90px', fontSize: '32px' }}
+                style={{ minHeight: '135px', fontSize: '32px' }}
               >
                 {cameraActive ? "カメラOFF" : "カメラON"}
               </button>
@@ -1112,14 +1112,14 @@ function App() {
                     ? "animate-pulse border-yellow-400 bg-yellow-400/30 text-yellow-200"
                     : "border-mint bg-mint text-fog"
                 )}
-                style={{ minHeight: '100px', fontSize: '40px' }}
+                style={{ minHeight: '150px', fontSize: '40px' }}
               >
                 {isProcessing ? "処理中..." : "撮影"}
               </button>
               <button
                 onClick={handleSaveReceipt}
                 className="flex-1 rounded-2xl border-2 border-white/30 bg-white/15 font-bold text-white"
-                style={{ minHeight: '90px', fontSize: '32px' }}
+                style={{ minHeight: '135px', fontSize: '32px' }}
               >
                 保存
               </button>
