@@ -683,24 +683,24 @@ function App() {
           <div className="pb-40">
             {/* APIキー設定モーダル */}
             {showApiKeyModal && (
-              <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 px-5">
-                <div className="w-full max-w-md rounded-2xl border border-white/10 bg-fog" style={{ padding: '32px' }}>
-                  <h3 className="font-bold text-white" style={{ fontSize: '40px' }}>⚙️ API設定</h3>
-                  <p className="text-slate-400" style={{ fontSize: '32px', marginTop: '18px' }}>
+              <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 px-4">
+                <div className="w-full rounded-2xl border border-white/10 bg-fog" style={{ padding: '32px', maxWidth: '92vw' }}>
+                  <h3 className="font-bold text-white" style={{ fontSize: '48px' }}>⚙️ API設定</h3>
+                  <p className="text-slate-300" style={{ fontSize: '36px', marginTop: '24px', lineHeight: '1.5' }}>
                     Gemini APIキーを入力してください。キーは端末内にのみ保存されます。
                   </p>
-                  <p className="text-slate-500" style={{ fontSize: '28px', marginTop: '14px' }}>
+                  <p className="text-slate-400" style={{ fontSize: '32px', marginTop: '18px', lineHeight: '1.5' }}>
                     <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener noreferrer" className="text-mint underline">Google AI Studio</a> から無料で取得できます
                   </p>
                   <input
                     type="password"
                     className="w-full rounded-xl border border-white/10 bg-white/5 text-white placeholder-slate-500"
-                    style={{ fontSize: '36px', padding: '22px', marginTop: '22px', minHeight: '80px' }}
+                    style={{ fontSize: '40px', padding: '24px', marginTop: '28px', minHeight: '90px' }}
                     placeholder="AIza..."
                     value={apiKeyInput}
                     onChange={(e) => setApiKeyInput(e.target.value)}
                   />
-                  <div className="flex gap-3" style={{ marginTop: '26px' }}>
+                  <div className="grid grid-cols-2 gap-4" style={{ marginTop: '32px' }}>
                     <button
                       onClick={() => {
                         if (apiKeyInput.trim()) {
@@ -709,8 +709,8 @@ function App() {
                         }
                         setShowApiKeyModal(false)
                       }}
-                      className="flex-1 rounded-xl bg-mint font-bold text-fog"
-                      style={{ fontSize: '36px', padding: '22px', minHeight: '80px' }}
+                      className="rounded-xl bg-mint font-bold text-fog"
+                      style={{ fontSize: '40px', padding: '24px', minHeight: '90px' }}
                     >
                       保存
                     </button>
@@ -720,16 +720,16 @@ function App() {
                         setApiKeyInput("")
                         setShowApiKeyModal(false)
                       }}
-                      className="flex-1 rounded-xl border border-red-400/50 bg-red-400/10 font-bold text-red-300"
-                      style={{ fontSize: '36px', padding: '22px', minHeight: '80px' }}
+                      className="rounded-xl border border-red-400/50 bg-red-400/10 font-bold text-red-300"
+                      style={{ fontSize: '40px', padding: '24px', minHeight: '90px' }}
                     >
                       削除
                     </button>
                   </div>
                   <button
                     onClick={() => setShowApiKeyModal(false)}
-                    className="w-full text-center text-slate-500"
-                    style={{ fontSize: '32px', marginTop: '22px', padding: '16px' }}
+                    className="w-full text-center text-slate-400"
+                    style={{ fontSize: '36px', marginTop: '28px', padding: '20px' }}
                   >
                     キャンセル
                   </button>
