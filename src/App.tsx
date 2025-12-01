@@ -4,7 +4,7 @@ import { clsx } from "clsx"
 import { downloadCsv, toCsv } from "./lib/csv"
 import { runOcr } from "./lib/ocr"
 import { analyzeReceiptWithGemini, saveApiKey, clearApiKey, hasApiKey } from "./lib/geminiOcr"
-import { decryptVault, deriveKey, encryptVault, getOrCreateSalt, clearSalt } from "./lib/crypto"
+import { decryptVault, deriveKey, encryptVault, getOrCreateSalt, clearSalt, savePassphrase, getSavedPassphrase, clearSavedPassphrase } from "./lib/crypto"
 import { clearVault, loadVault, saveVault } from "./lib/db"
 import type { Category, LineItem, Receipt, Vault } from "./lib/types"
 import { importCsvToReceipts } from "./lib/csvImport"
@@ -260,7 +260,7 @@ function App() {
     setSession({ key, vault: nextVault })
   }
 
-  const handleUnlock = async (passphrase: string) => {
+  const handleUnlock = async (passphrase: string, rememberMe: boolean = false) => {
     setUnlockError(null)
     setUnlocking(true)
 
@@ -273,6 +273,10 @@ function App() {
         const vault = createVault()
         await persistVault(vault, key)
         setDraft(initialDraft())
+        // 新規作成時もrememberMeがtrueならパスフレーズを保存
+        if (rememberMe) {
+          savePassphrase(passphrase)
+        }
         return
       }
 
@@ -284,13 +288,33 @@ function App() {
 
       setSession({ key, vault })
       setDraft(initialDraft())
+      
+      // ログイン成功時、rememberMeがtrueならパスフレーズを保存
+      if (rememberMe) {
+        savePassphrase(passphrase)
+      }
     } catch (error) {
       console.error(error)
       setUnlockError("パスフレーズが違うかデータを復号できませんでした。")
+      // 自動ログイン失敗時は記憶を削除
+      clearSavedPassphrase()
     } finally {
       setUnlocking(false)
     }
   }
+
+  // 自動ログイン処理
+  useEffect(() => {
+    const autoLogin = async () => {
+      const savedPassphrase = getSavedPassphrase()
+      if (savedPassphrase && !session) {
+        // 保存されたパスフレーズがある場合、自動ログイン試行
+        await handleUnlock(savedPassphrase, false) // rememberMe=falseで再保存しない
+      }
+    }
+    autoLogin()
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []) // 初回マウント時のみ実行
 
   const handleLock = async () => {
     stopCamera()
@@ -302,6 +326,8 @@ function App() {
     setOcrProgress(null)
     setLastUploadedName(null)
     setDraft(initialDraft())
+    // 注意: ログアウトでは記憶を消さない（明示的にログアウトしても次回は自動ログインできる）
+    // 記憶を消すのはデータ初期化時のみ
   }
 
   const handleReset = async () => {
@@ -312,6 +338,7 @@ function App() {
     
     await clearVault()
     clearSalt()
+    clearSavedPassphrase() // パスフレーズ記憶も削除
     setIsFirstTime(true)
     setSession(null)
     setDraft(initialDraft())
@@ -1755,13 +1782,14 @@ const UnlockPanel = ({
   isFirstTime,
   onReset,
 }: {
-  onUnlock: (passphrase: string) => void
+  onUnlock: (passphrase: string, rememberMe: boolean) => void
   unlocking: boolean
   error: string | null
   isFirstTime: boolean
   onReset: () => void
 }) => {
   const [value, setValue] = useState("")
+  const [rememberMe, setRememberMe] = useState(false)
   // スマホ判定 (安全なヘルパー関数を使用)
   const [isMobile, setIsMobile] = useState(detectMobile)
   useEffect(() => {
@@ -1791,9 +1819,28 @@ const UnlockPanel = ({
             onChange={(e) => setValue(e.target.value)}
           />
         </label>
+        {/* 次回から省略オプション */}
+        <label 
+          className="flex items-center gap-4 text-slate-300 cursor-pointer"
+          style={{ fontSize: '28px' }}
+        >
+          <input
+            type="checkbox"
+            checked={rememberMe}
+            onChange={(e) => setRememberMe(e.target.checked)}
+            className="rounded"
+            style={{ width: '36px', height: '36px' }}
+          />
+          次回から入力を省略する
+        </label>
+        {rememberMe && (
+          <p className="text-yellow-400/80" style={{ fontSize: '24px', lineHeight: '1.4' }}>
+            ⚠️ 端末を他人と共有している場合は非推奨
+          </p>
+        )}
         {error && <p className="text-red-300" style={{ fontSize: '32px' }}>{error}</p>}
         <button
-          onClick={() => onUnlock(value)}
+          onClick={() => onUnlock(value, rememberMe)}
           disabled={unlocking || value.length < 4}
           className="w-full rounded-xl bg-gradient-to-r from-mint/70 to-mint font-bold text-fog shadow-soft transition hover:translate-y-[-1px] disabled:cursor-not-allowed disabled:opacity-60"
           style={{ fontSize: '40px', padding: '28px', minHeight: '100px' }}
@@ -1833,9 +1880,24 @@ const UnlockPanel = ({
           onChange={(e) => setValue(e.target.value)}
         />
       </label>
+      {/* 次回から省略オプション */}
+      <label className="flex items-center gap-2 text-sm text-slate-300 cursor-pointer">
+        <input
+          type="checkbox"
+          checked={rememberMe}
+          onChange={(e) => setRememberMe(e.target.checked)}
+          className="rounded"
+        />
+        次回から入力を省略する
+      </label>
+      {rememberMe && (
+        <p className="text-xs text-yellow-400/80">
+          ⚠️ 端末を他人と共有している場合は非推奨
+        </p>
+      )}
       {error && <p className="text-sm text-red-300">{error}</p>}
       <button
-        onClick={() => onUnlock(value)}
+        onClick={() => onUnlock(value, rememberMe)}
         disabled={unlocking || value.length < 4}
         className="rounded-2xl bg-gradient-to-r from-mint/70 to-mint px-4 py-3 text-sm font-semibold text-fog shadow-soft transition hover:translate-y-[-1px] disabled:cursor-not-allowed disabled:opacity-60"
       >

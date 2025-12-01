@@ -1,6 +1,7 @@
 import type { Vault } from './types'
 
 const SALT_KEY = 'receipt-vault-salt'
+const PASSPHRASE_KEY = 'receipt-vault-passphrase'
 const encoder = new TextEncoder()
 const decoder = new TextDecoder()
 
@@ -23,6 +24,30 @@ export const getOrCreateSalt = (): Uint8Array => {
 
 export const clearSalt = (): void => {
   localStorage.removeItem(SALT_KEY)
+}
+
+// パスフレーズ記憶機能
+export const savePassphrase = (passphrase: string): void => {
+  // Base64エンコードして保存（平文ではなく軽い難読化）
+  localStorage.setItem(PASSPHRASE_KEY, btoa(encodeURIComponent(passphrase)))
+}
+
+export const getSavedPassphrase = (): string | null => {
+  const stored = localStorage.getItem(PASSPHRASE_KEY)
+  if (!stored) return null
+  try {
+    return decodeURIComponent(atob(stored))
+  } catch {
+    return null
+  }
+}
+
+export const clearSavedPassphrase = (): void => {
+  localStorage.removeItem(PASSPHRASE_KEY)
+}
+
+export const hasRememberedPassphrase = (): boolean => {
+  return localStorage.getItem(PASSPHRASE_KEY) !== null
 }
 
 export const deriveKey = async (
