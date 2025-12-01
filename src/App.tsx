@@ -908,7 +908,7 @@ function App() {
             {selectedReceipt && (
               <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 px-4" onClick={() => setSelectedReceipt(null)}>
                 <div className="w-full rounded-2xl border border-white/10 bg-fog" style={{ padding: '32px', maxWidth: '92vw', maxHeight: '80vh', overflow: 'auto' }} onClick={(e) => e.stopPropagation()}>
-                  <h3 className="font-bold text-white" style={{ fontSize: '40px' }}>{selectedReceipt.storeName}</h3>
+                  <h3 className="font-bold text-white" style={{ fontSize: '40px', lineHeight: '1.4', wordBreak: 'break-word' }}>{selectedReceipt.storeName}</h3>
                   <p className="text-slate-400" style={{ fontSize: '32px', marginTop: '12px' }}>{selectedReceipt.visitedAt}</p>
                   <div className="mt-6 space-y-3">
                     {selectedReceipt.lineItems && selectedReceipt.lineItems.length > 0 ? (
@@ -997,7 +997,7 @@ function App() {
                           style={{ maxWidth: '55%' }}
                         >
                           <p className="text-slate-400" style={{ fontSize: '32px' }}>{receipt.visitedAt}</p>
-                          <p className="font-semibold text-white underline" style={{ fontSize: '40px', marginTop: '8px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{receipt.storeName}</p>
+                          <p className="font-semibold text-white underline" style={{ fontSize: '40px', marginTop: '8px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', lineHeight: '1.4', paddingTop: '4px', paddingBottom: '4px' }}>{receipt.storeName}</p>
                           <span className="inline-block rounded-full bg-white/10 text-slate-300" style={{ fontSize: '28px', padding: '12px 24px', marginTop: '14px' }}>
                             {receipt.category || '未分類'}
                           </span>
