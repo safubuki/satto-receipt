@@ -26,5 +26,5 @@ export const saveVault = async (record: VaultRecord) => {
 
 export const clearVault = async () => {
   const db = await getDb()
-  await db.delete(STORE_NAME, 'data')
+  await db.clear(STORE_NAME)
 }

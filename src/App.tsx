@@ -4,7 +4,7 @@ import { clsx } from "clsx"
 import { downloadCsv, toCsv } from "./lib/csv"
 import { runOcr } from "./lib/ocr"
 import { analyzeReceiptWithGemini, saveApiKey, clearApiKey, hasApiKey } from "./lib/geminiOcr"
-import { decryptVault, deriveKey, encryptVault, getOrCreateSalt } from "./lib/crypto"
+import { decryptVault, deriveKey, encryptVault, getOrCreateSalt, clearSalt } from "./lib/crypto"
 import { clearVault, loadVault, saveVault } from "./lib/db"
 import type { Category, LineItem, Receipt, Vault } from "./lib/types"
 import { importCsvToReceipts } from "./lib/csvImport"
@@ -293,6 +293,9 @@ function App() {
 
   const handleLock = async () => {
     stopCamera()
+    // ログアウト時にisFirstTimeを再チェック
+    const stored = await loadVault()
+    setIsFirstTime(!stored)
     setSession(null)
     setOcrText("")
     setOcrProgress(null)
@@ -307,6 +310,8 @@ function App() {
     if (!confirmed) return
     
     await clearVault()
+    clearSalt()
+    setIsFirstTime(true)
     setSession(null)
     setDraft(initialDraft())
     setOcrText("")
@@ -681,7 +686,7 @@ function App() {
                 <h2 className="font-bold text-white" style={{ fontSize: '48px' }}>サッとレシート</h2>
                 <p className="text-slate-400" style={{ fontSize: '32px', marginTop: '20px' }}>買い物ごとにサッとパシャっと</p>
               </div>
-              <UnlockPanel onUnlock={handleUnlock} unlocking={unlocking} error={unlockError} isFirstTime={isFirstTime} />
+              <UnlockPanel onUnlock={handleUnlock} unlocking={unlocking} error={unlockError} isFirstTime={isFirstTime} onReset={handleReset} />
             </div>
           </div>
         ) : (
@@ -1226,7 +1231,7 @@ function App() {
                 端末に保存したデータを開くためのパスフレーズを設定・入力してください。
                 サーバーには送信せず、WebCrypto + IndexedDB で暗号化されます。
               </p>
-              <UnlockPanel onUnlock={handleUnlock} unlocking={unlocking} error={unlockError} isFirstTime={isFirstTime} />
+              <UnlockPanel onUnlock={handleUnlock} unlocking={unlocking} error={unlockError} isFirstTime={isFirstTime} onReset={handleReset} />
               <div className="mt-6 flex flex-wrap items-center gap-2 text-xs text-slate-400">
                 <Pill>ローカル暗号化</Pill>
                 <Pill>オフライン動作</Pill>
@@ -1745,11 +1750,13 @@ const UnlockPanel = ({
   unlocking,
   error,
   isFirstTime,
+  onReset,
 }: {
   onUnlock: (passphrase: string) => void
   unlocking: boolean
   error: string | null
   isFirstTime: boolean
+  onReset: () => void
 }) => {
   const [value, setValue] = useState("")
   // スマホ判定 (安全なヘルパー関数を使用)
@@ -1793,9 +1800,7 @@ const UnlockPanel = ({
         <button
           onClick={() => {
             if (confirm("すべてのデータを削除して初期化しますか？")) {
-              localStorage.clear()
-              indexedDB.deleteDatabase("satto-receipt-db")
-              location.reload()
+              onReset()
             }
           }}
           className="text-slate-500 underline"
