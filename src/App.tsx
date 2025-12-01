@@ -684,23 +684,23 @@ function App() {
             {/* APIキー設定モーダル */}
             {showApiKeyModal && (
               <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 px-5">
-                <div className="w-full max-w-md rounded-2xl border border-white/10 bg-fog" style={{ padding: '28px' }}>
-                  <h3 className="font-bold text-white" style={{ fontSize: '26px' }}>⚙️ API設定</h3>
-                  <p className="text-slate-400" style={{ fontSize: '18px', marginTop: '14px' }}>
+                <div className="w-full max-w-md rounded-2xl border border-white/10 bg-fog" style={{ padding: '32px' }}>
+                  <h3 className="font-bold text-white" style={{ fontSize: '40px' }}>⚙️ API設定</h3>
+                  <p className="text-slate-400" style={{ fontSize: '32px', marginTop: '18px' }}>
                     Gemini APIキーを入力してください。キーは端末内にのみ保存されます。
                   </p>
-                  <p className="text-slate-500" style={{ fontSize: '16px', marginTop: '10px' }}>
+                  <p className="text-slate-500" style={{ fontSize: '28px', marginTop: '14px' }}>
                     <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener noreferrer" className="text-mint underline">Google AI Studio</a> から無料で取得できます
                   </p>
                   <input
                     type="password"
                     className="w-full rounded-xl border border-white/10 bg-white/5 text-white placeholder-slate-500"
-                    style={{ fontSize: '20px', padding: '18px', marginTop: '18px', minHeight: '60px' }}
+                    style={{ fontSize: '36px', padding: '22px', marginTop: '22px', minHeight: '80px' }}
                     placeholder="AIza..."
                     value={apiKeyInput}
                     onChange={(e) => setApiKeyInput(e.target.value)}
                   />
-                  <div className="flex gap-3" style={{ marginTop: '22px' }}>
+                  <div className="flex gap-3" style={{ marginTop: '26px' }}>
                     <button
                       onClick={() => {
                         if (apiKeyInput.trim()) {
@@ -710,7 +710,7 @@ function App() {
                         setShowApiKeyModal(false)
                       }}
                       className="flex-1 rounded-xl bg-mint font-bold text-fog"
-                      style={{ fontSize: '20px', padding: '18px', minHeight: '60px' }}
+                      style={{ fontSize: '36px', padding: '22px', minHeight: '80px' }}
                     >
                       保存
                     </button>
@@ -721,7 +721,7 @@ function App() {
                         setShowApiKeyModal(false)
                       }}
                       className="flex-1 rounded-xl border border-red-400/50 bg-red-400/10 font-bold text-red-300"
-                      style={{ fontSize: '20px', padding: '18px', minHeight: '60px' }}
+                      style={{ fontSize: '36px', padding: '22px', minHeight: '80px' }}
                     >
                       削除
                     </button>
@@ -729,7 +729,7 @@ function App() {
                   <button
                     onClick={() => setShowApiKeyModal(false)}
                     className="w-full text-center text-slate-500"
-                    style={{ fontSize: '18px', marginTop: '18px', padding: '12px' }}
+                    style={{ fontSize: '32px', marginTop: '22px', padding: '16px' }}
                   >
                     キャンセル
                   </button>
@@ -894,10 +894,11 @@ function App() {
 
             {/* レシート一覧 */}
             <div className="mt-5 px-4">
-              <div className="flex items-center justify-between">
-                <h3 className="font-semibold text-white" style={{ fontSize: '40px' }}>レシート一覧</h3>
-                <span className="text-slate-400" style={{ fontSize: '36px' }}>{session.vault.receipts.length}件</span>
-              </div>
+              <div className="rounded-2xl border border-white/10 bg-white/5" style={{ padding: '24px' }}>
+                <div className="flex items-center justify-between">
+                  <h3 className="font-semibold text-white" style={{ fontSize: '40px' }}>レシート一覧</h3>
+                  <span className="text-slate-400" style={{ fontSize: '36px' }}>{session.vault.receipts.length}件</span>
+                </div>
               <div className="mt-4 space-y-4">
                 {session.vault.receipts.length === 0 ? (
                   <p className="rounded-2xl bg-white/5 text-center text-slate-400" style={{ fontSize: '36px', padding: '48px 24px' }}>
@@ -943,39 +944,38 @@ function App() {
                     もっと見る
                   </button>
                 )}
+                {/* CSV操作 - レシート一覧内に移動 */}
+                <div className="mt-4 grid grid-cols-2 gap-3">
+                  <button
+                    onClick={handleExport}
+                    className="rounded-xl border border-white/15 bg-white/10 font-semibold text-white"
+                    style={{ fontSize: '32px', padding: '24px', minHeight: '80px' }}
+                  >
+                    CSVを保存
+                  </button>
+                  <label className="flex cursor-pointer items-center justify-center rounded-xl border border-white/15 bg-white/10 font-semibold text-white" style={{ fontSize: '32px', padding: '24px', minHeight: '80px' }}>
+                    CSVを読込
+                    <input
+                      type="file"
+                      accept=".csv,text/csv"
+                      className="hidden"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0]
+                        if (!file) return
+                        handleImportCsv(file)
+                        e.target.value = ""
+                      }}
+                    />
+                  </label>
+                </div>
+              </div>
               </div>
             </div>
 
-            {/* CSV操作 - 2列レイアウト */}
-            <div className="mt-5 px-4">
-              <div className="grid grid-cols-2 gap-3">
-                <button
-                  onClick={handleExport}
-                  className="rounded-xl border border-white/15 bg-white/10 font-semibold text-white"
-                  style={{ fontSize: '32px', padding: '24px', minHeight: '80px' }}
-                >
-                  CSVを保存
-                </button>
-                <label className="flex cursor-pointer items-center justify-center rounded-xl border border-white/15 bg-white/10 font-semibold text-white" style={{ fontSize: '32px', padding: '24px', minHeight: '80px' }}>
-                  CSVを読込
-                  <input
-                    type="file"
-                    accept=".csv,text/csv"
-                    className="hidden"
-                    onChange={(e) => {
-                      const file = e.target.files?.[0]
-                      if (!file) return
-                      handleImportCsv(file)
-                      e.target.value = ""
-                    }}
-                  />
-                </label>
-              </div>
-            </div>
-
-            {/* Gemini AI設定 - CSVボタンの下に移動 */}
-            <div className="mt-4 px-4 pb-6">
+            {/* 設定セクション */}
+            <div className="mt-5 px-4 pb-6">
               <div className="rounded-2xl border border-white/10 bg-white/5" style={{ padding: '24px' }}>
+                <h3 className="font-semibold text-white" style={{ fontSize: '40px', marginBottom: '20px' }}>設定</h3>
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="font-semibold text-white" style={{ fontSize: '32px' }}>Gemini AI認識</p>
