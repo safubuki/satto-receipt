@@ -4,7 +4,7 @@ import { clsx } from "clsx"
 import { downloadCsv, toCsv } from "./lib/csv"
 import { runOcr } from "./lib/ocr"
 import { analyzeReceiptWithGemini, saveApiKey, clearApiKey, hasApiKey } from "./lib/geminiOcr"
-import { decryptVault, deriveKey, encryptVault, getOrCreateSalt, clearSalt } from "./lib/crypto"
+import { decryptVault, deriveKey, encryptVault, getOrCreateSalt } from "./lib/crypto"
 import { clearVault, loadVault, saveVault } from "./lib/db"
 import type { Category, LineItem, Receipt, Vault } from "./lib/types"
 import { importCsvToReceipts } from "./lib/csvImport"
@@ -307,8 +307,6 @@ function App() {
     if (!confirmed) return
     
     await clearVault()
-    clearSalt()
-    setIsFirstTime(true)
     setSession(null)
     setDraft(initialDraft())
     setOcrText("")
@@ -991,10 +989,9 @@ function App() {
                         <div 
                           className="cursor-pointer flex-1"
                           onClick={() => setSelectedReceipt(receipt)}
-                          style={{ maxWidth: '60%' }}
                         >
                           <p className="text-slate-400" style={{ fontSize: '32px' }}>{receipt.visitedAt}</p>
-                          <p className="font-semibold text-white underline" style={{ fontSize: '40px', marginTop: '8px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{receipt.storeName}</p>
+                          <p className="font-semibold text-white underline" style={{ fontSize: '40px', marginTop: '8px' }}>{receipt.storeName}</p>
                           <span className="inline-block rounded-full bg-white/10 text-slate-300" style={{ fontSize: '28px', padding: '12px 24px', marginTop: '14px' }}>
                             {receipt.category || '未分類'}
                           </span>

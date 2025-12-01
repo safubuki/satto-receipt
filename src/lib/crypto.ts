@@ -21,10 +21,6 @@ export const getOrCreateSalt = (): Uint8Array => {
   return salt
 }
 
-export const clearSalt = (): void => {
-  localStorage.removeItem(SALT_KEY)
-}
-
 export const deriveKey = async (
   passphrase: string,
   salt: Uint8Array,
