@@ -989,10 +989,9 @@ function App() {
                         <div 
                           className="cursor-pointer flex-1"
                           onClick={() => setSelectedReceipt(receipt)}
-                          style={{ maxWidth: '60%' }}
                         >
                           <p className="text-slate-400" style={{ fontSize: '32px' }}>{receipt.visitedAt}</p>
-                          <p className="font-semibold text-white underline" style={{ fontSize: '40px', marginTop: '8px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{receipt.storeName}</p>
+                          <p className="font-semibold text-white underline" style={{ fontSize: '40px', marginTop: '8px' }}>{receipt.storeName}</p>
                           <span className="inline-block rounded-full bg-white/10 text-slate-300" style={{ fontSize: '28px', padding: '12px 24px', marginTop: '14px' }}>
                             {receipt.category || '未分類'}
                           </span>
