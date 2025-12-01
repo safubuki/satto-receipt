@@ -485,7 +485,9 @@ function App() {
 
   const handleCleanupImages = async () => {
     if (!session) return
-    const cleaned = session.vault.receipts.map((r) => ({ ...r, imageData: undefined }))
+    // 日付降順（新しい順）でソートしてからエクスポート
+    const sorted = [...session.vault.receipts].sort((a, b) => b.visitedAt.localeCompare(a.visitedAt))
+    const cleaned = sorted.map((r) => ({ ...r, imageData: undefined }))
     await persistVault({ ...session.vault, receipts: cleaned }, session.key)
     setExpandedImages(new Set())
   }
@@ -512,6 +514,8 @@ function App() {
       // まずcameraActiveをtrueにしてvideo要素をレンダリングさせる
       // video要素のref callbackでストリーム接続が行われる
       setCameraActive(true)
+      // カメラ起動時にページトップへスクロール
+      window.scrollTo({ top: 0, behavior: 'smooth' })
 
       // タイムアウトチェック
       setTimeout(() => {
@@ -613,15 +617,18 @@ function App() {
   const filteredReceipts = useMemo(() => {
     if (!session) return []
     const query = filters.query.toLowerCase()
-    return session.vault.receipts.filter((receipt) => {
-      const matchesQuery =
-        !query ||
-        receipt.storeName.toLowerCase().includes(query) ||
-        (receipt.note ?? "").toLowerCase().includes(query)
-      const matchesCategory =
-        filters.category === "all" || receipt.category === filters.category
-      return matchesQuery && matchesCategory
-    })
+    return session.vault.receipts
+      .filter((receipt) => {
+        const matchesQuery =
+          !query ||
+          receipt.storeName.toLowerCase().includes(query) ||
+          (receipt.note ?? "").toLowerCase().includes(query)
+        const matchesCategory =
+          filters.category === "all" || receipt.category === filters.category
+        return matchesQuery && matchesCategory
+      })
+      // 日付降順（新しい順）でソート
+      .sort((a, b) => b.visitedAt.localeCompare(a.visitedAt))
   }, [session, filters])
 
   const displayedReceipts = useMemo(
@@ -1854,6 +1861,8 @@ const UnlockPanel = ({
           onClick={() => {
             if (confirm("すべてのデータを削除して初期化しますか？")) {
               onReset()
+              setValue("")
+              setRememberMe(false)
             }
           }}
           className="text-slate-500 underline"
