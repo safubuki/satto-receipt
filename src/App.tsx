@@ -1788,9 +1788,11 @@ const UnlockPanel = ({
   isFirstTime: boolean
   onReset: () => void
 }) => {
-  const [value, setValue] = useState("")
+  // 保存されたパスフレーズがあれば、入力欄にもセット
+  const savedPassphrase = getSavedPassphrase()
+  const [value, setValue] = useState(savedPassphrase ?? "")
   // 保存されたパスフレーズがあれば、チェックをONで表示
-  const [rememberMe, setRememberMe] = useState(() => getSavedPassphrase() !== null)
+  const [rememberMe, setRememberMe] = useState(savedPassphrase !== null)
   // スマホ判定 (安全なヘルパー関数を使用)
   const [isMobile, setIsMobile] = useState(detectMobile)
   useEffect(() => {
