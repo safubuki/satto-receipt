@@ -653,10 +653,10 @@ function App() {
 
         {!session ? (
           // ========== スマホ用ログイン画面 ==========
-          <div className="flex min-h-[80vh] flex-col items-center justify-center px-6">
-            <div className="w-full rounded-3xl border border-white/10 bg-white/5" style={{ padding: '40px' }}>
-              <div className="text-center" style={{ marginBottom: '40px' }}>
-                <div className="mx-auto rounded-full bg-gradient-to-r from-mint/60 to-mint/30 p-[3px]" style={{ width: '140px', height: '140px', marginBottom: '28px' }}>
+          <div className="flex min-h-[80vh] flex-col items-center justify-center px-5">
+            <div className="w-full rounded-3xl border border-white/10 bg-white/5" style={{ padding: '36px', maxWidth: '92vw' }}>
+              <div className="text-center" style={{ marginBottom: '36px' }}>
+                <div className="mx-auto rounded-full bg-gradient-to-r from-mint/60 to-mint/30 p-[3px]" style={{ width: '160px', height: '160px', marginBottom: '28px' }}>
                   <div className="h-full w-full rounded-full bg-fog/90 p-[2px]">
                     <img
                       src={`${import.meta.env.BASE_URL}turtle_icon_receipt.png`}
@@ -665,17 +665,10 @@ function App() {
                     />
                   </div>
                 </div>
-                <h2 className="font-bold text-white" style={{ fontSize: '40px' }}>サッとレシート</h2>
-                <p className="text-slate-400" style={{ fontSize: '26px', marginTop: '20px' }}>買い物ごとにパシャと</p>
+                <h2 className="font-bold text-white" style={{ fontSize: '48px' }}>サッとレシート</h2>
+                <p className="text-slate-400" style={{ fontSize: '32px', marginTop: '20px' }}>買い物ごとにパシャと</p>
               </div>
               <UnlockPanel onUnlock={handleUnlock} unlocking={unlocking} error={unlockError} />
-              <button
-                onClick={handleReset}
-                className="w-full text-center text-slate-500 underline"
-                style={{ fontSize: '22px', marginTop: '36px', padding: '16px' }}
-              >
-                データを初期化
-              </button>
             </div>
           </div>
         ) : (
@@ -1686,25 +1679,38 @@ const UnlockPanel = ({
     // スマホ用UI
     return (
       <div className="flex flex-col gap-6">
-        <label className="text-slate-200" style={{ fontSize: '24px' }}>
+        <label className="text-slate-200" style={{ fontSize: '36px' }}>
           🔑 パスフレーズ
           <input
             type="password"
             className="w-full rounded-xl border border-white/10 bg-white/5 text-white outline-none ring-mint/30 focus:ring-2"
-            style={{ fontSize: '26px', padding: '24px', marginTop: '16px', minHeight: '76px' }}
+            style={{ fontSize: '36px', padding: '24px', marginTop: '20px', minHeight: '90px' }}
             placeholder="パスフレーズを入力"
             value={value}
             onChange={(e) => setValue(e.target.value)}
           />
         </label>
-        {error && <p className="text-red-300" style={{ fontSize: '22px' }}>{error}</p>}
+        {error && <p className="text-red-300" style={{ fontSize: '32px' }}>{error}</p>}
         <button
           onClick={() => onUnlock(value)}
           disabled={unlocking || value.length < 4}
           className="w-full rounded-xl bg-gradient-to-r from-mint/70 to-mint font-bold text-fog shadow-soft transition hover:translate-y-[-1px] disabled:cursor-not-allowed disabled:opacity-60"
-          style={{ fontSize: '28px', padding: '26px', minHeight: '84px' }}
+          style={{ fontSize: '40px', padding: '28px', minHeight: '100px' }}
         >
           {unlocking ? "🔓 復号中..." : "🔐 データを開く"}
+        </button>
+        <button
+          onClick={() => {
+            if (confirm("すべてのデータを削除して初期化しますか？")) {
+              localStorage.clear()
+              indexedDB.deleteDatabase("satto-receipt-db")
+              location.reload()
+            }
+          }}
+          className="text-slate-500 underline"
+          style={{ fontSize: '32px', padding: '16px' }}
+        >
+          データを初期化
         </button>
       </div>
     )
