@@ -1469,12 +1469,13 @@ function App() {
                     </div>
                   </label>
                   <label className="flex flex-col gap-2 text-sm text-slate-200">
-                    分類 (ドロップダウン)
+                    分類
                     <select
                       className="w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-white outline-none ring-mint/30 focus:ring-2"
                       value={draft.category}
                       onChange={(e) => setDraft((prev) => ({ ...prev, category: e.target.value }))}
                     >
+                      <option value="">分類を選択</option>
                       {categories.map((cat) => (
                         <option key={cat.id} value={cat.name}>
                           {cat.name}
@@ -1816,12 +1817,17 @@ const UnlockPanel = ({
   // PC用UI
   return (
     <div className="mt-6 flex flex-col gap-3">
+      <p className="text-sm text-slate-300">
+        {isFirstTime 
+          ? "初回起動です。パスフレーズを設定してください（4文字以上）。"
+          : "パスフレーズを入力してデータを開いてください。"}
+      </p>
       <label className="text-sm text-slate-200">
         パスフレーズ
         <input
           type="password"
           className="mt-2 w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-white outline-none ring-mint/30 focus:ring-2"
-          placeholder="8文字以上で設定してください"
+          placeholder="4文字以上で入力"
           value={value}
           onChange={(e) => setValue(e.target.value)}
         />
@@ -1832,7 +1838,7 @@ const UnlockPanel = ({
         disabled={unlocking || value.length < 4}
         className="rounded-2xl bg-gradient-to-r from-mint/70 to-mint px-4 py-3 text-sm font-semibold text-fog shadow-soft transition hover:translate-y-[-1px] disabled:cursor-not-allowed disabled:opacity-60"
       >
-        {unlocking ? "復号しています..." : "データを開く / 新規作成"}
+        {unlocking ? "復号しています..." : "データを開く"}
       </button>
     </div>
   )
