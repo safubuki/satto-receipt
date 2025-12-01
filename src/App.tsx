@@ -51,12 +51,12 @@ const createVault = (): Vault => ({
   categories: defaultCategories,
 })
 
-const initialDraft = (categories: Category[]): ReceiptDraft => ({
+const initialDraft = (): ReceiptDraft => ({
   storeName: "",
   visitedAt: new Date().toISOString().slice(0, 10),
   total: "",
   note: "",
-  category: categories[0]?.name ?? "その他",
+  category: "",
   lineItems: [],
 })
 
@@ -178,28 +178,39 @@ function App() {
   const [session, setSession] = useState<Session | null>(null)
   const [unlocking, setUnlocking] = useState(false)
   const [unlockError, setUnlockError] = useState<string | null>(null)
+  const [isFirstTime, setIsFirstTime] = useState(true)
   const [ocrProgress, setOcrProgress] = useState<number | null>(null)
   const [ocrText, setOcrText] = useState("")
   const [lastUploadedName, setLastUploadedName] = useState<string | null>(null)
   const [saveImage, setSaveImage] = useState(false)
-  const [draft, setDraft] = useState<ReceiptDraft>(initialDraft(defaultCategories))
+  const [draft, setDraft] = useState<ReceiptDraft>(initialDraft())
   const [filters, setFilters] = useState({ query: "", category: "all" })
   const [summaryTab, setSummaryTab] = useState<"overview" | "monthly">("overview")
   const [visibleCount, setVisibleCount] = useState(20)
   const [expandedImages, setExpandedImages] = useState<Set<string>>(new Set())
+  const [selectedReceipt, setSelectedReceipt] = useState<Receipt | null>(null)
+  const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null)
   const categories = session?.vault.categories ?? defaultCategories
   const videoRef = useRef<HTMLVideoElement | null>(null)
   const streamRef = useRef<MediaStream | null>(null)
   const [cameraActive, setCameraActive] = useState(false)
   const [cameraError, setCameraError] = useState<string | null>(null)
   const [cameraReady, setCameraReady] = useState(false)
-  const [cameraPaused, setCameraPaused] = useState(false)  // 撮影後の一時停止
-  const [capturedImage, setCapturedImage] = useState<string | null>(null)  // 撮影した画像
-  const [isProcessing, setIsProcessing] = useState(false)  // OCR処理中
-  const [useGemini, setUseGemini] = useState(true)  // Gemini APIを使うか
-  const [showApiKeyModal, setShowApiKeyModal] = useState(false)  // APIキー設定モーダル
-  const [apiKeyInput, setApiKeyInput] = useState("")  // APIキー入力
+  const [cameraPaused, setCameraPaused] = useState(false)
+  const [capturedImage, setCapturedImage] = useState<string | null>(null)
+  const [isProcessing, setIsProcessing] = useState(false)
+  const [useGemini, setUseGemini] = useState(true)
+  const [showApiKeyModal, setShowApiKeyModal] = useState(false)
+  const [apiKeyInput, setApiKeyInput] = useState("")
   const isMobile = useIsMobile()
+
+  useEffect(() => {
+    const checkFirstTime = async () => {
+      const stored = await loadVault()
+      setIsFirstTime(!stored)
+    }
+    checkFirstTime()
+  }, [])
 
   // ビデオ要素にストリームを接続する処理
   const attachStreamToVideo = useCallback((video: HTMLVideoElement, stream: MediaStream) => {
@@ -260,7 +271,7 @@ function App() {
       if (!stored) {
         const vault = createVault()
         await persistVault(vault, key)
-        setDraft(initialDraft(vault.categories))
+        setDraft(initialDraft())
         return
       }
 
@@ -271,7 +282,7 @@ function App() {
       })
 
       setSession({ key, vault })
-      setDraft(initialDraft(vault.categories))
+      setDraft(initialDraft())
     } catch (error) {
       console.error(error)
       setUnlockError("パスフレーズが違うかデータを復号できませんでした。")
@@ -281,11 +292,12 @@ function App() {
   }
 
   const handleLock = async () => {
+    stopCamera()
     setSession(null)
     setOcrText("")
     setOcrProgress(null)
     setLastUploadedName(null)
-    setDraft(initialDraft(defaultCategories))
+    setDraft(initialDraft())
   }
 
   const handleReset = async () => {
@@ -296,7 +308,7 @@ function App() {
     
     await clearVault()
     setSession(null)
-    setDraft(initialDraft(defaultCategories))
+    setDraft(initialDraft())
     setOcrText("")
     setUnlockError(null)
     setLastUploadedName(null)
@@ -333,7 +345,7 @@ function App() {
         }))
         
         setDraft({
-          ...initialDraft(categories),
+          ...initialDraft(),
           storeName: result.storeName || "",
           visitedAt: result.date || new Date().toISOString().slice(0, 10),
           total: result.total || "",
@@ -347,7 +359,7 @@ function App() {
         setOcrText(text)
         const parsed = parseReceiptText(text)
         setDraft({
-          ...initialDraft(categories),
+          ...initialDraft(),
           storeName: parsed.store ?? "",
           total: parsed.total ?? "",
           imageData: preview,
@@ -363,7 +375,7 @@ function App() {
   }
 
   const clearDraft = () => {
-    setDraft(initialDraft(categories))
+    setDraft(initialDraft())
     setOcrText("")
     setOcrProgress(null)
     setLastUploadedName(null)
@@ -405,10 +417,11 @@ function App() {
     }
 
     await persistVault(nextVault, session.key)
-    setDraft(initialDraft(session.vault.categories))
+    setDraft(initialDraft())
     setOcrText("")
     setOcrProgress(null)
     setLastUploadedName(null)
+    stopCamera()
   }
 
   const handleDeleteReceipt = async (id: string) => {
@@ -449,7 +462,7 @@ function App() {
     setCameraReady(false)
     setCameraError(null)
     const constraints: MediaStreamConstraints = {
-      video: { facingMode: "environment", width: { ideal: 1280 }, height: { ideal: 720 } },
+      video: { facingMode: "environment", width: { ideal: 1280 }, height: { ideal: 720 }, frameRate: { ideal: 30, max: 30 } },
       audio: false,
     }
     try {
@@ -666,9 +679,9 @@ function App() {
                   </div>
                 </div>
                 <h2 className="font-bold text-white" style={{ fontSize: '48px' }}>サッとレシート</h2>
-                <p className="text-slate-400" style={{ fontSize: '32px', marginTop: '20px' }}>買い物ごとにパシャと</p>
+                <p className="text-slate-400" style={{ fontSize: '32px', marginTop: '20px' }}>買い物ごとにサッとパシャっと</p>
               </div>
-              <UnlockPanel onUnlock={handleUnlock} unlocking={unlocking} error={unlockError} />
+              <UnlockPanel onUnlock={handleUnlock} unlocking={unlocking} error={unlockError} isFirstTime={isFirstTime} />
             </div>
           </div>
         ) : (
@@ -795,15 +808,15 @@ function App() {
             {/* サマリー - 枠で囲んで2列レイアウト */}
             <div className="mt-4 px-4">
               <div className="rounded-2xl border border-white/10 bg-white/5" style={{ padding: '24px' }}>
-                <h3 style={{ fontSize: '36px', marginBottom: '20px' }} className="font-semibold text-white">サマリー</h3>
+                <h3 style={{ fontSize: '40px', marginBottom: '20px' }} className="font-semibold text-white">サマリー</h3>
                 <div className="grid grid-cols-2 gap-3">
                   <div className="rounded-xl border border-white/10 bg-white/10" style={{ padding: '20px' }}>
-                    <p style={{ fontSize: '28px' }} className="text-slate-400">今月</p>
-                    <p style={{ fontSize: '40px', marginTop: '8px' }} className="font-bold text-mint truncate">{formatCurrency(monthlySpent ?? 0)}</p>
+                    <p style={{ fontSize: '32px' }} className="text-slate-400">今月</p>
+                    <p style={{ fontSize: '44px', marginTop: '8px' }} className="font-bold text-mint truncate">{formatCurrency(monthlySpent ?? 0)}</p>
                   </div>
                   <div className="rounded-xl border border-white/10 bg-white/5" style={{ padding: '20px' }}>
-                    <p style={{ fontSize: '28px' }} className="text-slate-400">今年</p>
-                    <p style={{ fontSize: '40px', marginTop: '8px' }} className="font-bold text-white truncate">{formatCurrency(yearlySpent ?? 0)}</p>
+                    <p style={{ fontSize: '32px' }} className="text-slate-400">今年</p>
+                    <p style={{ fontSize: '44px', marginTop: '8px' }} className="font-bold text-white truncate">{formatCurrency(yearlySpent ?? 0)}</p>
                   </div>
                 </div>
               </div>
@@ -864,6 +877,7 @@ function App() {
                     value={draft.category}
                     onChange={(e) => setDraft((prev) => ({ ...prev, category: e.target.value }))}
                   >
+                    <option value="">分類を選択</option>
                     {categories.map((cat) => (
                       <option key={cat.id} value={cat.name}>
                         {cat.name}
@@ -885,6 +899,73 @@ function App() {
               </div>
             </div>
 
+            {/* 品目表示モーダル */}
+            {selectedReceipt && (
+              <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 px-4" onClick={() => setSelectedReceipt(null)}>
+                <div className="w-full rounded-2xl border border-white/10 bg-fog" style={{ padding: '32px', maxWidth: '92vw', maxHeight: '80vh', overflow: 'auto' }} onClick={(e) => e.stopPropagation()}>
+                  <h3 className="font-bold text-white" style={{ fontSize: '40px' }}>{selectedReceipt.storeName}</h3>
+                  <p className="text-slate-400" style={{ fontSize: '32px', marginTop: '12px' }}>{selectedReceipt.visitedAt}</p>
+                  <div className="mt-6 space-y-3">
+                    {selectedReceipt.lineItems && selectedReceipt.lineItems.length > 0 ? (
+                      selectedReceipt.lineItems.map((item, idx) => (
+                        <div key={item.id || idx} className="flex items-center justify-between rounded-xl bg-white/5" style={{ padding: '20px' }}>
+                          <div>
+                            <p className="text-white" style={{ fontSize: '32px' }}>{item.name}</p>
+                            {item.quantity > 1 && <p className="text-slate-400" style={{ fontSize: '26px' }}>×{item.quantity}</p>}
+                          </div>
+                          <p className="font-semibold text-mint" style={{ fontSize: '36px' }}>{formatCurrency(item.price)}</p>
+                        </div>
+                      ))
+                    ) : (
+                      <p className="text-center text-slate-400" style={{ fontSize: '32px', padding: '32px' }}>品目データがありません</p>
+                    )}
+                  </div>
+                  <div className="flex items-center justify-between border-t border-white/10" style={{ marginTop: '24px', paddingTop: '24px' }}>
+                    <span className="text-slate-300" style={{ fontSize: '36px' }}>合計</span>
+                    <span className="font-bold text-mint" style={{ fontSize: '44px' }}>{formatCurrency(selectedReceipt.total)}</span>
+                  </div>
+                  <button
+                    onClick={() => setSelectedReceipt(null)}
+                    className="w-full rounded-xl bg-white/10 text-white"
+                    style={{ fontSize: '36px', padding: '20px', marginTop: '24px' }}
+                  >
+                    閉じる
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* 削除確認モーダル */}
+            {deleteTargetId && (
+              <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 px-4">
+                <div className="w-full rounded-2xl border border-white/10 bg-fog" style={{ padding: '32px', maxWidth: '92vw' }}>
+                  <h3 className="font-bold text-white" style={{ fontSize: '40px' }}>削除の確認</h3>
+                  <p className="text-slate-300" style={{ fontSize: '32px', marginTop: '20px', lineHeight: '1.5' }}>
+                    このレシートを削除しますか？この操作は取り消せません。
+                  </p>
+                  <div className="grid grid-cols-2 gap-4" style={{ marginTop: '28px' }}>
+                    <button
+                      onClick={() => setDeleteTargetId(null)}
+                      className="rounded-xl bg-white/10 text-white"
+                      style={{ fontSize: '36px', padding: '22px', minHeight: '80px' }}
+                    >
+                      キャンセル
+                    </button>
+                    <button
+                      onClick={async () => {
+                        await handleDeleteReceipt(deleteTargetId)
+                        setDeleteTargetId(null)
+                      }}
+                      className="rounded-xl bg-red-500 font-bold text-white"
+                      style={{ fontSize: '36px', padding: '22px', minHeight: '80px' }}
+                    >
+                      削除する
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+
             {/* レシート一覧 */}
             <div className="mt-5 px-4">
               <div className="rounded-2xl border border-white/10 bg-white/5" style={{ padding: '24px' }}>
@@ -905,11 +986,14 @@ function App() {
                       style={{ padding: '28px' }}
                     >
                       <div className="flex items-center justify-between">
-                        <div>
+                        <div 
+                          className="cursor-pointer flex-1"
+                          onClick={() => setSelectedReceipt(receipt)}
+                        >
                           <p className="text-slate-400" style={{ fontSize: '32px' }}>{receipt.visitedAt}</p>
-                          <p className="font-semibold text-white" style={{ fontSize: '40px', marginTop: '8px' }}>{receipt.storeName}</p>
+                          <p className="font-semibold text-white underline" style={{ fontSize: '40px', marginTop: '8px' }}>{receipt.storeName}</p>
                           <span className="inline-block rounded-full bg-white/10 text-slate-300" style={{ fontSize: '28px', padding: '12px 24px', marginTop: '14px' }}>
-                            {receipt.category}
+                            {receipt.category || '未分類'}
                           </span>
                         </div>
                         <div className="text-right">
@@ -917,7 +1001,7 @@ function App() {
                             {formatCurrency(receipt.total)}
                           </p>
                           <button
-                            onClick={() => handleDeleteReceipt(receipt.id)}
+                            onClick={() => setDeleteTargetId(receipt.id)}
                             className="text-red-400"
                             style={{ fontSize: '32px', marginTop: '14px', padding: '10px 0' }}
                           >
@@ -1142,7 +1226,7 @@ function App() {
                 端末に保存したデータを開くためのパスフレーズを設定・入力してください。
                 サーバーには送信せず、WebCrypto + IndexedDB で暗号化されます。
               </p>
-              <UnlockPanel onUnlock={handleUnlock} unlocking={unlocking} error={unlockError} />
+              <UnlockPanel onUnlock={handleUnlock} unlocking={unlocking} error={unlockError} isFirstTime={isFirstTime} />
               <div className="mt-6 flex flex-wrap items-center gap-2 text-xs text-slate-400">
                 <Pill>ローカル暗号化</Pill>
                 <Pill>オフライン動作</Pill>
@@ -1660,10 +1744,12 @@ const UnlockPanel = ({
   onUnlock,
   unlocking,
   error,
+  isFirstTime,
 }: {
   onUnlock: (passphrase: string) => void
   unlocking: boolean
   error: string | null
+  isFirstTime: boolean
 }) => {
   const [value, setValue] = useState("")
   // スマホ判定 (安全なヘルパー関数を使用)
@@ -1679,6 +1765,11 @@ const UnlockPanel = ({
     // スマホ用UI
     return (
       <div className="flex flex-col gap-6">
+        <p className="text-slate-300" style={{ fontSize: '30px', lineHeight: '1.6' }}>
+          {isFirstTime 
+            ? "初回起動です。パスフレーズを設定してください（4文字以上）。"
+            : "パスフレーズを入力してデータを開いてください。"}
+        </p>
         <label className="text-slate-200" style={{ fontSize: '36px' }}>
           🔑 パスフレーズ
           <input
