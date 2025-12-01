@@ -810,13 +810,13 @@ function App() {
               <div className="rounded-2xl border border-white/10 bg-white/5" style={{ padding: '24px' }}>
                 <h3 style={{ fontSize: '40px', marginBottom: '20px' }} className="font-semibold text-white">サマリー</h3>
                 <div className="grid grid-cols-2 gap-3">
-                  <div className="rounded-xl border border-white/10 bg-white/10" style={{ padding: '24px 20px' }}>
-                    <p style={{ fontSize: '32px', lineHeight: '1.2' }} className="text-slate-400">今月</p>
-                    <p style={{ fontSize: '44px', marginTop: '12px', lineHeight: '1.3' }} className="font-bold text-mint truncate">{formatCurrency(monthlySpent ?? 0)}</p>
+                  <div className="rounded-xl border border-white/10 bg-white/10 py-6" style={{ padding: '20px' }}>
+                    <p style={{ fontSize: '32px' }} className="text-slate-400 leading-tight">今月</p>
+                    <p style={{ fontSize: '44px', marginTop: '10px' }} className="font-bold text-mint truncate leading-tight">{formatCurrency(monthlySpent ?? 0)}</p>
                   </div>
-                  <div className="rounded-xl border border-white/10 bg-white/5" style={{ padding: '24px 20px' }}>
-                    <p style={{ fontSize: '32px', lineHeight: '1.2' }} className="text-slate-400">今年</p>
-                    <p style={{ fontSize: '44px', marginTop: '12px', lineHeight: '1.3' }} className="font-bold text-white truncate">{formatCurrency(yearlySpent ?? 0)}</p>
+                  <div className="rounded-xl border border-white/10 bg-white/5 py-6" style={{ padding: '20px' }}>
+                    <p style={{ fontSize: '32px' }} className="text-slate-400 leading-tight">今年</p>
+                    <p style={{ fontSize: '44px', marginTop: '10px' }} className="font-bold text-white truncate leading-tight">{formatCurrency(yearlySpent ?? 0)}</p>
                   </div>
                 </div>
               </div>
