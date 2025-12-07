@@ -190,6 +190,8 @@ function App() {
   const [expandedImages, setExpandedImages] = useState<Set<string>>(new Set())
   const [selectedReceipt, setSelectedReceipt] = useState<Receipt | null>(null)
   const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null)
+  const [editingReceipt, setEditingReceipt] = useState<Receipt | null>(null)
+  const [detailReceipt, setDetailReceipt] = useState<Receipt | null>(null)
   // 常に最新のdefaultCategoriesを使用（古いvaultデータとの互換性のため）
   const categories = defaultCategories
   const videoRef = useRef<HTMLVideoElement | null>(null)
@@ -464,6 +466,18 @@ function App() {
       receipts: session.vault.receipts.filter((r) => r.id !== id),
     }
     await persistVault(nextVault, session.key)
+  }
+
+  const handleUpdateReceipt = async (id: string, storeName: string, total: number) => {
+    if (!session) return
+    const nextVault = {
+      ...session.vault,
+      receipts: session.vault.receipts.map((r) =>
+        r.id === id ? { ...r, storeName, total, updatedAt: new Date().toISOString() } : r
+      ),
+    }
+    await persistVault(nextVault, session.key)
+    setEditingReceipt(null)
   }
 
   const handleExport = () => {
@@ -1006,6 +1020,104 @@ function App() {
               </div>
             )}
 
+            {/* 編集モーダル */}
+            {editingReceipt && (
+              <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 px-4">
+                <div className="w-full rounded-2xl border border-white/10 bg-fog" style={{ padding: '32px', maxWidth: '92vw' }}>
+                  <h3 className="font-bold text-white" style={{ fontSize: '40px' }}>レシート編集</h3>
+                  <div className="mt-6 space-y-5">
+                    <label className="block">
+                      <span className="text-slate-200" style={{ fontSize: '32px' }}>店名</span>
+                      <input
+                        type="text"
+                        value={editingReceipt.storeName}
+                        onChange={(e) => setEditingReceipt({ ...editingReceipt, storeName: e.target.value })}
+                        className="mt-2 w-full rounded-xl border border-white/10 bg-white/5 text-white outline-none ring-mint/30 focus:ring-2"
+                        style={{ fontSize: '36px', padding: '20px' }}
+                      />
+                    </label>
+                    <label className="block">
+                      <span className="text-slate-200" style={{ fontSize: '32px' }}>合計金額</span>
+                      <input
+                        type="number"
+                        value={editingReceipt.total}
+                        onChange={(e) => setEditingReceipt({ ...editingReceipt, total: Number(e.target.value) })}
+                        className="mt-2 w-full rounded-xl border border-white/10 bg-white/5 text-white outline-none ring-mint/30 focus:ring-2"
+                        style={{ fontSize: '36px', padding: '20px' }}
+                      />
+                    </label>
+                  </div>
+                  <div className="grid grid-cols-2 gap-4" style={{ marginTop: '28px' }}>
+                    <button
+                      onClick={() => setEditingReceipt(null)}
+                      className="rounded-xl bg-white/10 text-white"
+                      style={{ fontSize: '36px', padding: '22px', minHeight: '80px' }}
+                    >
+                      キャンセル
+                    </button>
+                    <button
+                      onClick={() => handleUpdateReceipt(editingReceipt.id, editingReceipt.storeName, editingReceipt.total)}
+                      className="rounded-xl bg-mint font-bold text-fog"
+                      style={{ fontSize: '36px', padding: '22px', minHeight: '80px' }}
+                    >
+                      保存
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* 詳細表示モーダル */}
+            {detailReceipt && (
+              <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 px-4">
+                <div className="w-full max-h-[85vh] overflow-y-auto rounded-2xl border border-white/10 bg-fog" style={{ padding: '32px', maxWidth: '92vw' }}>
+                  <h3 className="font-bold text-white" style={{ fontSize: '40px' }}>レシート詳細</h3>
+                  <div className="mt-6 space-y-4">
+                    <div>
+                      <p className="text-slate-400" style={{ fontSize: '28px' }}>店名</p>
+                      <p className="text-white" style={{ fontSize: '36px', marginTop: '8px' }}>{detailReceipt.storeName}</p>
+                    </div>
+                    <div>
+                      <p className="text-slate-400" style={{ fontSize: '28px' }}>合計金額</p>
+                      <p className="font-bold text-mint" style={{ fontSize: '42px', marginTop: '8px' }}>{formatCurrency(detailReceipt.total)}</p>
+                    </div>
+                    {detailReceipt.lineItems.length > 0 && (
+                      <div>
+                        <p className="text-slate-400" style={{ fontSize: '28px', marginBottom: '16px' }}>明細</p>
+                        <div className="space-y-3">
+                          {detailReceipt.lineItems.map((item) => (
+                            <div key={item.id} className="rounded-xl border border-white/10 bg-white/5" style={{ padding: '16px' }}>
+                              <div className="flex items-start justify-between">
+                                <div>
+                                  <p className="text-white" style={{ fontSize: '32px' }}>{item.name}</p>
+                                  {item.category && (
+                                    <p className="text-slate-400" style={{ fontSize: '26px', marginTop: '4px' }}>{item.category}</p>
+                                  )}
+                                </div>
+                                <div className="text-right">
+                                  <p className="font-bold text-white" style={{ fontSize: '32px' }}>{formatCurrency(item.price)}</p>
+                                  {item.quantity > 1 && (
+                                    <p className="text-slate-400" style={{ fontSize: '26px' }}>× {item.quantity}</p>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                  <button
+                    onClick={() => setDetailReceipt(null)}
+                    className="w-full rounded-xl bg-white/10 text-white"
+                    style={{ fontSize: '36px', padding: '22px', marginTop: '28px' }}
+                  >
+                    閉じる
+                  </button>
+                </div>
+              </div>
+            )}
+
             {/* レシート一覧 */}
             <div className="mt-5 px-4">
               <div className="rounded-2xl border border-white/10 bg-white/5" style={{ padding: '24px' }}>
@@ -1041,13 +1153,29 @@ function App() {
                           <p className="font-bold text-mint" style={{ fontSize: '48px' }}>
                             {formatCurrency(receipt.total)}
                           </p>
-                          <button
-                            onClick={() => setDeleteTargetId(receipt.id)}
-                            className="text-red-400"
-                            style={{ fontSize: '32px', marginTop: '14px', padding: '10px 0' }}
-                          >
-                            削除
-                          </button>
+                          <div className="flex gap-3 justify-end" style={{ marginTop: '14px' }}>
+                            <button
+                              onClick={() => setDetailReceipt(receipt)}
+                              className="text-blue-400"
+                              style={{ fontSize: '32px', padding: '10px 16px' }}
+                            >
+                              詳細
+                            </button>
+                            <button
+                              onClick={() => setEditingReceipt(receipt)}
+                              className="text-yellow-400"
+                              style={{ fontSize: '32px', padding: '10px 16px' }}
+                            >
+                              編集
+                            </button>
+                            <button
+                              onClick={() => setDeleteTargetId(receipt.id)}
+                              className="text-red-400"
+                              style={{ fontSize: '32px', padding: '10px 16px' }}
+                            >
+                              削除
+                            </button>
+                          </div>
                         </div>
                       </div>
                     </div>
@@ -1060,6 +1188,15 @@ function App() {
                     style={{ fontSize: '36px', padding: '28px', minHeight: '90px' }}
                   >
                     もっと見る
+                  </button>
+                )}
+                {filteredReceipts.length > 0 && visibleCount > 20 && (
+                  <button
+                    onClick={() => setVisibleCount(20)}
+                    className="w-full rounded-xl border border-white/10 bg-white/5 font-semibold text-white"
+                    style={{ fontSize: '36px', padding: '28px', minHeight: '90px' }}
+                  >
+                    折りたたむ
                   </button>
                 )}
                 {/* CSV操作 - レシート一覧内に移動 */}
@@ -1174,6 +1311,99 @@ function App() {
   // ========== PC用UI (従来のレイアウト) ==========
   return (
     <div className="min-h-screen text-sand">
+      {/* 編集モーダル (PC版) */}
+      {editingReceipt && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70">
+          <div className="w-full max-w-md rounded-2xl border border-white/10 bg-fog p-6">
+            <h3 className="text-xl font-bold text-white">レシート編集</h3>
+            <div className="mt-4 space-y-4">
+              <label className="block">
+                <span className="text-sm text-slate-200">店名</span>
+                <input
+                  type="text"
+                  value={editingReceipt.storeName}
+                  onChange={(e) => setEditingReceipt({ ...editingReceipt, storeName: e.target.value })}
+                  className="mt-2 w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-white outline-none ring-mint/30 focus:ring-2"
+                />
+              </label>
+              <label className="block">
+                <span className="text-sm text-slate-200">合計金額</span>
+                <input
+                  type="number"
+                  value={editingReceipt.total}
+                  onChange={(e) => setEditingReceipt({ ...editingReceipt, total: Number(e.target.value) })}
+                  className="mt-2 w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-white outline-none ring-mint/30 focus:ring-2"
+                />
+              </label>
+            </div>
+            <div className="mt-6 flex gap-3">
+              <button
+                onClick={() => setEditingReceipt(null)}
+                className="flex-1 rounded-xl bg-white/10 px-4 py-2 text-sm text-white hover:bg-white/15"
+              >
+                キャンセル
+              </button>
+              <button
+                onClick={() => handleUpdateReceipt(editingReceipt.id, editingReceipt.storeName, editingReceipt.total)}
+                className="flex-1 rounded-xl bg-mint px-4 py-2 text-sm font-semibold text-fog hover:bg-mint/90"
+              >
+                保存
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 詳細表示モーダル (PC版) */}
+      {detailReceipt && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70">
+          <div className="w-full max-w-2xl max-h-[85vh] overflow-y-auto rounded-2xl border border-white/10 bg-fog p-6">
+            <h3 className="text-xl font-bold text-white">レシート詳細</h3>
+            <div className="mt-4 space-y-4">
+              <div>
+                <p className="text-sm text-slate-400">店名</p>
+                <p className="mt-1 text-lg text-white">{detailReceipt.storeName}</p>
+              </div>
+              <div>
+                <p className="text-sm text-slate-400">合計金額</p>
+                <p className="mt-1 text-2xl font-bold text-mint">{formatCurrency(detailReceipt.total)}</p>
+              </div>
+              {detailReceipt.lineItems.length > 0 && (
+                <div>
+                  <p className="text-sm text-slate-400 mb-2">明細</p>
+                  <div className="space-y-2">
+                    {detailReceipt.lineItems.map((item) => (
+                      <div key={item.id} className="rounded-xl border border-white/10 bg-white/5 p-3">
+                        <div className="flex items-start justify-between">
+                          <div>
+                            <p className="text-white">{item.name}</p>
+                            {item.category && (
+                              <p className="text-xs text-slate-400 mt-1">{item.category}</p>
+                            )}
+                          </div>
+                          <div className="text-right">
+                            <p className="font-semibold text-white">{formatCurrency(item.price)}</p>
+                            {item.quantity > 1 && (
+                              <p className="text-xs text-slate-400">× {item.quantity}</p>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+            <button
+              onClick={() => setDetailReceipt(null)}
+              className="mt-6 w-full rounded-xl bg-white/10 px-4 py-2 text-sm text-white hover:bg-white/15"
+            >
+              閉じる
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* PC用APIキー設定モーダル */}
       {showApiKeyModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70">
@@ -1716,6 +1946,18 @@ function App() {
                             <p className="text-xs text-slate-400">{receipt.category}</p>
                           )}
                         </div>
+                        <button
+                          onClick={() => setDetailReceipt(receipt)}
+                          className="rounded-full border border-blue-500/40 bg-blue-500/10 px-3 py-2 text-xs font-semibold text-blue-100 transition hover:bg-blue-500/20"
+                        >
+                          詳細
+                        </button>
+                        <button
+                          onClick={() => setEditingReceipt(receipt)}
+                          className="rounded-full border border-yellow-500/40 bg-yellow-500/10 px-3 py-2 text-xs font-semibold text-yellow-100 transition hover:bg-yellow-500/20"
+                        >
+                          編集
+                        </button>
                         <button
                           onClick={() => handleDeleteReceipt(receipt.id)}
                           className="rounded-full border border-red-500/40 bg-red-500/10 px-3 py-2 text-xs font-semibold text-red-100 transition hover:bg-red-500/20"
