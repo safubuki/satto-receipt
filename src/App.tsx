@@ -938,6 +938,30 @@ function App() {
                       </option>
                     ))}
                   </select>
+                  {/* 詳細表示ボタン */}
+                  {draft.lineItems && draft.lineItems.length > 0 && (
+                    <button
+                      onClick={() => setDetailReceipt({
+                        id: 'draft',
+                        storeName: draft.storeName || '(未入力)',
+                        visitedAt: draft.visitedAt || '',
+                        total: parseInt(draft.total) || 0,
+                        category: draft.category || '',
+                        lineItems: draft.lineItems.map(item => ({
+                          ...item,
+                          price: parseInt(item.price) || 0,
+                          quantity: typeof item.quantity === 'string' ? parseInt(item.quantity) || 1 : item.quantity,
+                        })),
+                        note: draft.note,
+                        createdAt: new Date().toISOString(),
+                        updatedAt: new Date().toISOString(),
+                      })}
+                      className="w-full rounded-xl border border-blue-500/30 bg-blue-500/10 text-blue-300"
+                      style={{ fontSize: '32px', padding: '20px', minHeight: '70px' }}
+                    >
+                      📋 読み取り詳細を確認
+                    </button>
+                  )}
                   {/* 画像保存オプション - レシート情報内に移動 */}
                   <label className="flex items-center gap-4 text-slate-300" style={{ fontSize: '32px', marginTop: '8px' }}>
                     <input
@@ -1155,13 +1179,6 @@ function App() {
                           </p>
                           <div className="flex gap-3 justify-end" style={{ marginTop: '14px' }}>
                             <button
-                              onClick={() => setDetailReceipt(receipt)}
-                              className="text-blue-400"
-                              style={{ fontSize: '32px', padding: '10px 16px' }}
-                            >
-                              詳細
-                            </button>
-                            <button
                               onClick={() => setEditingReceipt(receipt)}
                               className="text-yellow-400"
                               style={{ fontSize: '32px', padding: '10px 16px' }}
@@ -1193,10 +1210,10 @@ function App() {
                 {filteredReceipts.length > 0 && visibleCount > 20 && (
                   <button
                     onClick={() => setVisibleCount(20)}
-                    className="w-full rounded-xl border border-white/10 bg-white/5 font-semibold text-white"
-                    style={{ fontSize: '36px', padding: '28px', minHeight: '90px' }}
+                    className="w-full rounded-xl border border-white/10 bg-white/5 font-semibold text-slate-400"
+                    style={{ fontSize: '32px', padding: '20px', minHeight: '70px' }}
                   >
-                    折りたたむ
+                    ▲ 20件表示に戻す
                   </button>
                 )}
                 {/* CSV操作 - レシート一覧内に移動 */}
@@ -1701,6 +1718,31 @@ function App() {
               <div className="rounded-3xl border border-white/10 bg-white/5 p-6">
                 <h2 className="text-xl font-semibold text-white">レシート詳細・編集</h2>
                 <p className="text-sm text-slate-400">店名・日付・合計を確認し、必要に応じてメモを追加。</p>
+                
+                {/* 読み取り詳細確認ボタン */}
+                {draft.lineItems && draft.lineItems.length > 0 && (
+                  <button
+                    onClick={() => setDetailReceipt({
+                      id: 'draft',
+                      storeName: draft.storeName || '(未入力)',
+                      visitedAt: draft.visitedAt || '',
+                      total: parseInt(draft.total) || 0,
+                      category: draft.category || '',
+                      lineItems: draft.lineItems.map(item => ({
+                        ...item,
+                        price: parseInt(item.price) || 0,
+                        quantity: typeof item.quantity === 'string' ? parseInt(item.quantity) || 1 : item.quantity,
+                      })),
+                      note: draft.note,
+                      createdAt: new Date().toISOString(),
+                      updatedAt: new Date().toISOString(),
+                    })}
+                    className="mt-4 w-full rounded-xl border border-blue-500/30 bg-blue-500/10 px-4 py-3 text-sm font-semibold text-blue-300 transition hover:bg-blue-500/20"
+                  >
+                    📋 読み取り詳細を確認
+                  </button>
+                )}
+
                 <div className="mt-4 grid gap-4 md:grid-cols-2">
                   <label className="flex flex-col gap-2 text-sm text-slate-200">
                     店名
@@ -1946,12 +1988,6 @@ function App() {
                             <p className="text-xs text-slate-400">{receipt.category}</p>
                           )}
                         </div>
-                        <button
-                          onClick={() => setDetailReceipt(receipt)}
-                          className="rounded-full border border-blue-500/40 bg-blue-500/10 px-3 py-2 text-xs font-semibold text-blue-100 transition hover:bg-blue-500/20"
-                        >
-                          詳細
-                        </button>
                         <button
                           onClick={() => setEditingReceipt(receipt)}
                           className="rounded-full border border-yellow-500/40 bg-yellow-500/10 px-3 py-2 text-xs font-semibold text-yellow-100 transition hover:bg-yellow-500/20"
