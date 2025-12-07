@@ -959,7 +959,7 @@ function App() {
                       className="w-full rounded-xl border border-blue-500/30 bg-blue-500/10 text-blue-300"
                       style={{ fontSize: '32px', padding: '20px', minHeight: '70px' }}
                     >
-                      📋 読み取り詳細を確認
+                      読み取り詳細を確認
                     </button>
                   )}
                   {/* 画像保存オプション - レシート情報内に移動 */}
@@ -1211,7 +1211,7 @@ function App() {
                   <button
                     onClick={() => setVisibleCount(20)}
                     className="w-full rounded-xl border border-white/10 bg-white/5 font-semibold text-slate-400"
-                    style={{ fontSize: '32px', padding: '20px', minHeight: '70px' }}
+                    style={{ fontSize: '36px', padding: '28px', minHeight: '90px' }}
                   >
                     ▲ 20件表示に戻す
                   </button>
@@ -1739,7 +1739,7 @@ function App() {
                     })}
                     className="mt-4 w-full rounded-xl border border-blue-500/30 bg-blue-500/10 px-4 py-3 text-sm font-semibold text-blue-300 transition hover:bg-blue-500/20"
                   >
-                    📋 読み取り詳細を確認
+                    読み取り詳細を確認
                   </button>
                 )}
 
