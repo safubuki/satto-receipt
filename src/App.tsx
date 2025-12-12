@@ -163,9 +163,6 @@ const useIsMobile = () => {
   const [isMobile, setIsMobile] = useState(detectMobile)
   
   useEffect(() => {
-    // マウント後に再判定
-    setIsMobile(detectMobile())
-    
     const handleResize = () => setIsMobile(detectMobile())
     window.addEventListener('resize', handleResize)
     return () => window.removeEventListener('resize', handleResize)
@@ -2081,7 +2078,6 @@ const UnlockPanel = ({
   // スマホ判定 (安全なヘルパー関数を使用)
   const [isMobile, setIsMobile] = useState(detectMobile)
   useEffect(() => {
-    setIsMobile(detectMobile())
     const handleResize = () => setIsMobile(detectMobile())
     window.addEventListener('resize', handleResize)
     return () => window.removeEventListener('resize', handleResize)
