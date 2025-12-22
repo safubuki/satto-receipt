@@ -1300,6 +1300,7 @@ function App() {
                     </div>
                   ))
                 )}
+                </div>
                 {filteredReceipts.length > visibleCount && (
                   <button
                     onClick={() => setVisibleCount((v) => v + 20)}
@@ -1341,7 +1342,6 @@ function App() {
                       }}
                     />
                   </label>
-                </div>
                 </div>
               </div>
             </div>
