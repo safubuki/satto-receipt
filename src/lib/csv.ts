@@ -20,6 +20,8 @@ export const toCsv = (receipts: Receipt[]): string => {
     'subtotal',
     'receipt_total',
     'note',
+    'is_nomikai',
+    'is_jibara',
   ]
   const rows = receipts.flatMap((receipt) => {
     // 品目がない場合は1行で出力
@@ -36,6 +38,8 @@ export const toCsv = (receipts: Receipt[]): string => {
           '',
           receipt.total,
           receipt.note ?? '',
+          receipt.isNomikai ? '1' : '',
+          receipt.isJibara ? '1' : '',
         ],
       ]
     }
@@ -52,6 +56,8 @@ export const toCsv = (receipts: Receipt[]): string => {
       line.price * line.quantity,
       receipt.total,
       receipt.note ?? '',
+      receipt.isNomikai ? '1' : '',
+      receipt.isJibara ? '1' : '',
     ])
   })
 
