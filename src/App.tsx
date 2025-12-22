@@ -32,6 +32,8 @@ type ReceiptDraft = {
   category: string
   imageData?: string
   lineItems: LineItemDraft[]
+  isNomikai?: boolean  // 飲み会フラグ
+  isJibara?: boolean   // 自腹フラグ
 }
 
 const defaultCategories: Category[] = [
@@ -58,6 +60,8 @@ const initialDraft = (): ReceiptDraft => ({
   note: "",
   category: "",
   lineItems: [],
+  isNomikai: false,
+  isJibara: false,
 })
 
 const compressImage = async (file: File, maxSide = 1280, quality = 0.6): Promise<string> => {
@@ -96,26 +100,6 @@ const formatCurrency = (value: number) =>
     currency: "JPY",
     maximumFractionDigits: 0,
   }).format(value)
-
-const StatCard = ({
-  label,
-  value,
-  accent,
-}: {
-  label: string
-  value: string
-  accent?: boolean
-}) => (
-  <div
-    className={clsx(
-      "rounded-2xl border border-white/10 p-4 backdrop-blur",
-      accent ? "bg-white/10 shadow-soft" : "bg-white/5",
-    )}
-  >
-    <p className="text-xs uppercase tracking-[0.15em] text-slate-400">{label}</p>
-    <p className="mt-2 text-2xl font-semibold text-white">{value}</p>
-  </div>
-)
 
 const Pill = ({ children }: { children: ReactNode }) => (
   <span className="rounded-full bg-white/10 px-3 py-1 text-xs text-slate-200">
@@ -186,6 +170,8 @@ function App() {
   const [draft, setDraft] = useState<ReceiptDraft>(initialDraft())
   const [filters, setFilters] = useState({ query: "", category: "all" })
   const [summaryTab, setSummaryTab] = useState<"overview" | "monthly">("overview")
+  // 選択中の年月（YYYY-MM形式）
+  const [selectedMonth, setSelectedMonth] = useState(() => new Date().toISOString().slice(0, 7))
   const [visibleCount, setVisibleCount] = useState(20)
   const [expandedImages, setExpandedImages] = useState<Set<string>>(new Set())
   const [selectedReceipt, setSelectedReceipt] = useState<Receipt | null>(null)
@@ -442,6 +428,8 @@ function App() {
       note: draft.note || undefined,
       imageData: saveImage ? draft.imageData : undefined,
       lineItems,
+      isNomikai: draft.isNomikai || false,
+      isJibara: draft.isJibara || false,
       createdAt: now,
       updatedAt: now,
     }
@@ -468,12 +456,12 @@ function App() {
     await persistVault(nextVault, session.key)
   }
 
-  const handleUpdateReceipt = async (id: string, storeName: string, total: number) => {
+  const handleUpdateReceipt = async (id: string, storeName: string, total: number, isNomikai?: boolean, isJibara?: boolean) => {
     if (!session) return
     const nextVault = {
       ...session.vault,
       receipts: session.vault.receipts.map((r) =>
-        r.id === id ? { ...r, storeName, total, updatedAt: new Date().toISOString() } : r
+        r.id === id ? { ...r, storeName, total, isNomikai, isJibara, updatedAt: new Date().toISOString() } : r
       ),
     }
     await persistVault(nextVault, session.key)
@@ -633,33 +621,87 @@ function App() {
     const query = filters.query.toLowerCase()
     return session.vault.receipts
       .filter((receipt) => {
+        // 選択された月のみ表示
+        const matchesMonth = receipt.visitedAt.startsWith(selectedMonth)
         const matchesQuery =
           !query ||
           receipt.storeName.toLowerCase().includes(query) ||
           (receipt.note ?? "").toLowerCase().includes(query)
         const matchesCategory =
           filters.category === "all" || receipt.category === filters.category
-        return matchesQuery && matchesCategory
+        return matchesMonth && matchesQuery && matchesCategory
       })
       // 日付降順（新しい順）でソート
       .sort((a, b) => b.visitedAt.localeCompare(a.visitedAt))
-  }, [session, filters])
+  }, [session, filters, selectedMonth])
+
+  // データが存在する月のリストを取得
+  const availableMonths = useMemo(() => {
+    if (!session) return []
+    const months = new Set<string>()
+    session.vault.receipts.forEach((r) => {
+      if (r.visitedAt) months.add(r.visitedAt.slice(0, 7))
+    })
+    return Array.from(months).sort((a, b) => b.localeCompare(a))
+  }, [session])
+
+  // 前月へ移動（データがある月まで）
+  const goToPrevMonth = useCallback(() => {
+    const prevMonths = availableMonths.filter((m) => m < selectedMonth)
+    if (prevMonths.length > 0) {
+      setSelectedMonth(prevMonths[0])
+      setVisibleCount(20)
+    }
+  }, [availableMonths, selectedMonth])
+
+  // 次月へ移動（データがある月まで）
+  const goToNextMonth = useCallback(() => {
+    const nextMonths = availableMonths.filter((m) => m > selectedMonth).reverse()
+    if (nextMonths.length > 0) {
+      setSelectedMonth(nextMonths[0])
+      setVisibleCount(20)
+    }
+  }, [availableMonths, selectedMonth])
+
+  // 前月にデータがあるか
+  const hasPrevMonth = availableMonths.some((m) => m < selectedMonth)
+  // 次月にデータがあるか
+  const hasNextMonth = availableMonths.some((m) => m > selectedMonth)
+
+  // 選択月の合計金額
+  const selectedMonthTotal = useMemo(() => {
+    if (!session) return 0
+    return session.vault.receipts
+      .filter((r) => r.visitedAt.startsWith(selectedMonth))
+      .reduce((sum, r) => sum + r.total, 0)
+  }, [session, selectedMonth])
+
+  // 選択月の飲み会合計
+  const selectedMonthNomikai = useMemo(() => {
+    if (!session) return 0
+    return session.vault.receipts
+      .filter((r) => r.visitedAt.startsWith(selectedMonth) && r.isNomikai)
+      .reduce((sum, r) => sum + r.total, 0)
+  }, [session, selectedMonth])
+
+  // 選択月の自腹合計
+  const selectedMonthJibara = useMemo(() => {
+    if (!session) return 0
+    return session.vault.receipts
+      .filter((r) => r.visitedAt.startsWith(selectedMonth) && r.isJibara)
+      .reduce((sum, r) => sum + r.total, 0)
+  }, [session, selectedMonth])
+
+  // ドラフトに未保存データがあるか
+  const hasDraftData = useMemo(() => {
+    return draft.storeName.trim() !== '' || (draft.total !== '' && parseInt(draft.total) > 0)
+  }, [draft.storeName, draft.total])
 
   const displayedReceipts = useMemo(
     () => (filteredReceipts.length > visibleCount ? filteredReceipts.slice(0, visibleCount) : filteredReceipts),
     [filteredReceipts, visibleCount],
   )
-
-  const currentYear = new Date().getFullYear().toString()
   
-  const yearlySpent = session?.vault.receipts
-    .filter((r) => r.visitedAt.startsWith(currentYear))
-    .reduce((sum, r) => sum + r.total, 0)
-
-  const monthlySpent = session?.vault.receipts
-    .filter((r) => r.visitedAt.startsWith(new Date().toISOString().slice(0, 7)))
-    .reduce((sum, r) => sum + r.total, 0)
-
   const monthlyTotals = useMemo(() => {
     const map = new Map<string, { total: number; count: number }>()
     session?.vault.receipts.forEach((r) => {
@@ -684,8 +726,6 @@ function App() {
       .map(([year, total]) => ({ year, total }))
       .sort((a, b) => (a.year > b.year ? -1 : 1))
   }, [session])
-
-  const lastReceipt = session?.vault.receipts[0]
 
   // ========== スマホ専用UI ==========
   if (isMobile) {
@@ -859,44 +899,69 @@ function App() {
               </div>
             )}
 
-            {/* サマリー - 枠で囲んで2列レイアウト */}
+            {/* 月選択とサマリー */}
             <div className="mt-4 px-4">
               <div className="rounded-2xl border border-white/10 bg-white/5" style={{ padding: '24px' }}>
-                <h3 style={{ fontSize: '40px', marginBottom: '20px' }} className="font-semibold text-white">サマリー</h3>
+                {/* 月選択 */}
+                <div className="flex items-center justify-between" style={{ marginBottom: '20px' }}>
+                  <button
+                    onClick={goToPrevMonth}
+                    disabled={!hasPrevMonth}
+                    className={clsx(
+                      "rounded-xl px-6 py-3 font-bold transition",
+                      hasPrevMonth
+                        ? "bg-white/10 text-white hover:bg-white/20"
+                        : "bg-white/5 text-slate-600 cursor-not-allowed"
+                    )}
+                    style={{ fontSize: '36px' }}
+                  >
+                    &lt;
+                  </button>
+                  <span className="font-semibold text-white" style={{ fontSize: '40px' }}>
+                    {selectedMonth.replace('-', '年')}月
+                  </span>
+                  <button
+                    onClick={goToNextMonth}
+                    disabled={!hasNextMonth}
+                    className={clsx(
+                      "rounded-xl px-6 py-3 font-bold transition",
+                      hasNextMonth
+                        ? "bg-white/10 text-white hover:bg-white/20"
+                        : "bg-white/5 text-slate-600 cursor-not-allowed"
+                    )}
+                    style={{ fontSize: '36px' }}
+                  >
+                    &gt;
+                  </button>
+                </div>
+                {/* 合計金額 */}
+                <div className="rounded-xl border border-mint/30 bg-mint/10" style={{ padding: '24px', marginBottom: '16px' }}>
+                  <p className="text-center font-bold text-mint" style={{ fontSize: '56px' }}>
+                    {formatCurrency(selectedMonthTotal)}
+                  </p>
+                </div>
+                {/* 飲み会・自腹 */}
                 <div className="grid grid-cols-2 gap-3">
-                  <div className="rounded-xl border border-white/10 bg-white/10 py-6" style={{ padding: '20px' }}>
-                    <p style={{ fontSize: '32px' }} className="text-slate-400 leading-tight">今月</p>
-                    <p style={{ fontSize: '44px', marginTop: '10px' }} className="font-bold text-mint truncate leading-tight">{formatCurrency(monthlySpent ?? 0)}</p>
+                  <div className="rounded-xl border border-white/10 bg-white/5" style={{ padding: '16px' }}>
+                    <p className="text-slate-400" style={{ fontSize: '28px' }}>🍺 飲み会</p>
+                    <p className="font-bold text-amber-400" style={{ fontSize: '36px', marginTop: '8px' }}>
+                      {formatCurrency(selectedMonthNomikai)}
+                    </p>
                   </div>
-                  <div className="rounded-xl border border-white/10 bg-white/5 py-6" style={{ padding: '20px' }}>
-                    <p style={{ fontSize: '32px' }} className="text-slate-400 leading-tight">今年</p>
-                    <p style={{ fontSize: '44px', marginTop: '10px' }} className="font-bold text-white truncate leading-tight">{formatCurrency(yearlySpent ?? 0)}</p>
+                  <div className="rounded-xl border border-white/10 bg-white/5" style={{ padding: '16px' }}>
+                    <p className="text-slate-400" style={{ fontSize: '28px' }}>👛 自腹</p>
+                    <p className="font-bold text-rose-400" style={{ fontSize: '36px', marginTop: '8px' }}>
+                      {formatCurrency(selectedMonthJibara)}
+                    </p>
                   </div>
                 </div>
               </div>
             </div>
 
-            {/* 月別合計 */}
-            {monthlyTotals.length > 0 && (
-              <div className="mt-3 px-4">
-                <div className="rounded-2xl border border-white/10 bg-white/5" style={{ padding: '28px' }}>
-                  <p className="font-semibold text-white" style={{ fontSize: '36px', marginBottom: '24px' }}>月別合計</p>
-                  <div className="space-y-4">
-                    {monthlyTotals.slice(0, 6).map((entry) => (
-                      <div key={entry.month} className="flex items-center justify-between" style={{ padding: '12px 0' }}>
-                        <span className="text-slate-300" style={{ fontSize: '36px' }}>{entry.month}</span>
-                        <span className="font-semibold text-mint" style={{ fontSize: '44px' }}>{formatCurrency(entry.total)}</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            )}
-
             {/* 入力フォーム（シンプル版）*/}
             <div className="mt-4 space-y-4 px-4">
               <div className="rounded-2xl border border-white/10 bg-white/5" style={{ padding: '28px' }}>
-                <h3 style={{ fontSize: '40px', marginBottom: '24px' }} className="font-semibold text-white">レシート情報</h3>
+                <h3 style={{ fontSize: '40px', marginBottom: '24px' }} className="font-semibold text-white">支出情報入力</h3>
                 <div className="space-y-4">
                   <input
                     className="w-full rounded-xl border border-white/10 bg-white/5 text-white placeholder-slate-500"
@@ -924,6 +989,33 @@ function App() {
                       onChange={(e) => setDraft((prev) => ({ ...prev, total: e.target.value }))}
                       placeholder="0"
                     />
+                  </div>
+                  {/* 飲み会・自腹トグル */}
+                  <div className="grid grid-cols-2 gap-3">
+                    <button
+                      onClick={() => setDraft((prev) => ({ ...prev, isNomikai: !prev.isNomikai, isJibara: false }))}
+                      className={clsx(
+                        "rounded-xl border-2 py-4 font-semibold transition",
+                        draft.isNomikai
+                          ? "border-amber-500 bg-amber-500/20 text-amber-400"
+                          : "border-white/10 bg-white/5 text-slate-400"
+                      )}
+                      style={{ fontSize: '32px', padding: '20px' }}
+                    >
+                      🍺 飲み会
+                    </button>
+                    <button
+                      onClick={() => setDraft((prev) => ({ ...prev, isJibara: !prev.isJibara, isNomikai: false }))}
+                      className={clsx(
+                        "rounded-xl border-2 py-4 font-semibold transition",
+                        draft.isJibara
+                          ? "border-rose-500 bg-rose-500/20 text-rose-400"
+                          : "border-white/10 bg-white/5 text-slate-400"
+                      )}
+                      style={{ fontSize: '32px', padding: '20px' }}
+                    >
+                      👛 自腹
+                    </button>
                   </div>
                   <select
                     className="w-full rounded-xl border border-white/10 bg-white/5 text-white"
@@ -1048,7 +1140,7 @@ function App() {
             {editingReceipt && (
               <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 px-4">
                 <div className="w-full rounded-2xl border border-white/10 bg-fog" style={{ padding: '32px', maxWidth: '92vw' }}>
-                  <h3 className="font-bold text-white" style={{ fontSize: '40px' }}>レシート編集</h3>
+                  <h3 className="font-bold text-white" style={{ fontSize: '40px' }}>支出編集</h3>
                   <div className="mt-6 space-y-5">
                     <label className="block">
                       <span className="text-slate-200" style={{ fontSize: '32px' }}>店名</span>
@@ -1070,6 +1162,36 @@ function App() {
                         style={{ fontSize: '36px', padding: '20px' }}
                       />
                     </label>
+                    {/* 飲み会/自腹トグル */}
+                    <div>
+                      <span className="text-slate-200" style={{ fontSize: '32px' }}>分類</span>
+                      <div className="mt-2 flex gap-4">
+                        <button
+                          type="button"
+                          onClick={() => setEditingReceipt({ ...editingReceipt, isNomikai: !editingReceipt.isNomikai, isJibara: false })}
+                          className={`flex-1 rounded-xl border transition-all ${
+                            editingReceipt.isNomikai
+                              ? 'border-amber-400 bg-amber-400/20 text-amber-300'
+                              : 'border-white/10 bg-white/5 text-slate-400'
+                          }`}
+                          style={{ fontSize: '32px', padding: '16px' }}
+                        >
+                          🍺 飲み会
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setEditingReceipt({ ...editingReceipt, isJibara: !editingReceipt.isJibara, isNomikai: false })}
+                          className={`flex-1 rounded-xl border transition-all ${
+                            editingReceipt.isJibara
+                              ? 'border-emerald-400 bg-emerald-400/20 text-emerald-300'
+                              : 'border-white/10 bg-white/5 text-slate-400'
+                          }`}
+                          style={{ fontSize: '32px', padding: '16px' }}
+                        >
+                          👛 自腹
+                        </button>
+                      </div>
+                    </div>
                   </div>
                   <div className="grid grid-cols-2 gap-4" style={{ marginTop: '28px' }}>
                     <button
@@ -1080,7 +1202,7 @@ function App() {
                       キャンセル
                     </button>
                     <button
-                      onClick={() => handleUpdateReceipt(editingReceipt.id, editingReceipt.storeName, editingReceipt.total)}
+                      onClick={() => handleUpdateReceipt(editingReceipt.id, editingReceipt.storeName, editingReceipt.total, editingReceipt.isNomikai, editingReceipt.isJibara)}
                       className="rounded-xl bg-mint font-bold text-fog"
                       style={{ fontSize: '36px', padding: '22px', minHeight: '80px' }}
                     >
@@ -1142,17 +1264,19 @@ function App() {
               </div>
             )}
 
-            {/* レシート一覧 */}
+            {/* 支出一覧 */}
             <div className="mt-5 px-4">
               <div className="rounded-2xl border border-white/10 bg-white/5" style={{ padding: '24px' }}>
                 <div className="flex items-center justify-between">
-                  <h3 className="font-semibold text-white" style={{ fontSize: '40px' }}>レシート一覧</h3>
-                  <span className="text-slate-400" style={{ fontSize: '36px' }}>{session.vault.receipts.length}件</span>
+                  <h3 className="font-semibold text-white" style={{ fontSize: '40px' }}>
+                    {selectedMonth.replace('-', '年')}月の支出一覧
+                  </h3>
+                  <span className="text-slate-400" style={{ fontSize: '36px' }}>{filteredReceipts.length}件</span>
                 </div>
                 <div className="mt-4 space-y-4">
-                {session.vault.receipts.length === 0 ? (
+                {filteredReceipts.length === 0 ? (
                   <p className="rounded-2xl bg-white/5 text-center text-slate-400" style={{ fontSize: '36px', padding: '48px 24px' }}>
-                    まだレシートがありません
+                    この月の支出はありません
                   </p>
                 ) : (
                   displayedReceipts.map((receipt) => (
@@ -1169,9 +1293,13 @@ function App() {
                         >
                           <p className="text-slate-400" style={{ fontSize: '32px' }}>{receipt.visitedAt}</p>
                           <p className="font-semibold text-white underline" style={{ fontSize: '40px', marginTop: '8px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', lineHeight: '1.4', paddingTop: '4px', paddingBottom: '4px' }}>{receipt.storeName}</p>
-                          <span className="inline-block rounded-full bg-white/10 text-slate-300" style={{ fontSize: '28px', padding: '12px 24px', marginTop: '14px' }}>
-                            {receipt.category || '未分類'}
-                          </span>
+                          <div className="flex items-center gap-2" style={{ marginTop: '14px' }}>
+                            <span className="inline-block rounded-full bg-white/10 text-slate-300" style={{ fontSize: '28px', padding: '12px 24px' }}>
+                              {receipt.category || '未分類'}
+                            </span>
+                            {receipt.isNomikai && <span style={{ fontSize: '32px' }}>🍺</span>}
+                            {receipt.isJibara && <span style={{ fontSize: '32px' }}>👛</span>}
+                          </div>
                         </div>
                         <div className="text-right">
                           <p className="font-bold text-mint" style={{ fontSize: '48px' }}>
@@ -1313,7 +1441,12 @@ function App() {
               </button>
               <button
                 onClick={handleSaveReceipt}
-                className="flex-1 rounded-2xl border-2 border-white/30 bg-white/15 font-bold text-white"
+                className={clsx(
+                  "flex-1 rounded-2xl border-2 font-bold transition-all",
+                  hasDraftData
+                    ? "animate-pulse border-mint bg-mint/30 text-mint shadow-lg shadow-mint/30"
+                    : "border-white/30 bg-white/15 text-white"
+                )}
                 style={{ minHeight: '135px', fontSize: '32px' }}
               >
                 保存
@@ -1332,7 +1465,7 @@ function App() {
       {editingReceipt && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70">
           <div className="w-full max-w-md rounded-2xl border border-white/10 bg-fog p-6">
-            <h3 className="text-xl font-bold text-white">レシート編集</h3>
+            <h3 className="text-xl font-bold text-white">支出編集</h3>
             <div className="mt-4 space-y-4">
               <label className="block">
                 <span className="text-sm text-slate-200">店名</span>
@@ -1352,6 +1485,34 @@ function App() {
                   className="mt-2 w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-white outline-none ring-mint/30 focus:ring-2"
                 />
               </label>
+              {/* 飲み会/自腹トグル */}
+              <div>
+                <span className="text-sm text-slate-200">分類</span>
+                <div className="mt-2 flex gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setEditingReceipt({ ...editingReceipt, isNomikai: !editingReceipt.isNomikai, isJibara: false })}
+                    className={`flex-1 rounded-xl border px-3 py-2 text-sm transition-all ${
+                      editingReceipt.isNomikai
+                        ? 'border-amber-400 bg-amber-400/20 text-amber-300'
+                        : 'border-white/10 bg-white/5 text-slate-400 hover:bg-white/10'
+                    }`}
+                  >
+                    🍺 飲み会
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setEditingReceipt({ ...editingReceipt, isJibara: !editingReceipt.isJibara, isNomikai: false })}
+                    className={`flex-1 rounded-xl border px-3 py-2 text-sm transition-all ${
+                      editingReceipt.isJibara
+                        ? 'border-emerald-400 bg-emerald-400/20 text-emerald-300'
+                        : 'border-white/10 bg-white/5 text-slate-400 hover:bg-white/10'
+                    }`}
+                  >
+                    👛 自腹
+                  </button>
+                </div>
+              </div>
             </div>
             <div className="mt-6 flex gap-3">
               <button
@@ -1361,7 +1522,7 @@ function App() {
                 キャンセル
               </button>
               <button
-                onClick={() => handleUpdateReceipt(editingReceipt.id, editingReceipt.storeName, editingReceipt.total)}
+                onClick={() => handleUpdateReceipt(editingReceipt.id, editingReceipt.storeName, editingReceipt.total, editingReceipt.isNomikai, editingReceipt.isJibara)}
                 className="flex-1 rounded-xl bg-mint px-4 py-2 text-sm font-semibold text-fog hover:bg-mint/90"
               >
                 保存
@@ -1792,6 +1953,35 @@ function App() {
                   </label>
                 </div>
 
+                {/* 飲み会/自腹トグル */}
+                <div className="mt-4">
+                  <span className="text-sm text-slate-200">タグ</span>
+                  <div className="mt-2 flex gap-3">
+                    <button
+                      type="button"
+                      onClick={() => setDraft((prev) => ({ ...prev, isNomikai: !prev.isNomikai, isJibara: false }))}
+                      className={`flex-1 rounded-xl border px-3 py-2 text-sm transition-all ${
+                        draft.isNomikai
+                          ? 'border-amber-400 bg-amber-400/20 text-amber-300'
+                          : 'border-white/10 bg-white/5 text-slate-400 hover:bg-white/10'
+                      }`}
+                    >
+                      🍺 飲み会
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setDraft((prev) => ({ ...prev, isJibara: !prev.isJibara, isNomikai: false }))}
+                      className={`flex-1 rounded-xl border px-3 py-2 text-sm transition-all ${
+                        draft.isJibara
+                          ? 'border-emerald-400 bg-emerald-400/20 text-emerald-300'
+                          : 'border-white/10 bg-white/5 text-slate-400 hover:bg-white/10'
+                      }`}
+                    >
+                      👛 自腹
+                    </button>
+                  </div>
+                </div>
+
                 <div className="mt-4">
                   <label className="flex flex-col gap-2 text-sm text-slate-200">
                     メモ (任意)
@@ -1808,7 +1998,12 @@ function App() {
                 <div className="mt-6 flex flex-wrap gap-3">
                   <button
                     onClick={handleSaveReceipt}
-                    className="rounded-2xl bg-gradient-to-r from-mint/80 to-mint px-5 py-3 text-sm font-semibold text-fog shadow-soft transition hover:translate-y-[-1px]"
+                    className={clsx(
+                      "rounded-2xl px-5 py-3 text-sm font-semibold shadow-soft transition hover:translate-y-[-1px]",
+                      hasDraftData
+                        ? "animate-pulse bg-gradient-to-r from-mint to-mint/80 text-fog ring-2 ring-mint/50"
+                        : "bg-gradient-to-r from-mint/80 to-mint text-fog"
+                    )}
                   >
                     保存する
                   </button>
@@ -1817,8 +2012,62 @@ function App() {
 
             </section>
             <aside className="order-2 lg:order-none lg:col-start-2 lg:row-start-1 lg:row-span-2 space-y-4 rounded-3xl border border-white/10 bg-white/5 p-6">
+              {/* 月選択 */}
+              <div className="flex items-center justify-center gap-4">
+                <button
+                  onClick={goToPrevMonth}
+                  disabled={!hasPrevMonth}
+                  className={clsx(
+                    "rounded-full p-2 transition",
+                    hasPrevMonth 
+                      ? "bg-white/10 text-white hover:bg-white/20" 
+                      : "text-slate-600 cursor-not-allowed"
+                  )}
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                  </svg>
+                </button>
+                <div className="text-center">
+                  <p className="text-lg font-bold text-white">
+                    {parseInt(selectedMonth.split('-')[0])}年{parseInt(selectedMonth.split('-')[1])}月
+                  </p>
+                </div>
+                <button
+                  onClick={goToNextMonth}
+                  disabled={!hasNextMonth}
+                  className={clsx(
+                    "rounded-full p-2 transition",
+                    hasNextMonth 
+                      ? "bg-white/10 text-white hover:bg-white/20" 
+                      : "text-slate-600 cursor-not-allowed"
+                  )}
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                  </svg>
+                </button>
+              </div>
+
+              {/* 月間合計 */}
+              <div className="rounded-2xl border border-mint/30 bg-mint/10 p-4 text-center">
+                <p className="text-3xl font-bold text-mint">{formatCurrency(selectedMonthTotal)}</p>
+              </div>
+
+              {/* 飲み会/自腹 内訳 */}
+              <div className="grid grid-cols-2 gap-3">
+                <div className="rounded-xl border border-amber-400/30 bg-amber-400/10 p-3 text-center">
+                  <p className="text-sm text-amber-300">🍺 飲み会</p>
+                  <p className="text-lg font-bold text-amber-200">{formatCurrency(selectedMonthNomikai)}</p>
+                </div>
+                <div className="rounded-xl border border-emerald-400/30 bg-emerald-400/10 p-3 text-center">
+                  <p className="text-sm text-emerald-300">👛 自腹</p>
+                  <p className="text-lg font-bold text-emerald-200">{formatCurrency(selectedMonthJibara)}</p>
+                </div>
+              </div>
+
               <div className="flex items-center justify-between">
-                <h2 className="text-lg font-semibold text-white">サマリー</h2>
+                <h2 className="text-lg font-semibold text-white">詳細</h2>
                 <div className="flex gap-2">
                   <button
                     onClick={() => setSummaryTab("overview")}
@@ -1829,7 +2078,7 @@ function App() {
                         : "bg-white/5 text-slate-300 border border-white/10",
                     )}
                   >
-                    サマリー
+                    年別
                   </button>
                   <button
                     onClick={() => setSummaryTab("monthly")}
@@ -1840,23 +2089,13 @@ function App() {
                         : "bg-white/5 text-slate-300 border border-white/10",
                     )}
                   >
-                    月別一覧
+                    月別
                   </button>
                 </div>
               </div>
 
               {summaryTab === "overview" ? (
                 <>
-                  <div className="grid gap-3 sm:grid-cols-2">
-                    <StatCard label="今月の支出" value={formatCurrency(monthlySpent ?? 0)} accent />
-                    <StatCard label="今年の支出" value={formatCurrency(yearlySpent ?? 0)} />
-                  </div>
-                  
-                  <div className="rounded-2xl border border-white/10 bg-white/5 p-3">
-                    <p className="text-xs text-slate-400">最終更新</p>
-                    <p className="text-sm font-semibold text-white">{lastReceipt ? lastReceipt.visitedAt : "未登録"}</p>
-                  </div>
-
                   <div className="rounded-2xl border border-white/10 bg-white/5 p-4 text-sm text-slate-300">
                     <p className="font-semibold text-white">年別 合計</p>
                     {yearlyTotals.length === 0 && <p className="text-slate-400">まだありません</p>}
@@ -1914,7 +2153,9 @@ function App() {
             <section className="order-3 lg:order-none lg:col-start-1 lg:row-start-2 rounded-3xl border border-white/10 bg-white/5 p-6">
               <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
                 <div>
-                  <h2 className="text-xl font-semibold text-white">レシート一覧</h2>
+                  <h2 className="text-xl font-semibold text-white">
+                    {parseInt(selectedMonth.split('-')[0])}年{parseInt(selectedMonth.split('-')[1])}月の支出一覧
+                  </h2>
                   <p className="text-sm text-slate-400">検索とカテゴリフィルタで絞り込みできます。</p>
                 </div>
                 <div className="flex flex-wrap gap-2">
@@ -1957,7 +2198,7 @@ function App() {
 
               <div className="mt-4 space-y-4">
                 {filteredReceipts.length === 0 && (
-                  <p className="text-sm text-slate-400">まだレシートがありません。アップロードして保存してください。</p>
+                  <p className="text-sm text-slate-400">この月の支出データはありません。</p>
                 )}
                 {displayedReceipts.map((receipt) => (
                   <article
@@ -1968,6 +2209,8 @@ function App() {
                       <div>
                         <p className="text-sm uppercase tracking-[0.15em] text-slate-400">
                           {receipt.visitedAt}
+                          {receipt.isNomikai && <span className="ml-2">🍺</span>}
+                          {receipt.isJibara && <span className="ml-2">👛</span>}
                         </p>
                         <h3 className="text-xl font-semibold text-white">
                           {receipt.storeName}

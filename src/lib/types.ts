@@ -16,6 +16,8 @@ export type Receipt = {
   note?: string
   imageData?: string
   lineItems: LineItem[]
+  isNomikai?: boolean  // 飲み会フラグ
+  isJibara?: boolean   // 自腹フラグ
   createdAt: string
   updatedAt: string
 }
