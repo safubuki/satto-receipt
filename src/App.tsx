@@ -732,10 +732,10 @@ function App() {
     return (
       <div className="min-h-screen bg-fog text-sand text-lg">
         {/* スマホ用ヘッダー */}
-        <header className="sticky top-0 z-20 border-b border-white/10 bg-fog/95 backdrop-blur-lg" style={{ padding: '24px 28px' }}>
+        <header className="sticky top-0 z-20 border-b border-white/10 bg-fog/95 backdrop-blur-lg" style={{ padding: '12px 16px' }}>
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <div className="rounded-full bg-gradient-to-r from-mint/60 to-mint/30 p-[2px]" style={{ width: '72px', height: '72px' }}>
+            <div className="flex items-center gap-3">
+              <div className="rounded-full bg-gradient-to-r from-mint/60 to-mint/30 p-[2px]" style={{ width: '44px', height: '44px' }}>
                 <div className="h-full w-full rounded-full bg-fog/90 p-[1px]">
                   <img
                     src={`${import.meta.env.BASE_URL}turtle_icon_receipt.png`}
@@ -744,13 +744,13 @@ function App() {
                   />
                 </div>
               </div>
-              <h1 className="font-bold text-white" style={{ fontSize: '22px' }}>サッとレシート</h1>
+              <h1 className="font-bold text-white whitespace-nowrap" style={{ fontSize: '18px' }}>サッとレシート</h1>
             </div>
             {session && (
               <button
                 onClick={handleLock}
                 className="rounded-full border border-white/20 bg-white/10 font-semibold text-white"
-                style={{ fontSize: '14px', padding: '20px 28px', minHeight: '72px' }}
+                style={{ fontSize: '12px', padding: '8px 16px' }}
               >
                 ログアウト
               </button>
@@ -760,11 +760,11 @@ function App() {
 
         {!session ? (
           // ========== スマホ用ログイン画面 ==========
-          <div className="flex min-h-[80vh] flex-col items-center justify-center px-5">
-            <div className="w-full rounded-3xl border border-white/10 bg-white/5" style={{ padding: '36px', maxWidth: '92vw' }}>
-              <div className="text-center" style={{ marginBottom: '36px' }}>
-                <div className="mx-auto rounded-full bg-gradient-to-r from-mint/60 to-mint/30 p-[3px]" style={{ width: '160px', height: '160px', marginBottom: '28px' }}>
-                  <div className="h-full w-full rounded-full bg-fog/90 p-[2px]">
+          <div className="flex min-h-[80vh] flex-col items-center justify-center px-4">
+            <div className="w-full rounded-2xl border border-white/10 bg-white/5 p-6" style={{ maxWidth: '92vw' }}>
+              <div className="text-center mb-6">
+                <div className="mx-auto rounded-full bg-gradient-to-r from-mint/60 to-mint/30 p-[2px] w-24 h-24 mb-4">
+                  <div className="h-full w-full rounded-full bg-fog/90 p-[1px]">
                     <img
                       src={`${import.meta.env.BASE_URL}turtle_icon_receipt.png`}
                       alt="アイコン"
@@ -772,8 +772,8 @@ function App() {
                     />
                   </div>
                 </div>
-                <h2 className="font-bold text-white" style={{ fontSize: '14px' }}>サッとレシート</h2>
-                <p className="text-slate-400" style={{ fontSize: '18px', marginTop: '20px' }}>買い物ごとにサッとパシャっと</p>
+                <h2 className="font-bold text-white text-lg">サッとレシート</h2>
+                <p className="text-slate-400 text-sm mt-2">買い物ごとにサッとパシャっと</p>
               </div>
               <UnlockPanel onUnlock={handleUnlock} unlocking={unlocking} error={unlockError} isFirstTime={isFirstTime} onReset={handleReset} />
             </div>
@@ -784,23 +784,22 @@ function App() {
             {/* APIキー設定モーダル */}
             {showApiKeyModal && (
               <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 px-4">
-                <div className="w-full rounded-2xl border border-white/10 bg-fog" style={{ padding: '32px', maxWidth: '92vw' }}>
-                  <h3 className="font-bold text-white" style={{ fontSize: '14px' }}>⚙️ API設定</h3>
-                  <p className="text-slate-300" style={{ fontSize: '18px', marginTop: '24px', lineHeight: '1.5' }}>
+                <div className="w-full rounded-2xl border border-white/10 bg-fog p-5" style={{ maxWidth: '92vw' }}>
+                  <h3 className="font-bold text-white text-base">⚙️ API設定</h3>
+                  <p className="text-slate-300 text-sm mt-3 leading-relaxed">
                     Gemini APIキーを入力してください。キーは端末内にのみ保存されます。
                   </p>
-                  <p className="text-slate-400" style={{ fontSize: '18px', marginTop: '18px', lineHeight: '1.5' }}>
+                  <p className="text-slate-400 text-sm mt-2 leading-relaxed">
                     <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener noreferrer" className="text-mint underline">Google AI Studio</a> から無料で取得できます
                   </p>
                   <input
                     type="password"
-                    className="w-full rounded-xl border border-white/10 bg-white/5 text-white placeholder-slate-500"
-                    style={{ fontSize: '22px', padding: '24px', marginTop: '28px', minHeight: '90px' }}
+                    className="w-full rounded-xl border border-white/10 bg-white/5 text-white placeholder-slate-500 px-4 py-3 mt-4 text-base"
                     placeholder="AIza..."
                     value={apiKeyInput}
                     onChange={(e) => setApiKeyInput(e.target.value)}
                   />
-                  <div className="grid grid-cols-2 gap-4" style={{ marginTop: '32px' }}>
+                  <div className="grid grid-cols-2 gap-3 mt-4">
                     <button
                       onClick={() => {
                         if (apiKeyInput.trim()) {
@@ -809,8 +808,7 @@ function App() {
                         }
                         setShowApiKeyModal(false)
                       }}
-                      className="rounded-xl bg-mint font-bold text-fog"
-                      style={{ fontSize: '22px', padding: '24px', minHeight: '90px' }}
+                      className="rounded-xl bg-mint font-bold text-fog py-3 text-sm"
                     >
                       保存
                     </button>
@@ -820,16 +818,14 @@ function App() {
                         setApiKeyInput("")
                         setShowApiKeyModal(false)
                       }}
-                      className="rounded-xl border border-red-400/50 bg-red-400/10 font-bold text-red-300"
-                      style={{ fontSize: '22px', padding: '24px', minHeight: '90px' }}
+                      className="rounded-xl border border-red-400/50 bg-red-400/10 font-bold text-red-300 py-3 text-sm"
                     >
                       削除
                     </button>
                   </div>
                   <button
                     onClick={() => setShowApiKeyModal(false)}
-                    className="w-full text-center text-slate-400"
-                    style={{ fontSize: '18px', marginTop: '28px', padding: '20px' }}
+                    className="w-full text-center text-slate-400 text-sm mt-4 py-2"
                   >
                     キャンセル
                   </button>
@@ -903,12 +899,12 @@ function App() {
             <div className="mt-4 px-4">
               <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
                 {/* 月選択 */}
-                <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center justify-between mb-2">
                   <button
                     onClick={goToPrevMonth}
                     disabled={!hasPrevMonth}
                     className={clsx(
-                      "rounded-lg px-4 py-2 font-bold transition text-xl",
+                      "rounded-lg px-3 py-1 font-bold transition text-lg",
                       hasPrevMonth
                         ? "bg-white/10 text-white hover:bg-white/20"
                         : "bg-white/5 text-slate-600 cursor-not-allowed"
@@ -916,14 +912,14 @@ function App() {
                   >
                     &lt;
                   </button>
-                  <span className="font-semibold text-white text-lg">
+                  <span className="font-semibold text-white text-base">
                     {selectedMonth.replace('-', '年')}月
                   </span>
                   <button
                     onClick={goToNextMonth}
                     disabled={!hasNextMonth}
                     className={clsx(
-                      "rounded-lg px-4 py-2 font-bold transition text-xl",
+                      "rounded-lg px-3 py-1 font-bold transition text-lg",
                       hasNextMonth
                         ? "bg-white/10 text-white hover:bg-white/20"
                         : "bg-white/5 text-slate-600 cursor-not-allowed"
@@ -933,22 +929,22 @@ function App() {
                   </button>
                 </div>
                 {/* 合計金額 */}
-                <div className="rounded-xl border border-mint/30 bg-mint/10 p-4 mb-3">
-                  <p className="text-center font-bold text-mint text-2xl">
+                <div className="rounded-xl border border-mint/30 bg-mint/10 py-2 px-3 mb-2">
+                  <p className="text-center font-bold text-mint text-xl">
                     {formatCurrency(selectedMonthTotal)}
                   </p>
                 </div>
                 {/* 飲み会・自腹 */}
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="rounded-xl border border-white/10 bg-white/5 p-3">
-                    <p className="text-slate-400 text-sm">🍺 飲み会</p>
-                    <p className="font-bold text-amber-400 text-lg mt-1">
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="rounded-xl border border-white/10 bg-white/5 py-2 px-3">
+                    <p className="text-slate-400 text-xs">🍺 飲み会</p>
+                    <p className="font-bold text-amber-400 text-base">
                       {formatCurrency(selectedMonthNomikai)}
                     </p>
                   </div>
-                  <div className="rounded-xl border border-white/10 bg-white/5 p-3">
-                    <p className="text-slate-400 text-sm">👛 自腹</p>
-                    <p className="font-bold text-rose-400 text-lg mt-1">
+                  <div className="rounded-xl border border-white/10 bg-white/5 py-2 px-3">
+                    <p className="text-slate-400 text-xs">👛 自腹</p>
+                    <p className="font-bold text-rose-400 text-base">
                       {formatCurrency(selectedMonthJibara)}
                     </p>
                   </div>
@@ -1041,19 +1037,19 @@ function App() {
                         updatedAt: new Date().toISOString(),
                       })}
                       className="w-full rounded-xl border border-blue-500/30 bg-blue-500/10 text-blue-300"
-                      style={{ fontSize: '18px', padding: '20px', minHeight: '70px' }}
+                      style={{ fontSize: '14px', padding: '12px' }}
                     >
                       読み取り詳細を確認
                     </button>
                   )}
                   {/* 画像保存オプション - レシート情報内に移動 */}
-                  <label className="flex items-center gap-4 text-slate-300" style={{ fontSize: '18px', marginTop: '8px' }}>
+                  <label className="flex items-center gap-2 text-slate-300" style={{ fontSize: '14px', marginTop: '8px' }}>
                     <input
                       type="checkbox"
                       checked={saveImage}
                       onChange={(e) => setSaveImage(e.target.checked)}
                       className="rounded"
-                      style={{ width: '40px', height: '40px' }}
+                      style={{ width: '20px', height: '20px' }}
                     />
                     カメラ画像も保存する
                   </label>
@@ -1064,32 +1060,31 @@ function App() {
             {/* 品目表示モーダル */}
             {selectedReceipt && (
               <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 px-4" onClick={() => setSelectedReceipt(null)}>
-                <div className="w-full rounded-2xl border border-white/10 bg-fog" style={{ padding: '32px', maxWidth: '92vw', maxHeight: '80vh', overflow: 'auto' }} onClick={(e) => e.stopPropagation()}>
-                  <h3 className="font-bold text-white" style={{ fontSize: '22px', lineHeight: '1.4', wordBreak: 'break-word' }}>{selectedReceipt.storeName}</h3>
-                  <p className="text-slate-400" style={{ fontSize: '18px', marginTop: '12px' }}>{selectedReceipt.visitedAt}</p>
-                  <div className="mt-6 space-y-3">
+                <div className="w-full rounded-2xl border border-white/10 bg-fog p-5" style={{ maxWidth: '92vw', maxHeight: '80vh', overflow: 'auto' }} onClick={(e) => e.stopPropagation()}>
+                  <h3 className="font-bold text-white text-base leading-snug break-words">{selectedReceipt.storeName}</h3>
+                  <p className="text-slate-400 text-sm mt-2">{selectedReceipt.visitedAt}</p>
+                  <div className="mt-4 space-y-2">
                     {selectedReceipt.lineItems && selectedReceipt.lineItems.length > 0 ? (
                       selectedReceipt.lineItems.map((item, idx) => (
-                        <div key={item.id || idx} className="flex items-center justify-between rounded-xl bg-white/5" style={{ padding: '20px' }}>
+                        <div key={item.id || idx} className="flex items-center justify-between rounded-lg bg-white/5 px-3 py-2">
                           <div>
-                            <p className="text-white" style={{ fontSize: '18px' }}>{item.name}</p>
-                            {item.quantity > 1 && <p className="text-slate-400" style={{ fontSize: '13px' }}>×{item.quantity}</p>}
+                            <p className="text-white text-sm">{item.name}</p>
+                            {item.quantity > 1 && <p className="text-slate-400 text-xs">×{item.quantity}</p>}
                           </div>
-                          <p className="font-semibold text-mint" style={{ fontSize: '18px' }}>{formatCurrency(item.price)}</p>
+                          <p className="font-semibold text-mint text-sm">{formatCurrency(item.price)}</p>
                         </div>
                       ))
                     ) : (
-                      <p className="text-center text-slate-400" style={{ fontSize: '18px', padding: '32px' }}>品目データがありません</p>
+                      <p className="text-center text-slate-400 text-sm py-6">品目データがありません</p>
                     )}
                   </div>
-                  <div className="flex items-center justify-between border-t border-white/10" style={{ marginTop: '24px', paddingTop: '24px' }}>
-                    <span className="text-slate-300" style={{ fontSize: '18px' }}>合計（税込）</span>
-                    <span className="font-bold text-mint" style={{ fontSize: '13px' }}>{formatCurrency(selectedReceipt.total)}</span>
+                  <div className="flex items-center justify-between border-t border-white/10 mt-4 pt-3">
+                    <span className="text-slate-300 text-sm">合計（税込）</span>
+                    <span className="font-bold text-mint text-lg">{formatCurrency(selectedReceipt.total)}</span>
                   </div>
                   <button
                     onClick={() => setSelectedReceipt(null)}
-                    className="w-full rounded-xl bg-white/10 text-white"
-                    style={{ fontSize: '18px', padding: '20px', marginTop: '24px' }}
+                    className="w-full rounded-xl bg-white/10 text-white py-3 mt-4 text-sm"
                   >
                     閉じる
                   </button>
@@ -1100,16 +1095,15 @@ function App() {
             {/* 削除確認モーダル */}
             {deleteTargetId && (
               <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 px-4">
-                <div className="w-full rounded-2xl border border-white/10 bg-fog" style={{ padding: '32px', maxWidth: '92vw' }}>
-                  <h3 className="font-bold text-white" style={{ fontSize: '22px' }}>削除の確認</h3>
-                  <p className="text-slate-300" style={{ fontSize: '18px', marginTop: '20px', lineHeight: '1.5' }}>
+                <div className="w-full rounded-2xl border border-white/10 bg-fog p-5" style={{ maxWidth: '92vw' }}>
+                  <h3 className="font-bold text-white text-base">削除の確認</h3>
+                  <p className="text-slate-300 text-sm mt-3 leading-relaxed">
                     このレシートを削除しますか？この操作は取り消せません。
                   </p>
-                  <div className="grid grid-cols-2 gap-4" style={{ marginTop: '28px' }}>
+                  <div className="grid grid-cols-2 gap-3 mt-4">
                     <button
                       onClick={() => setDeleteTargetId(null)}
-                      className="rounded-xl bg-white/10 text-white"
-                      style={{ fontSize: '18px', padding: '22px', minHeight: '80px' }}
+                      className="rounded-xl bg-white/10 text-white py-3 text-sm"
                     >
                       キャンセル
                     </button>
@@ -1118,8 +1112,7 @@ function App() {
                         await handleDeleteReceipt(deleteTargetId)
                         setDeleteTargetId(null)
                       }}
-                      className="rounded-xl bg-red-500 font-bold text-white"
-                      style={{ fontSize: '18px', padding: '22px', minHeight: '80px' }}
+                      className="rounded-xl bg-red-500 font-bold text-white py-3 text-sm"
                     >
                       削除する
                     </button>
@@ -1131,72 +1124,66 @@ function App() {
             {/* 編集モーダル */}
             {editingReceipt && (
               <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 px-4">
-                <div className="w-full rounded-2xl border border-white/10 bg-fog" style={{ padding: '32px', maxWidth: '92vw' }}>
-                  <h3 className="font-bold text-white" style={{ fontSize: '22px' }}>支出編集</h3>
-                  <div className="mt-6 space-y-5">
+                <div className="w-full rounded-2xl border border-white/10 bg-fog p-5" style={{ maxWidth: '92vw' }}>
+                  <h3 className="font-bold text-white text-base">支出編集</h3>
+                  <div className="mt-4 space-y-3">
                     <label className="block">
-                      <span className="text-slate-200" style={{ fontSize: '18px' }}>店名</span>
+                      <span className="text-slate-200 text-sm">店名</span>
                       <input
                         type="text"
                         value={editingReceipt.storeName}
                         onChange={(e) => setEditingReceipt({ ...editingReceipt, storeName: e.target.value })}
-                        className="mt-2 w-full rounded-xl border border-white/10 bg-white/5 text-white outline-none ring-mint/30 focus:ring-2"
-                        style={{ fontSize: '18px', padding: '20px' }}
+                        className="mt-1 w-full rounded-lg border border-white/10 bg-white/5 text-white outline-none ring-mint/30 focus:ring-2 px-3 py-2 text-sm"
                       />
                     </label>
                     <label className="block">
-                      <span className="text-slate-200" style={{ fontSize: '18px' }}>合計金額</span>
+                      <span className="text-slate-200 text-sm">合計金額</span>
                       <input
                         type="number"
                         value={editingReceipt.total}
                         onChange={(e) => setEditingReceipt({ ...editingReceipt, total: Number(e.target.value) })}
-                        className="mt-2 w-full rounded-xl border border-white/10 bg-white/5 text-white outline-none ring-mint/30 focus:ring-2"
-                        style={{ fontSize: '18px', padding: '20px' }}
+                        className="mt-1 w-full rounded-lg border border-white/10 bg-white/5 text-white outline-none ring-mint/30 focus:ring-2 px-3 py-2 text-sm"
                       />
                     </label>
                     {/* 飲み会/自腹トグル */}
                     <div>
-                      <span className="text-slate-200" style={{ fontSize: '18px' }}>分類</span>
-                      <div className="mt-2 flex gap-4">
+                      <span className="text-slate-200 text-sm">分類</span>
+                      <div className="mt-1 flex gap-2">
                         <button
                           type="button"
                           onClick={() => setEditingReceipt({ ...editingReceipt, isNomikai: !editingReceipt.isNomikai, isJibara: false })}
-                          className={`flex-1 rounded-xl border transition-all ${
+                          className={`flex-1 rounded-lg border transition-all py-2 text-sm ${
                             editingReceipt.isNomikai
                               ? 'border-amber-400 bg-amber-400/20 text-amber-300'
                               : 'border-white/10 bg-white/5 text-slate-400'
                           }`}
-                          style={{ fontSize: '18px', padding: '16px' }}
                         >
                           🍺 飲み会
                         </button>
                         <button
                           type="button"
                           onClick={() => setEditingReceipt({ ...editingReceipt, isJibara: !editingReceipt.isJibara, isNomikai: false })}
-                          className={`flex-1 rounded-xl border transition-all ${
+                          className={`flex-1 rounded-lg border transition-all py-2 text-sm ${
                             editingReceipt.isJibara
                               ? 'border-emerald-400 bg-emerald-400/20 text-emerald-300'
                               : 'border-white/10 bg-white/5 text-slate-400'
                           }`}
-                          style={{ fontSize: '18px', padding: '16px' }}
                         >
                           👛 自腹
                         </button>
                       </div>
                     </div>
                   </div>
-                  <div className="grid grid-cols-2 gap-4" style={{ marginTop: '28px' }}>
+                  <div className="grid grid-cols-2 gap-3 mt-4">
                     <button
                       onClick={() => setEditingReceipt(null)}
-                      className="rounded-xl bg-white/10 text-white"
-                      style={{ fontSize: '18px', padding: '22px', minHeight: '80px' }}
+                      className="rounded-xl bg-white/10 text-white py-3 text-sm"
                     >
                       キャンセル
                     </button>
                     <button
                       onClick={() => handleUpdateReceipt(editingReceipt.id, editingReceipt.storeName, editingReceipt.total, editingReceipt.isNomikai, editingReceipt.isJibara)}
-                      className="rounded-xl bg-mint font-bold text-fog"
-                      style={{ fontSize: '18px', padding: '22px', minHeight: '80px' }}
+                      className="rounded-xl bg-mint font-bold text-fog py-3 text-sm"
                     >
                       保存
                     </button>
@@ -1208,34 +1195,34 @@ function App() {
             {/* 詳細表示モーダル */}
             {detailReceipt && (
               <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 px-4">
-                <div className="w-full max-h-[85vh] overflow-y-auto rounded-2xl border border-white/10 bg-fog" style={{ padding: '32px', maxWidth: '92vw' }}>
-                  <h3 className="font-bold text-white" style={{ fontSize: '22px' }}>レシート詳細</h3>
-                  <div className="mt-6 space-y-4">
+                <div className="w-full max-h-[85vh] overflow-y-auto rounded-2xl border border-white/10 bg-fog p-5" style={{ maxWidth: '92vw' }}>
+                  <h3 className="font-bold text-white text-base">レシート詳細</h3>
+                  <div className="mt-4 space-y-3">
                     <div>
-                      <p className="text-slate-400" style={{ fontSize: '14px' }}>店名</p>
-                      <p className="text-white" style={{ fontSize: '18px', marginTop: '8px' }}>{detailReceipt.storeName}</p>
+                      <p className="text-slate-400 text-xs">店名</p>
+                      <p className="text-white text-sm mt-1">{detailReceipt.storeName}</p>
                     </div>
                     <div>
-                      <p className="text-slate-400" style={{ fontSize: '14px' }}>合計金額</p>
-                      <p className="font-bold text-mint" style={{ fontSize: '24px', marginTop: '8px' }}>{formatCurrency(detailReceipt.total)}</p>
+                      <p className="text-slate-400 text-xs">合計金額</p>
+                      <p className="font-bold text-mint text-xl mt-1">{formatCurrency(detailReceipt.total)}</p>
                     </div>
                     {detailReceipt.lineItems.length > 0 && (
                       <div>
-                        <p className="text-slate-400" style={{ fontSize: '14px', marginBottom: '16px' }}>明細</p>
-                        <div className="space-y-3">
+                        <p className="text-slate-400 text-xs mb-2">明細</p>
+                        <div className="space-y-2">
                           {detailReceipt.lineItems.map((item) => (
-                            <div key={item.id} className="rounded-xl border border-white/10 bg-white/5" style={{ padding: '16px' }}>
+                            <div key={item.id} className="rounded-lg border border-white/10 bg-white/5 px-3 py-2">
                               <div className="flex items-start justify-between">
                                 <div>
-                                  <p className="text-white" style={{ fontSize: '18px' }}>{item.name}</p>
+                                  <p className="text-white text-sm">{item.name}</p>
                                   {item.category && (
-                                    <p className="text-slate-400" style={{ fontSize: '13px', marginTop: '4px' }}>{item.category}</p>
+                                    <p className="text-slate-400 text-xs mt-1">{item.category}</p>
                                   )}
                                 </div>
                                 <div className="text-right">
-                                  <p className="font-bold text-white" style={{ fontSize: '18px' }}>{formatCurrency(item.price)}</p>
+                                  <p className="font-bold text-white text-sm">{formatCurrency(item.price)}</p>
                                   {item.quantity > 1 && (
-                                    <p className="text-slate-400" style={{ fontSize: '13px' }}>× {item.quantity}</p>
+                                    <p className="text-slate-400 text-xs">× {item.quantity}</p>
                                   )}
                                 </div>
                               </div>
@@ -1247,8 +1234,7 @@ function App() {
                   </div>
                   <button
                     onClick={() => setDetailReceipt(null)}
-                    className="w-full rounded-xl bg-white/10 text-white"
-                    style={{ fontSize: '18px', padding: '22px', marginTop: '28px' }}
+                    className="w-full rounded-xl bg-white/10 text-white py-3 mt-4 text-sm"
                   >
                     閉じる
                   </button>
@@ -1257,58 +1243,54 @@ function App() {
             )}
 
             {/* 支出一覧 */}
-            <div className="mt-5 px-4">
-              <div className="rounded-2xl border border-white/10 bg-white/5" style={{ padding: '24px' }}>
+            <div className="mt-4 px-4">
+              <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
                 <div className="flex items-center justify-between">
-                  <h3 className="font-semibold text-white" style={{ fontSize: '22px' }}>
+                  <h3 className="font-semibold text-white text-base">
                     {selectedMonth.replace('-', '年')}月の支出一覧
                   </h3>
-                  <span className="text-slate-400" style={{ fontSize: '18px' }}>{filteredReceipts.length}件</span>
+                  <span className="text-slate-400 text-sm">{filteredReceipts.length}件</span>
                 </div>
-                <div className="mt-4 space-y-4">
+                <div className="mt-3 space-y-2">
                 {filteredReceipts.length === 0 ? (
-                  <p className="rounded-2xl bg-white/5 text-center text-slate-400" style={{ fontSize: '18px', padding: '48px 24px' }}>
+                  <p className="rounded-xl bg-white/5 text-center text-slate-400 text-sm py-8">
                     この月の支出はありません
                   </p>
                 ) : (
                   displayedReceipts.map((receipt) => (
                     <div
                       key={receipt.id}
-                      className="rounded-2xl border border-white/10 bg-white/5"
-                      style={{ padding: '28px' }}
+                      className="rounded-xl border border-white/10 bg-white/5 p-3"
                     >
-                      <div className="flex items-center justify-between">
+                      <div className="flex items-start justify-between gap-2">
                         <div 
-                          className="cursor-pointer flex-1"
+                          className="cursor-pointer flex-1 min-w-0"
                           onClick={() => setSelectedReceipt(receipt)}
-                          style={{ maxWidth: '55%' }}
                         >
-                          <p className="text-slate-400" style={{ fontSize: '18px' }}>{receipt.visitedAt}</p>
-                          <p className="font-semibold text-white underline" style={{ fontSize: '22px', marginTop: '8px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', lineHeight: '1.4', paddingTop: '4px', paddingBottom: '4px' }}>{receipt.storeName}</p>
-                          <div className="flex items-center gap-2" style={{ marginTop: '14px' }}>
-                            <span className="inline-block rounded-full bg-white/10 text-slate-300" style={{ fontSize: '14px', padding: '12px 24px' }}>
+                          <p className="text-slate-400 text-xs">{receipt.visitedAt}</p>
+                          <p className="font-semibold text-white underline text-sm mt-1 truncate">{receipt.storeName}</p>
+                          <div className="flex items-center gap-1 mt-2">
+                            <span className="inline-block rounded-full bg-white/10 text-slate-300 text-xs px-2 py-1">
                               {receipt.category || '未分類'}
                             </span>
-                            {receipt.isNomikai && <span style={{ fontSize: '18px' }}>🍺</span>}
-                            {receipt.isJibara && <span style={{ fontSize: '18px' }}>👛</span>}
+                            {receipt.isNomikai && <span className="text-sm">🍺</span>}
+                            {receipt.isJibara && <span className="text-sm">👛</span>}
                           </div>
                         </div>
-                        <div className="text-right">
-                          <p className="font-bold text-mint" style={{ fontSize: '14px' }}>
+                        <div className="text-right shrink-0">
+                          <p className="font-bold text-mint text-lg">
                             {formatCurrency(receipt.total)}
                           </p>
-                          <div className="flex gap-3 justify-end" style={{ marginTop: '14px' }}>
+                          <div className="flex gap-2 justify-end mt-1">
                             <button
                               onClick={() => setEditingReceipt(receipt)}
-                              className="text-yellow-400"
-                              style={{ fontSize: '18px', padding: '10px 16px' }}
+                              className="text-yellow-400 text-xs"
                             >
                               編集
                             </button>
                             <button
                               onClick={() => setDeleteTargetId(receipt.id)}
-                              className="text-red-400"
-                              style={{ fontSize: '18px', padding: '10px 16px' }}
+                              className="text-red-400 text-xs"
                             >
                               削除
                             </button>
@@ -1322,7 +1304,7 @@ function App() {
                   <button
                     onClick={() => setVisibleCount((v) => v + 20)}
                     className="w-full rounded-xl border border-white/10 bg-white/5 font-semibold text-white"
-                    style={{ fontSize: '18px', padding: '28px', minHeight: '90px' }}
+                    style={{ fontSize: '14px', padding: '12px' }}
                   >
                     もっと見る
                   </button>
@@ -1331,21 +1313,21 @@ function App() {
                   <button
                     onClick={() => setVisibleCount(20)}
                     className="w-full rounded-xl border border-white/10 bg-white/5 font-semibold text-slate-400"
-                    style={{ fontSize: '18px', padding: '28px', minHeight: '90px' }}
+                    style={{ fontSize: '14px', padding: '12px' }}
                   >
                     ▲ 20件表示に戻す
                   </button>
                 )}
                 {/* CSV操作 - レシート一覧内に移動 */}
-                <div className="mt-4 grid grid-cols-2 gap-3">
+                <div className="mt-4 grid grid-cols-2 gap-2">
                   <button
                     onClick={handleExport}
                     className="rounded-xl border border-white/15 bg-white/10 font-semibold text-white"
-                    style={{ fontSize: '18px', padding: '24px', minHeight: '80px' }}
+                    style={{ fontSize: '14px', padding: '12px 16px' }}
                   >
                     CSVを保存
                   </button>
-                  <label className="flex cursor-pointer items-center justify-center rounded-xl border border-white/15 bg-white/10 font-semibold text-white" style={{ fontSize: '18px', padding: '24px', minHeight: '80px' }}>
+                  <label className="flex cursor-pointer items-center justify-center rounded-xl border border-white/15 bg-white/10 font-semibold text-white" style={{ fontSize: '14px', padding: '12px 16px' }}>
                     CSVを読込
                     <input
                       type="file"
@@ -1365,17 +1347,17 @@ function App() {
             </div>
 
             {/* 設定セクション */}
-            <div className="mt-5 px-4 pb-6">
-              <div className="rounded-2xl border border-white/10 bg-white/5" style={{ padding: '24px' }}>
-                <h3 className="font-semibold text-white" style={{ fontSize: '22px', marginBottom: '20px' }}>設定</h3>
+            <div className="mt-4 px-4 pb-6">
+              <div className="rounded-2xl border border-white/10 bg-white/5" style={{ padding: '16px' }}>
+                <h3 className="font-semibold text-white" style={{ fontSize: '16px', marginBottom: '12px' }}>設定</h3>
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="font-semibold text-white" style={{ fontSize: '18px' }}>Gemini AI認識</p>
-                    <p className="text-slate-400" style={{ fontSize: '14px', marginTop: '6px' }}>
+                    <p className="font-semibold text-white" style={{ fontSize: '14px' }}>Gemini AI認識</p>
+                    <p className="text-slate-400" style={{ fontSize: '12px', marginTop: '4px' }}>
                       {hasApiKey() ? "✅ 設定済み" : "❌ 未設定"}
                     </p>
                   </div>
-                  <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-2">
                     <button
                       onClick={() => setUseGemini(!useGemini)}
                       className={clsx(
@@ -1384,14 +1366,14 @@ function App() {
                           ? "bg-mint text-fog"
                           : "border border-white/20 bg-white/10 text-white"
                       )}
-                      style={{ fontSize: '18px', padding: '20px 32px', minHeight: '72px' }}
+                      style={{ fontSize: '13px', padding: '8px 16px' }}
                     >
                       {useGemini ? "ON" : "OFF"}
                     </button>
                     <button
                       onClick={() => setShowApiKeyModal(true)}
                       className="rounded-full border border-white/20 bg-white/10 text-white"
-                      style={{ fontSize: '18px', padding: '18px 24px', minHeight: '72px' }}
+                      style={{ fontSize: '14px', padding: '8px 12px' }}
                     >
                       ⚙️
                     </button>
@@ -1404,12 +1386,12 @@ function App() {
 
         {/* スマホ用固定フッター */}
         {session && (
-          <div className="fixed inset-x-0 bottom-0 z-30 border-t border-white/10 bg-fog/95 backdrop-blur-lg safe-area-pb px-4 py-3">
-            <div className="flex items-center gap-3">
+          <div className="fixed inset-x-0 bottom-0 z-30 border-t border-white/10 bg-fog/95 backdrop-blur-lg safe-area-pb px-4 py-2">
+            <div className="flex items-center gap-2">
               <button
                 onClick={cameraActive ? stopCamera : startCamera}
                 className={clsx(
-                  "flex-1 rounded-xl font-semibold py-4 text-sm whitespace-nowrap",
+                  "flex-1 rounded-lg font-semibold py-3 text-xs whitespace-nowrap",
                   cameraActive
                     ? "border border-white/30 bg-white/10 text-white"
                     : "border border-mint/60 bg-mint/20 text-mint"
@@ -1421,7 +1403,7 @@ function App() {
                 onClick={captureFromCamera}
                 disabled={!cameraActive || isProcessing}
                 className={clsx(
-                  "flex-[2] rounded-xl font-bold py-4 text-base shadow-lg disabled:opacity-50",
+                  "flex-[2] rounded-lg font-bold py-3 text-sm shadow-lg disabled:opacity-50",
                   isProcessing
                     ? "animate-pulse border border-yellow-400 bg-yellow-400/30 text-yellow-200"
                     : "border border-mint bg-mint text-fog"
@@ -1432,7 +1414,7 @@ function App() {
               <button
                 onClick={handleSaveReceipt}
                 className={clsx(
-                  "flex-1 rounded-xl font-semibold py-4 text-sm transition-all",
+                  "flex-1 rounded-lg font-semibold py-3 text-xs transition-all whitespace-nowrap",
                   hasDraftData
                     ? "animate-pulse border border-mint bg-mint/30 text-mint shadow-lg shadow-mint/30"
                     : "border border-white/30 bg-white/15 text-white"
