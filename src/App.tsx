@@ -540,6 +540,8 @@ function App() {
     setCameraReady(false)
     setCameraPaused(false)
     setCapturedImage(null)
+    // 撮影データを破棄し、ドラフトをリセット
+    setDraft(initialDraft())
   }
 
   // カメラを一時停止
@@ -750,7 +752,7 @@ function App() {
               <button
                 onClick={handleLock}
                 className="rounded-full border border-white/20 bg-white/10 font-semibold text-white"
-                style={{ fontSize: '12px', padding: '8px 16px' }}
+                style={{ fontSize: '11px', padding: '4px 12px' }}
               >
                 ログアウト
               </button>
@@ -955,10 +957,10 @@ function App() {
             {/* 入力フォーム（シンプル版）*/}
             <div className="mt-4 space-y-4 px-4">
               <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
-                <h3 className="font-semibold text-white text-lg mb-4">支出情報入力</h3>
+                <h3 className="font-semibold text-white text-base mb-3">支出情報入力</h3>
                 <div className="space-y-3">
                   <input
-                    className="w-full rounded-xl border border-white/10 bg-white/5 text-white placeholder-slate-500 px-4 py-3 text-base"
+                    className="w-full rounded-xl border border-white/10 bg-white/5 text-white placeholder-slate-500 px-4 py-2 text-sm"
                     value={draft.storeName}
                     onChange={(e) => setDraft((prev) => ({ ...prev, storeName: e.target.value }))}
                     placeholder="店名"
@@ -966,12 +968,12 @@ function App() {
                   {/* 日付 - 1列 */}
                   <input
                     type="date"
-                    className="w-full rounded-xl border border-white/10 bg-white/5 text-white px-4 py-3 text-base"
+                    className="w-full rounded-xl border border-white/10 bg-white/5 text-white px-4 py-2 text-sm"
                     value={draft.visitedAt}
                     onChange={(e) => setDraft((prev) => ({ ...prev, visitedAt: e.target.value }))}
                   />
                   {/* 金額 - 1列 */}
-                  <div className="flex items-center rounded-xl border-2 border-mint/50 bg-mint/10 px-4 py-3">
+                  <div className="flex items-center rounded-xl border-2 border-mint/50 bg-mint/10 px-3 py-2">
                     <span className="font-bold text-mint/70 text-xl">¥</span>
                     <input
                       inputMode="numeric"
@@ -1249,7 +1251,7 @@ function App() {
                   <h3 className="font-semibold text-white text-base">
                     {selectedMonth.replace('-', '年')}月の支出一覧
                   </h3>
-                  <span className="text-slate-400 text-sm">{filteredReceipts.length}件</span>
+                  <span className="text-slate-400 text-xs">{filteredReceipts.length}件</span>
                 </div>
                 <div className="mt-3 space-y-2">
                 {filteredReceipts.length === 0 ? (
@@ -1268,7 +1270,7 @@ function App() {
                           onClick={() => setSelectedReceipt(receipt)}
                         >
                           <p className="text-slate-400 text-xs">{receipt.visitedAt}</p>
-                          <p className="font-semibold text-white underline text-sm mt-1 truncate">{receipt.storeName}</p>
+                          <p className="font-semibold text-white underline text-xs mt-1 truncate">{receipt.storeName}</p>
                           <div className="flex items-center gap-1 mt-2">
                             <span className="inline-block rounded-full bg-white/10 text-slate-300 text-xs px-2 py-1">
                               {receipt.category || '未分類'}
@@ -1281,7 +1283,7 @@ function App() {
                           <p className="font-bold text-mint text-lg">
                             {formatCurrency(receipt.total)}
                           </p>
-                          <div className="flex gap-2 justify-end mt-1">
+                          <div className="flex gap-1 justify-end mt-1">
                             <button
                               onClick={() => setEditingReceipt(receipt)}
                               className="text-yellow-400 text-xs"
@@ -1304,7 +1306,7 @@ function App() {
                 {filteredReceipts.length > visibleCount && (
                   <button
                     onClick={() => setVisibleCount((v) => v + 20)}
-                    className="w-full rounded-xl border border-white/10 bg-white/5 font-semibold text-white"
+                    className="w-full rounded-xl border border-white/10 bg-white/5 font-semibold text-white mt-2"
                     style={{ fontSize: '14px', padding: '12px' }}
                   >
                     もっと見る
@@ -1366,14 +1368,14 @@ function App() {
                           ? "bg-mint text-fog"
                           : "border border-white/20 bg-white/10 text-white"
                       )}
-                      style={{ fontSize: '13px', padding: '8px 16px' }}
+                      style={{ fontSize: '12px', padding: '4px 12px' }}
                     >
                       {useGemini ? "ON" : "OFF"}
                     </button>
                     <button
                       onClick={() => setShowApiKeyModal(true)}
                       className="rounded-full border border-white/20 bg-white/10 text-white"
-                      style={{ fontSize: '14px', padding: '8px 12px' }}
+                      style={{ fontSize: '12px', padding: '4px 8px' }}
                     >
                       ⚙️
                     </button>
@@ -1387,11 +1389,11 @@ function App() {
         {/* スマホ用固定フッター */}
         {session && (
           <div className="fixed inset-x-0 bottom-0 z-30 border-t border-white/10 bg-fog/95 backdrop-blur-lg safe-area-pb px-4 py-2">
-            <div className="flex items-center gap-2">
+            <div className="flex items-center justify-center gap-2">
               <button
                 onClick={cameraActive ? stopCamera : startCamera}
                 className={clsx(
-                  "flex-1 rounded-lg font-semibold py-3 text-xs whitespace-nowrap",
+                  "w-20 rounded-lg font-semibold py-2 text-xs whitespace-nowrap",
                   cameraActive
                     ? "border border-white/30 bg-white/10 text-white"
                     : "border border-mint/60 bg-mint/20 text-mint"
@@ -1403,7 +1405,7 @@ function App() {
                 onClick={captureFromCamera}
                 disabled={!cameraActive || isProcessing}
                 className={clsx(
-                  "flex-[2] rounded-lg font-bold py-3 text-sm shadow-lg disabled:opacity-50",
+                  "flex-1 max-w-[180px] rounded-lg font-bold py-2 text-sm shadow-lg disabled:opacity-50",
                   isProcessing
                     ? "animate-pulse border border-yellow-400 bg-yellow-400/30 text-yellow-200"
                     : "border border-mint bg-mint text-fog"
@@ -1414,7 +1416,7 @@ function App() {
               <button
                 onClick={handleSaveReceipt}
                 className={clsx(
-                  "flex-1 rounded-lg font-semibold py-3 text-xs transition-all whitespace-nowrap",
+                  "w-20 rounded-lg font-semibold py-2 text-xs transition-all whitespace-nowrap",
                   hasDraftData
                     ? "animate-pulse border border-mint bg-mint/30 text-mint shadow-lg shadow-mint/30"
                     : "border border-white/30 bg-white/15 text-white"
