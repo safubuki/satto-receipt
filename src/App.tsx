@@ -1,4 +1,4 @@
-import type { ReactNode } from "react"
+ï»¿import type { ReactNode } from "react"
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { clsx } from "clsx"
 import { downloadCsv, toCsv } from "./lib/csv"
@@ -32,20 +32,20 @@ type ReceiptDraft = {
   category: string
   imageData?: string
   lineItems: LineItemDraft[]
-  isNomikai?: boolean  // ˆù‚İ‰ïƒtƒ‰ƒO
-  isJibara?: boolean   // ©• ƒtƒ‰ƒO
+  isNomikai?: boolean  // é£²ã¿ä¼šãƒ•ãƒ©ã‚°
+  isJibara?: boolean   // è‡ªè…¹ãƒ•ãƒ©ã‚°
 }
 
 const defaultCategories: Category[] = [
-  { id: "supermarket", name: "ƒX[ƒp[", color: "#3de0a2" },
-  { id: "convenience", name: "ƒRƒ“ƒrƒj", color: "#f59e0b" },
-  { id: "drugstore", name: "ƒhƒ‰ƒbƒOƒXƒgƒA", color: "#a78bfa" },
-  { id: "restaurant", name: "ˆùH“X", color: "#ef4444" },
-  { id: "clothing", name: "ˆß—¿•i“X", color: "#ec4899" },
-  { id: "electronics", name: "‰Æ“dEG‰İ", color: "#38bdf8" },
-  { id: "medical", name: "ˆã—ÃE–ò‹Ç", color: "#14b8a6" },
-  { id: "entertainment", name: "ŒâŠy", color: "#8b5cf6" },
-  { id: "other", name: "‚»‚Ì‘¼", color: "#94a3b8" },
+  { id: "supermarket", name: "ã‚¹ãƒ¼ãƒ‘ãƒ¼", color: "#3de0a2" },
+  { id: "convenience", name: "ã‚³ãƒ³ãƒ“ãƒ‹", color: "#f59e0b" },
+  { id: "drugstore", name: "ãƒ‰ãƒ©ãƒƒã‚°ã‚¹ãƒˆã‚¢", color: "#a78bfa" },
+  { id: "restaurant", name: "é£²é£Ÿåº—", color: "#ef4444" },
+  { id: "clothing", name: "è¡£æ–™å“åº—", color: "#ec4899" },
+  { id: "electronics", name: "å®¶é›»ãƒ»é›‘è²¨", color: "#38bdf8" },
+  { id: "medical", name: "åŒ»ç™‚ãƒ»è–¬å±€", color: "#14b8a6" },
+  { id: "entertainment", name: "å¨¯æ¥½", color: "#8b5cf6" },
+  { id: "other", name: "ãã®ä»–", color: "#94a3b8" },
 ]
 
 const createVault = (): Vault => ({
@@ -85,7 +85,7 @@ const parseReceiptText = (text: string): { items: LineItemDraft[]; total?: strin
   const store = lines[0]
 
   for (const line of lines) {
-    if (/‡Œv|Œv|total/i.test(line) && !total) {
+    if (/åˆè¨ˆ|è¨ˆ|total/i.test(line) && !total) {
       const num = line.match(/([0-9]+[.,]?[0-9]*)/)
       if (num) total = num[1].replace(",", "")
     }
@@ -107,16 +107,16 @@ const Pill = ({ children }: { children: ReactNode }) => (
   </span>
 )
 
-// ƒXƒ}ƒz”»’èƒwƒ‹ƒp[ŠÖ”iˆÀ‘S‚É”»’èj
+// ã‚¹ãƒãƒ›åˆ¤å®šãƒ˜ãƒ«ãƒ‘ãƒ¼é–¢æ•°ï¼ˆå®‰å…¨ã«åˆ¤å®šï¼‰
 const detectMobile = (): boolean => {
   try {
-    if (typeof window === 'undefined') return true // SSR‚ÍƒXƒ}ƒzˆµ‚¢
+    if (typeof window === 'undefined') return true // SSRæ™‚ã¯ã‚¹ãƒãƒ›æ‰±ã„
     
-    // ‰æ–Ê•”»’è (Å‚àŠmÀ)
+    // ç”»é¢å¹…åˆ¤å®š (æœ€ã‚‚ç¢ºå®Ÿ)
     const narrowScreen = window.innerWidth < 768
     if (narrowScreen) return true
     
-    // ƒ^ƒbƒ`ƒfƒoƒCƒX”»’è
+    // ã‚¿ãƒƒãƒãƒ‡ãƒã‚¤ã‚¹åˆ¤å®š
     let hasTouch = false
     try {
       hasTouch = 'ontouchstart' in window || (navigator && navigator.maxTouchPoints > 0)
@@ -125,7 +125,7 @@ const detectMobile = (): boolean => {
     }
     if (hasTouch) return true
     
-    // User-Agent”»’è
+    // User-Agentåˆ¤å®š
     let mobileUA = false
     try {
       if (navigator && navigator.userAgent) {
@@ -137,17 +137,17 @@ const detectMobile = (): boolean => {
     
     return mobileUA
   } catch {
-    // ‰½‚©ƒGƒ‰[‚ª‚ ‚Á‚½‚çƒXƒ}ƒzˆµ‚¢iˆÀ‘S‘¤j
+    // ä½•ã‹ã‚¨ãƒ©ãƒ¼ãŒã‚ã£ãŸã‚‰ã‚¹ãƒãƒ›æ‰±ã„ï¼ˆå®‰å…¨å´ï¼‰
     return true
   }
 }
 
-// ƒXƒ}ƒz”»’èƒJƒXƒ^ƒ€ƒtƒbƒN
+// ã‚¹ãƒãƒ›åˆ¤å®šã‚«ã‚¹ã‚¿ãƒ ãƒ•ãƒƒã‚¯
 const useIsMobile = () => {
   const [isMobile, setIsMobile] = useState(detectMobile)
   
   useEffect(() => {
-    // ƒ}ƒEƒ“ƒgŒã‚ÉÄ”»’è
+    // ãƒã‚¦ãƒ³ãƒˆå¾Œã«å†åˆ¤å®š
     setIsMobile(detectMobile())
     
     const handleResize = () => setIsMobile(detectMobile())
@@ -170,7 +170,7 @@ function App() {
   const [draft, setDraft] = useState<ReceiptDraft>(initialDraft())
   const [filters, setFilters] = useState({ query: "", category: "all" })
   const [summaryTab, setSummaryTab] = useState<"overview" | "monthly">("overview")
-  // ‘I‘ğ’†‚Ì”NŒiYYYY-MMŒ`®j
+  // é¸æŠä¸­ã®å¹´æœˆï¼ˆYYYY-MMå½¢å¼ï¼‰
   const [selectedMonth, setSelectedMonth] = useState(() => new Date().toISOString().slice(0, 7))
   const [visibleCount, setVisibleCount] = useState(20)
   const [expandedImages, setExpandedImages] = useState<Set<string>>(new Set())
@@ -178,7 +178,7 @@ function App() {
   const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null)
   const [editingReceipt, setEditingReceipt] = useState<Receipt | null>(null)
   const [detailReceipt, setDetailReceipt] = useState<Receipt | null>(null)
-  // í‚ÉÅV‚ÌdefaultCategories‚ğg—piŒÃ‚¢vaultƒf[ƒ^‚Æ‚ÌŒİŠ·«‚Ì‚½‚ßj
+  // å¸¸ã«æœ€æ–°ã®defaultCategoriesã‚’ä½¿ç”¨ï¼ˆå¤ã„vaultãƒ‡ãƒ¼ã‚¿ã¨ã®äº’æ›æ€§ã®ãŸã‚ï¼‰
   const categories = defaultCategories
   const videoRef = useRef<HTMLVideoElement | null>(null)
   const streamRef = useRef<MediaStream | null>(null)
@@ -201,7 +201,7 @@ function App() {
     checkFirstTime()
   }, [])
 
-  // ƒrƒfƒI—v‘f‚ÉƒXƒgƒŠ[ƒ€‚ğÚ‘±‚·‚éˆ—
+  // ãƒ“ãƒ‡ã‚ªè¦ç´ ã«ã‚¹ãƒˆãƒªãƒ¼ãƒ ã‚’æ¥ç¶šã™ã‚‹å‡¦ç†
   const attachStreamToVideo = useCallback((video: HTMLVideoElement, stream: MediaStream) => {
     video.srcObject = stream
     video.muted = true
@@ -214,7 +214,7 @@ function App() {
           setCameraReady(true)
           setCameraError(null)
         } else {
-          // ­‚µ‘Ò‚Á‚Ä‚©‚çÄƒ`ƒFƒbƒN
+          // å°‘ã—å¾…ã£ã¦ã‹ã‚‰å†ãƒã‚§ãƒƒã‚¯
           setTimeout(() => {
             if (video.videoWidth > 0 && video.videoHeight > 0) {
               setCameraReady(true)
@@ -223,7 +223,7 @@ function App() {
           }, 500)
         }
       } catch {
-        setCameraError("‰f‘œ‚ÌÄ¶‚É¸”s‚µ‚Ü‚µ‚½B")
+        setCameraError("æ˜ åƒã®å†ç”Ÿã«å¤±æ•—ã—ã¾ã—ãŸã€‚")
       }
     }
 
@@ -234,7 +234,7 @@ function App() {
     }
   }, [])
 
-  // video—v‘f‚Ìref callback
+  // videoè¦ç´ ã®ref callback
   const setVideoRef = useCallback((node: HTMLVideoElement | null) => {
     videoRef.current = node
     if (node && streamRef.current) {
@@ -261,7 +261,7 @@ function App() {
         const vault = createVault()
         await persistVault(vault, key)
         setDraft(initialDraft())
-        // V‹Kì¬‚àrememberMe‚ªtrue‚È‚çƒpƒXƒtƒŒ[ƒY‚ğ•Û‘¶
+        // æ–°è¦ä½œæˆæ™‚ã‚‚rememberMeãŒtrueãªã‚‰ãƒ‘ã‚¹ãƒ•ãƒ¬ãƒ¼ã‚ºã‚’ä¿å­˜
         if (rememberMe) {
           savePassphrase(passphrase)
         }
@@ -277,36 +277,36 @@ function App() {
       setSession({ key, vault })
       setDraft(initialDraft())
       
-      // ƒƒOƒCƒ“¬Œ÷ArememberMe‚ªtrue‚È‚çƒpƒXƒtƒŒ[ƒY‚ğ•Û‘¶
+      // ãƒ­ã‚°ã‚¤ãƒ³æˆåŠŸæ™‚ã€rememberMeãŒtrueãªã‚‰ãƒ‘ã‚¹ãƒ•ãƒ¬ãƒ¼ã‚ºã‚’ä¿å­˜
       if (rememberMe) {
         savePassphrase(passphrase)
       }
     } catch (error) {
       console.error(error)
-      setUnlockError("ƒpƒXƒtƒŒ[ƒY‚ªˆá‚¤‚©ƒf[ƒ^‚ğ•œ†‚Å‚«‚Ü‚¹‚ñ‚Å‚µ‚½B")
-      // ©“®ƒƒOƒCƒ“¸”s‚Í‹L‰¯‚ğíœ
+      setUnlockError("ãƒ‘ã‚¹ãƒ•ãƒ¬ãƒ¼ã‚ºãŒé•ã†ã‹ãƒ‡ãƒ¼ã‚¿ã‚’å¾©å·ã§ãã¾ã›ã‚“ã§ã—ãŸã€‚")
+      // è‡ªå‹•ãƒ­ã‚°ã‚¤ãƒ³å¤±æ•—æ™‚ã¯è¨˜æ†¶ã‚’å‰Šé™¤
       clearSavedPassphrase()
     } finally {
       setUnlocking(false)
     }
   }
 
-  // ©“®ƒƒOƒCƒ“ˆ—
+  // è‡ªå‹•ãƒ­ã‚°ã‚¤ãƒ³å‡¦ç†
   useEffect(() => {
     const autoLogin = async () => {
       const savedPassphrase = getSavedPassphrase()
       if (savedPassphrase && !session) {
-        // •Û‘¶‚³‚ê‚½ƒpƒXƒtƒŒ[ƒY‚ª‚ ‚éê‡A©“®ƒƒOƒCƒ“s
-        await handleUnlock(savedPassphrase, false) // rememberMe=false‚ÅÄ•Û‘¶‚µ‚È‚¢
+        // ä¿å­˜ã•ã‚ŒãŸãƒ‘ã‚¹ãƒ•ãƒ¬ãƒ¼ã‚ºãŒã‚ã‚‹å ´åˆã€è‡ªå‹•ãƒ­ã‚°ã‚¤ãƒ³è©¦è¡Œ
+        await handleUnlock(savedPassphrase, false) // rememberMe=falseã§å†ä¿å­˜ã—ãªã„
       }
     }
     autoLogin()
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []) // ‰‰ñƒ}ƒEƒ“ƒg‚Ì‚İÀs
+  }, []) // åˆå›ãƒã‚¦ãƒ³ãƒˆæ™‚ã®ã¿å®Ÿè¡Œ
 
   const handleLock = async () => {
     stopCamera()
-    // ƒƒOƒAƒEƒg‚ÉisFirstTime‚ğÄƒ`ƒFƒbƒN
+    // ãƒ­ã‚°ã‚¢ã‚¦ãƒˆæ™‚ã«isFirstTimeã‚’å†ãƒã‚§ãƒƒã‚¯
     const stored = await loadVault()
     setIsFirstTime(!stored)
     setSession(null)
@@ -314,19 +314,19 @@ function App() {
     setOcrProgress(null)
     setLastUploadedName(null)
     setDraft(initialDraft())
-    // ’ˆÓ: ƒƒOƒAƒEƒg‚Å‚Í‹L‰¯‚ğÁ‚³‚È‚¢i–¾¦“I‚ÉƒƒOƒAƒEƒg‚µ‚Ä‚àŸ‰ñ‚Í©“®ƒƒOƒCƒ“‚Å‚«‚éj
-    // ‹L‰¯‚ğÁ‚·‚Ì‚Íƒf[ƒ^‰Šú‰»‚Ì‚İ
+    // æ³¨æ„: ãƒ­ã‚°ã‚¢ã‚¦ãƒˆã§ã¯è¨˜æ†¶ã‚’æ¶ˆã•ãªã„ï¼ˆæ˜ç¤ºçš„ã«ãƒ­ã‚°ã‚¢ã‚¦ãƒˆã—ã¦ã‚‚æ¬¡å›ã¯è‡ªå‹•ãƒ­ã‚°ã‚¤ãƒ³ã§ãã‚‹ï¼‰
+    // è¨˜æ†¶ã‚’æ¶ˆã™ã®ã¯ãƒ‡ãƒ¼ã‚¿åˆæœŸåŒ–æ™‚ã®ã¿
   }
 
   const handleReset = async () => {
     const confirmed = window.confirm(
-      '?? ‚±‚ê‚Ü‚Å•Û‘¶‚µ‚½‚·‚×‚Ä‚Ìƒf[ƒ^iƒŒƒV[ƒgEİ’èj‚ªŠ®‘S‚Éíœ‚³‚ê‚Ü‚·B\n\n‚±‚Ì‘€ì‚Íæ‚èÁ‚µ‚Å‚«‚Ü‚¹‚ñB\n–{“–‚Éíœ‚µ‚Ü‚·‚©H'
+      'âš ï¸ ã“ã‚Œã¾ã§ä¿å­˜ã—ãŸã™ã¹ã¦ã®ãƒ‡ãƒ¼ã‚¿ï¼ˆãƒ¬ã‚·ãƒ¼ãƒˆãƒ»è¨­å®šï¼‰ãŒå®Œå…¨ã«å‰Šé™¤ã•ã‚Œã¾ã™ã€‚\n\nã“ã®æ“ä½œã¯å–ã‚Šæ¶ˆã—ã§ãã¾ã›ã‚“ã€‚\næœ¬å½“ã«å‰Šé™¤ã—ã¾ã™ã‹ï¼Ÿ'
     )
     if (!confirmed) return
     
     await clearVault()
     clearSalt()
-    clearSavedPassphrase() // ƒpƒXƒtƒŒ[ƒY‹L‰¯‚àíœ
+    clearSavedPassphrase() // ãƒ‘ã‚¹ãƒ•ãƒ¬ãƒ¼ã‚ºè¨˜æ†¶ã‚‚å‰Šé™¤
     setIsFirstTime(true)
     setSession(null)
     setDraft(initialDraft())
@@ -341,14 +341,14 @@ function App() {
     try {
       const preview = await compressImage(file)
       
-      // Gemini API‚ğg‚¤‚©A]—ˆ‚ÌOCR‚ğg‚¤‚©
+      // Gemini APIã‚’ä½¿ã†ã‹ã€å¾“æ¥ã®OCRã‚’ä½¿ã†ã‹
       if (useGemini && hasApiKey()) {
         // Gemini API
         const result = await analyzeReceiptWithGemini(file, setOcrProgress)
         setOcrText(result.rawText)
         
-        // AI‚ª”»’è‚µ‚½ƒJƒeƒSƒŠ‚ğİ’èi‘¶İ‚·‚éê‡j
-        let selectedCategory = categories[0]?.name ?? "‚»‚Ì‘¼"
+        // AIãŒåˆ¤å®šã—ãŸã‚«ãƒ†ã‚´ãƒªã‚’è¨­å®šï¼ˆå­˜åœ¨ã™ã‚‹å ´åˆï¼‰
+        let selectedCategory = categories[0]?.name ?? "ãã®ä»–"
         if (result.category) {
           const found = categories.find(c => c.name === result.category)
           if (found) {
@@ -356,7 +356,7 @@ function App() {
           }
         }
         
-        // •i–Úƒf[ƒ^‚ğLineItemDraftŒ`®‚É•ÏŠ·
+        // å“ç›®ãƒ‡ãƒ¼ã‚¿ã‚’LineItemDraftå½¢å¼ã«å¤‰æ›
         const lineItemDrafts: LineItemDraft[] = (result.items || []).map((item: { name: string; price: number; quantity?: number; category?: string }, idx: number) => ({
           id: `item-${idx}-${Date.now()}`,
           name: item.name,
@@ -375,7 +375,7 @@ function App() {
           lineItems: lineItemDrafts,
         })
       } else {
-        // ]—ˆ‚ÌTesseract OCR
+        // å¾“æ¥ã®Tesseract OCR
         const text = await runOcr(file, setOcrProgress)
         setOcrText(text)
         const parsed = parseReceiptText(text)
@@ -388,7 +388,7 @@ function App() {
       }
     } catch (error) {
       console.error("OCR error:", error)
-      setCameraError(error instanceof Error ? error.message : "OCRˆ—‚É¸”s‚µ‚Ü‚µ‚½")
+      setCameraError(error instanceof Error ? error.message : "OCRå‡¦ç†ã«å¤±æ•—ã—ã¾ã—ãŸ")
     } finally {
       setOcrProgress(null)
       if (input) input.value = ""
@@ -406,7 +406,7 @@ function App() {
   const handleSaveReceipt = async () => {
     if (!session) return
     
-    // ƒhƒ‰ƒtƒg‚Ì•i–Úƒf[ƒ^‚ğLineItemŒ`®‚É•ÏŠ·
+    // ãƒ‰ãƒ©ãƒ•ãƒˆã®å“ç›®ãƒ‡ãƒ¼ã‚¿ã‚’LineItemå½¢å¼ã«å¤‰æ›
     const lineItems: LineItem[] = draft.lineItems.map((item) => ({
       id: item.id,
       name: item.name,
@@ -421,7 +421,7 @@ function App() {
 
     const receipt: Receipt = {
       id: crypto.randomUUID(),
-      storeName: draft.storeName || "–³‘è‚ÌƒŒƒV[ƒg",
+      storeName: draft.storeName || "ç„¡é¡Œã®ãƒ¬ã‚·ãƒ¼ãƒˆ",
       visitedAt: draft.visitedAt || now.slice(0, 10),
       total: computedTotal,
       category: draft.category,
@@ -470,7 +470,7 @@ function App() {
 
   const handleExport = () => {
     if (!session) return
-    // “ú•t~‡iV‚µ‚¢‡j‚Åƒ\[ƒg‚µ‚Ä‚©‚çƒGƒNƒXƒ|[ƒg
+    // æ—¥ä»˜é™é †ï¼ˆæ–°ã—ã„é †ï¼‰ã§ã‚½ãƒ¼ãƒˆã—ã¦ã‹ã‚‰ã‚¨ã‚¯ã‚¹ãƒãƒ¼ãƒˆ
     const sorted = [...session.vault.receipts].sort((a, b) => b.visitedAt.localeCompare(a.visitedAt))
     const csv = toCsv(sorted)
     downloadCsv(csv)
@@ -513,21 +513,21 @@ function App() {
           // ignore
         }
       }
-      // ‚Ü‚¸cameraActive‚ğtrue‚É‚µ‚Ävideo—v‘f‚ğƒŒƒ“ƒ_ƒŠƒ“ƒO‚³‚¹‚é
-      // video—v‘f‚Ìref callback‚ÅƒXƒgƒŠ[ƒ€Ú‘±‚ªs‚í‚ê‚é
+      // ã¾ãšcameraActiveã‚’trueã«ã—ã¦videoè¦ç´ ã‚’ãƒ¬ãƒ³ãƒ€ãƒªãƒ³ã‚°ã•ã›ã‚‹
+      // videoè¦ç´ ã®ref callbackã§ã‚¹ãƒˆãƒªãƒ¼ãƒ æ¥ç¶šãŒè¡Œã‚ã‚Œã‚‹
       setCameraActive(true)
-      // ƒJƒƒ‰‹N“®‚Éƒy[ƒWƒgƒbƒv‚ÖƒXƒNƒ[ƒ‹
+      // ã‚«ãƒ¡ãƒ©èµ·å‹•æ™‚ã«ãƒšãƒ¼ã‚¸ãƒˆãƒƒãƒ—ã¸ã‚¹ã‚¯ãƒ­ãƒ¼ãƒ«
       window.scrollTo({ top: 0, behavior: 'smooth' })
 
-      // ƒ^ƒCƒ€ƒAƒEƒgƒ`ƒFƒbƒN
+      // ã‚¿ã‚¤ãƒ ã‚¢ã‚¦ãƒˆãƒã‚§ãƒƒã‚¯
       setTimeout(() => {
         const currentVideo = videoRef.current
         if (currentVideo && currentVideo.videoWidth === 0) {
-          setCameraError("ƒJƒƒ‰‰f‘œ‚ªæ“¾‚Å‚«‚Ü‚¹‚ñBƒuƒ‰ƒEƒU‚ÌƒJƒƒ‰İ’èEƒfƒoƒCƒXØ‚è‘Ö‚¦‚ğŠm”F‚µ‚Ä‚­‚¾‚³‚¢B")
+          setCameraError("ã‚«ãƒ¡ãƒ©æ˜ åƒãŒå–å¾—ã§ãã¾ã›ã‚“ã€‚ãƒ–ãƒ©ã‚¦ã‚¶ã®ã‚«ãƒ¡ãƒ©è¨­å®šãƒ»ãƒ‡ãƒã‚¤ã‚¹åˆ‡ã‚Šæ›¿ãˆã‚’ç¢ºèªã—ã¦ãã ã•ã„ã€‚")
         }
       }, 3000)
     } catch {
-      setCameraError("ƒJƒƒ‰‚ğ‹N“®‚Å‚«‚Ü‚¹‚ñ‚Å‚µ‚½BŒ ŒÀE‘¼ƒAƒvƒŠg—p’†EƒfƒoƒCƒX—L–³‚ğŠm”F‚µ‚Ä‚­‚¾‚³‚¢B")
+      setCameraError("ã‚«ãƒ¡ãƒ©ã‚’èµ·å‹•ã§ãã¾ã›ã‚“ã§ã—ãŸã€‚æ¨©é™ãƒ»ä»–ã‚¢ãƒ—ãƒªä½¿ç”¨ä¸­ãƒ»ãƒ‡ãƒã‚¤ã‚¹æœ‰ç„¡ã‚’ç¢ºèªã—ã¦ãã ã•ã„ã€‚")
     }
   }
 
@@ -542,7 +542,7 @@ function App() {
     setCapturedImage(null)
   }
 
-  // ƒJƒƒ‰‚ğˆê’â~
+  // ã‚«ãƒ¡ãƒ©ã‚’ä¸€æ™‚åœæ­¢
   const pauseCamera = () => {
     if (videoRef.current) {
       videoRef.current.pause()
@@ -550,7 +550,7 @@ function App() {
     }
   }
 
-  // ƒJƒƒ‰‚ğÄŠJ
+  // ã‚«ãƒ¡ãƒ©ã‚’å†é–‹
   const resumeCamera = () => {
     if (videoRef.current) {
       videoRef.current.play()
@@ -568,28 +568,28 @@ function App() {
 
   const captureFromCamera = async () => {
     if (!videoRef.current) {
-      setCameraError("ƒJƒƒ‰‚ª‰Šú‰»‚³‚ê‚Ä‚¢‚Ü‚¹‚ñB‹N“®‚µ’¼‚µ‚Ä‚­‚¾‚³‚¢B")
+      setCameraError("ã‚«ãƒ¡ãƒ©ãŒåˆæœŸåŒ–ã•ã‚Œã¦ã„ã¾ã›ã‚“ã€‚èµ·å‹•ã—ç›´ã—ã¦ãã ã•ã„ã€‚")
       return
     }
     if (!cameraReady) {
-      setCameraError("ƒJƒƒ‰‰f‘œ‚ª€”õ‚Å‚«‚Ä‚¢‚Ü‚¹‚ñB”•b‘Ò‚Â‚©Ä‹N“®‚µ‚Ä‚­‚¾‚³‚¢B")
+      setCameraError("ã‚«ãƒ¡ãƒ©æ˜ åƒãŒæº–å‚™ã§ãã¦ã„ã¾ã›ã‚“ã€‚æ•°ç§’å¾…ã¤ã‹å†èµ·å‹•ã—ã¦ãã ã•ã„ã€‚")
       return
     }
     
     const video = videoRef.current
     
-    // 1. ƒJƒƒ‰‚ğˆê’â~iB‰e‚µ‚½uŠÔ‚ğŒÅ’èj
+    // 1. ã‚«ãƒ¡ãƒ©ã‚’ä¸€æ™‚åœæ­¢ï¼ˆæ’®å½±ã—ãŸç¬é–“ã‚’å›ºå®šï¼‰
     pauseCamera()
     setIsProcessing(true)
     
-    // 2. ƒLƒƒƒ“ƒoƒX‚ÅB‰e
+    // 2. ã‚­ãƒ£ãƒ³ãƒã‚¹ã§æ’®å½±
     const canvas = document.createElement("canvas")
     canvas.width = video.videoWidth
     canvas.height = video.videoHeight
     const ctx = canvas.getContext("2d")
     if (ctx) ctx.drawImage(video, 0, 0, canvas.width, canvas.height)
     
-    // 3. B‰e‰æ‘œ‚ğ•Û‘¶iƒvƒŒƒrƒ…[—pj
+    // 3. æ’®å½±ç”»åƒã‚’ä¿å­˜ï¼ˆãƒ—ãƒ¬ãƒ“ãƒ¥ãƒ¼ç”¨ï¼‰
     const previewDataUrl = canvas.toDataURL("image/jpeg", 0.8)
     setCapturedImage(previewDataUrl)
     
@@ -604,12 +604,12 @@ function App() {
     
     const file = new File([blob], `capture-${Date.now()}.jpg`, { type: "image/jpeg" })
     
-    // 4. OCRˆ—
+    // 4. OCRå‡¦ç†
     try {
       await handleOcr(file)
     } finally {
       setIsProcessing(false)
-      // ˆ—Š®—¹ŒãA3•b‘Ò‚Á‚Ä‚©‚çƒJƒƒ‰‚ğÄŠJ
+      // å‡¦ç†å®Œäº†å¾Œã€3ç§’å¾…ã£ã¦ã‹ã‚‰ã‚«ãƒ¡ãƒ©ã‚’å†é–‹
       setTimeout(() => {
         resumeCamera()
       }, 3000)
@@ -621,7 +621,7 @@ function App() {
     const query = filters.query.toLowerCase()
     return session.vault.receipts
       .filter((receipt) => {
-        // ‘I‘ğ‚³‚ê‚½Œ‚Ì‚İ•\¦
+        // é¸æŠã•ã‚ŒãŸæœˆã®ã¿è¡¨ç¤º
         const matchesMonth = receipt.visitedAt.startsWith(selectedMonth)
         const matchesQuery =
           !query ||
@@ -631,11 +631,11 @@ function App() {
           filters.category === "all" || receipt.category === filters.category
         return matchesMonth && matchesQuery && matchesCategory
       })
-      // “ú•t~‡iV‚µ‚¢‡j‚Åƒ\[ƒg
+      // æ—¥ä»˜é™é †ï¼ˆæ–°ã—ã„é †ï¼‰ã§ã‚½ãƒ¼ãƒˆ
       .sort((a, b) => b.visitedAt.localeCompare(a.visitedAt))
   }, [session, filters, selectedMonth])
 
-  // ƒf[ƒ^‚ª‘¶İ‚·‚éŒ‚ÌƒŠƒXƒg‚ğæ“¾
+  // ãƒ‡ãƒ¼ã‚¿ãŒå­˜åœ¨ã™ã‚‹æœˆã®ãƒªã‚¹ãƒˆã‚’å–å¾—
   const availableMonths = useMemo(() => {
     if (!session) return []
     const months = new Set<string>()
@@ -645,7 +645,7 @@ function App() {
     return Array.from(months).sort((a, b) => b.localeCompare(a))
   }, [session])
 
-  // ‘OŒ‚ÖˆÚ“®iƒf[ƒ^‚ª‚ ‚éŒ‚Ü‚Åj
+  // å‰æœˆã¸ç§»å‹•ï¼ˆãƒ‡ãƒ¼ã‚¿ãŒã‚ã‚‹æœˆã¾ã§ï¼‰
   const goToPrevMonth = useCallback(() => {
     const prevMonths = availableMonths.filter((m) => m < selectedMonth)
     if (prevMonths.length > 0) {
@@ -654,7 +654,7 @@ function App() {
     }
   }, [availableMonths, selectedMonth])
 
-  // ŸŒ‚ÖˆÚ“®iƒf[ƒ^‚ª‚ ‚éŒ‚Ü‚Åj
+  // æ¬¡æœˆã¸ç§»å‹•ï¼ˆãƒ‡ãƒ¼ã‚¿ãŒã‚ã‚‹æœˆã¾ã§ï¼‰
   const goToNextMonth = useCallback(() => {
     const nextMonths = availableMonths.filter((m) => m > selectedMonth).reverse()
     if (nextMonths.length > 0) {
@@ -663,12 +663,12 @@ function App() {
     }
   }, [availableMonths, selectedMonth])
 
-  // ‘OŒ‚Éƒf[ƒ^‚ª‚ ‚é‚©
+  // å‰æœˆã«ãƒ‡ãƒ¼ã‚¿ãŒã‚ã‚‹ã‹
   const hasPrevMonth = availableMonths.some((m) => m < selectedMonth)
-  // ŸŒ‚Éƒf[ƒ^‚ª‚ ‚é‚©
+  // æ¬¡æœˆã«ãƒ‡ãƒ¼ã‚¿ãŒã‚ã‚‹ã‹
   const hasNextMonth = availableMonths.some((m) => m > selectedMonth)
 
-  // ‘I‘ğŒ‚Ì‡Œv‹àŠz
+  // é¸æŠæœˆã®åˆè¨ˆé‡‘é¡
   const selectedMonthTotal = useMemo(() => {
     if (!session) return 0
     return session.vault.receipts
@@ -676,7 +676,7 @@ function App() {
       .reduce((sum, r) => sum + r.total, 0)
   }, [session, selectedMonth])
 
-  // ‘I‘ğŒ‚Ìˆù‚İ‰ï‡Œv
+  // é¸æŠæœˆã®é£²ã¿ä¼šåˆè¨ˆ
   const selectedMonthNomikai = useMemo(() => {
     if (!session) return 0
     return session.vault.receipts
@@ -684,7 +684,7 @@ function App() {
       .reduce((sum, r) => sum + r.total, 0)
   }, [session, selectedMonth])
 
-  // ‘I‘ğŒ‚Ì©• ‡Œv
+  // é¸æŠæœˆã®è‡ªè…¹åˆè¨ˆ
   const selectedMonthJibara = useMemo(() => {
     if (!session) return 0
     return session.vault.receipts
@@ -692,7 +692,7 @@ function App() {
       .reduce((sum, r) => sum + r.total, 0)
   }, [session, selectedMonth])
 
-  // ƒhƒ‰ƒtƒg‚É–¢•Û‘¶ƒf[ƒ^‚ª‚ ‚é‚©
+  // ãƒ‰ãƒ©ãƒ•ãƒˆã«æœªä¿å­˜ãƒ‡ãƒ¼ã‚¿ãŒã‚ã‚‹ã‹
   const hasDraftData = useMemo(() => {
     return draft.storeName.trim() !== '' || (draft.total !== '' && parseInt(draft.total) > 0)
   }, [draft.storeName, draft.total])
@@ -727,11 +727,11 @@ function App() {
       .sort((a, b) => (a.year > b.year ? -1 : 1))
   }, [session])
 
-  // ========== ƒXƒ}ƒzê—pUI ==========
+  // ========== ã‚¹ãƒãƒ›å°‚ç”¨UI ==========
   if (isMobile) {
     return (
       <div className="min-h-screen bg-fog text-sand text-lg">
-        {/* ƒXƒ}ƒz—pƒwƒbƒ_[ */}
+        {/* ã‚¹ãƒãƒ›ç”¨ãƒ˜ãƒƒãƒ€ãƒ¼ */}
         <header className="sticky top-0 z-20 border-b border-white/10 bg-fog/95 backdrop-blur-lg" style={{ padding: '24px 28px' }}>
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
@@ -739,12 +739,12 @@ function App() {
                 <div className="h-full w-full rounded-full bg-fog/90 p-[1px]">
                   <img
                     src={`${import.meta.env.BASE_URL}turtle_icon_receipt.png`}
-                    alt="ƒAƒCƒRƒ“"
+                    alt="ã‚¢ã‚¤ã‚³ãƒ³"
                     className="h-full w-full rounded-full object-cover"
                   />
                 </div>
               </div>
-              <h1 className="font-bold text-white" style={{ fontSize: '22px' }}>ƒTƒb‚ÆƒŒƒV[ƒg</h1>
+              <h1 className="font-bold text-white" style={{ fontSize: '22px' }}>ã‚µãƒƒã¨ãƒ¬ã‚·ãƒ¼ãƒˆ</h1>
             </div>
             {session && (
               <button
@@ -752,14 +752,14 @@ function App() {
                 className="rounded-full border border-white/20 bg-white/10 font-semibold text-white"
                 style={{ fontSize: '14px', padding: '20px 28px', minHeight: '72px' }}
               >
-                ƒƒOƒAƒEƒg
+                ãƒ­ã‚°ã‚¢ã‚¦ãƒˆ
               </button>
             )}
           </div>
         </header>
 
         {!session ? (
-          // ========== ƒXƒ}ƒz—pƒƒOƒCƒ“‰æ–Ê ==========
+          // ========== ã‚¹ãƒãƒ›ç”¨ãƒ­ã‚°ã‚¤ãƒ³ç”»é¢ ==========
           <div className="flex min-h-[80vh] flex-col items-center justify-center px-5">
             <div className="w-full rounded-3xl border border-white/10 bg-white/5" style={{ padding: '36px', maxWidth: '92vw' }}>
               <div className="text-center" style={{ marginBottom: '36px' }}>
@@ -767,30 +767,30 @@ function App() {
                   <div className="h-full w-full rounded-full bg-fog/90 p-[2px]">
                     <img
                       src={`${import.meta.env.BASE_URL}turtle_icon_receipt.png`}
-                      alt="ƒAƒCƒRƒ“"
+                      alt="ã‚¢ã‚¤ã‚³ãƒ³"
                       className="h-full w-full rounded-full object-cover"
                     />
                   </div>
                 </div>
-                <h2 className="font-bold text-white" style={{ fontSize: '14px' }}>ƒTƒb‚ÆƒŒƒV[ƒg</h2>
-                <p className="text-slate-400" style={{ fontSize: '18px', marginTop: '20px' }}>”ƒ‚¢•¨‚²‚Æ‚ÉƒTƒb‚ÆƒpƒVƒƒ‚Á‚Æ</p>
+                <h2 className="font-bold text-white" style={{ fontSize: '14px' }}>ã‚µãƒƒã¨ãƒ¬ã‚·ãƒ¼ãƒˆ</h2>
+                <p className="text-slate-400" style={{ fontSize: '18px', marginTop: '20px' }}>è²·ã„ç‰©ã”ã¨ã«ã‚µãƒƒã¨ãƒ‘ã‚·ãƒ£ã£ã¨</p>
               </div>
               <UnlockPanel onUnlock={handleUnlock} unlocking={unlocking} error={unlockError} isFirstTime={isFirstTime} onReset={handleReset} />
             </div>
           </div>
         ) : (
-          // ========== ƒXƒ}ƒz—pƒƒCƒ“‰æ–Ê ==========
+          // ========== ã‚¹ãƒãƒ›ç”¨ãƒ¡ã‚¤ãƒ³ç”»é¢ ==========
           <div className="pb-40">
-            {/* APIƒL[İ’èƒ‚[ƒ_ƒ‹ */}
+            {/* APIã‚­ãƒ¼è¨­å®šãƒ¢ãƒ¼ãƒ€ãƒ« */}
             {showApiKeyModal && (
               <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 px-4">
                 <div className="w-full rounded-2xl border border-white/10 bg-fog" style={{ padding: '32px', maxWidth: '92vw' }}>
-                  <h3 className="font-bold text-white" style={{ fontSize: '14px' }}>?? APIİ’è</h3>
+                  <h3 className="font-bold text-white" style={{ fontSize: '14px' }}>âš™ï¸ APIè¨­å®š</h3>
                   <p className="text-slate-300" style={{ fontSize: '18px', marginTop: '24px', lineHeight: '1.5' }}>
-                    Gemini APIƒL[‚ğ“ü—Í‚µ‚Ä‚­‚¾‚³‚¢BƒL[‚Í’[––“à‚É‚Ì‚İ•Û‘¶‚³‚ê‚Ü‚·B
+                    Gemini APIã‚­ãƒ¼ã‚’å…¥åŠ›ã—ã¦ãã ã•ã„ã€‚ã‚­ãƒ¼ã¯ç«¯æœ«å†…ã«ã®ã¿ä¿å­˜ã•ã‚Œã¾ã™ã€‚
                   </p>
                   <p className="text-slate-400" style={{ fontSize: '18px', marginTop: '18px', lineHeight: '1.5' }}>
-                    <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener noreferrer" className="text-mint underline">Google AI Studio</a> ‚©‚ç–³—¿‚Åæ“¾‚Å‚«‚Ü‚·
+                    <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener noreferrer" className="text-mint underline">Google AI Studio</a> ã‹ã‚‰ç„¡æ–™ã§å–å¾—ã§ãã¾ã™
                   </p>
                   <input
                     type="password"
@@ -812,7 +812,7 @@ function App() {
                       className="rounded-xl bg-mint font-bold text-fog"
                       style={{ fontSize: '22px', padding: '24px', minHeight: '90px' }}
                     >
-                      •Û‘¶
+                      ä¿å­˜
                     </button>
                     <button
                       onClick={() => {
@@ -823,7 +823,7 @@ function App() {
                       className="rounded-xl border border-red-400/50 bg-red-400/10 font-bold text-red-300"
                       style={{ fontSize: '22px', padding: '24px', minHeight: '90px' }}
                     >
-                      íœ
+                      å‰Šé™¤
                     </button>
                   </div>
                   <button
@@ -831,34 +831,34 @@ function App() {
                     className="w-full text-center text-slate-400"
                     style={{ fontSize: '18px', marginTop: '28px', padding: '20px' }}
                   >
-                    ƒLƒƒƒ“ƒZƒ‹
+                    ã‚­ãƒ£ãƒ³ã‚»ãƒ«
                   </button>
                 </div>
               </div>
             )}
 
-            {/* ƒJƒƒ‰ƒvƒŒƒrƒ…[ (‘å‚«‚­•\¦) */}
+            {/* ã‚«ãƒ¡ãƒ©ãƒ—ãƒ¬ãƒ“ãƒ¥ãƒ¼ (å¤§ããè¡¨ç¤º) */}
             {cameraActive && (
               <div className="px-4 pt-4">
                 <div className="relative overflow-hidden rounded-3xl border-2 border-mint/40 bg-black shadow-xl">
-                  {/* B‰e‚µ‚½‰æ‘œ‚ÌƒI[ƒo[ƒŒƒC */}
+                  {/* æ’®å½±ã—ãŸç”»åƒã®ã‚ªãƒ¼ãƒãƒ¼ãƒ¬ã‚¤ */}
                   {capturedImage && cameraPaused && (
                     <div className="absolute inset-0 z-10">
                       <img
                         src={capturedImage}
-                        alt="B‰e‰æ‘œ"
+                        alt="æ’®å½±ç”»åƒ"
                         className="h-full w-full object-cover"
                       />
                       <div className="absolute inset-0 flex items-center justify-center bg-black/50">
                         {isProcessing ? (
                           <div className="text-center">
                             <div className="mx-auto h-16 w-16 animate-spin rounded-full border-4 border-mint border-t-transparent" />
-                            <p className="mt-4 text-3xl font-bold text-white">?? ”F¯’†...</p>
+                            <p className="mt-4 text-3xl font-bold text-white">ğŸ“ èªè­˜ä¸­...</p>
                           </div>
                         ) : (
                           <div className="text-center">
-                            <p className="text-5xl">?</p>
-                            <p className="mt-2 text-3xl font-bold text-mint">”F¯Š®—¹!</p>
+                            <p className="text-5xl">âœ…</p>
+                            <p className="mt-2 text-3xl font-bold text-mint">èªè­˜å®Œäº†!</p>
                           </div>
                         )}
                       </div>
@@ -874,35 +874,35 @@ function App() {
                   />
                   {!cameraReady && !capturedImage && (
                     <p className="bg-white/5 px-4 py-3 text-center text-base text-slate-400">
-                      ?? ƒJƒƒ‰€”õ’†...
+                      ğŸ“¹ ã‚«ãƒ¡ãƒ©æº–å‚™ä¸­...
                     </p>
                   )}
                   {cameraError && (
                     <p className="bg-red-500/10 px-4 py-3 text-center text-base text-red-200">
-                      ?? {cameraError}
+                      âš ï¸ {cameraError}
                     </p>
                   )}
                 </div>
               </div>
             )}
 
-            {/* ƒvƒŒƒrƒ…[‰æ‘œ */}
+            {/* ãƒ—ãƒ¬ãƒ“ãƒ¥ãƒ¼ç”»åƒ */}
             {!cameraActive && draft.imageData && (
               <div className="px-4 pt-4">
                 <div className="overflow-hidden rounded-2xl border border-white/10 bg-black/30">
                   <img
                     src={draft.imageData}
-                    alt="B‰e‰æ‘œ"
+                    alt="æ’®å½±ç”»åƒ"
                     className="max-h-64 w-full object-contain"
                   />
                 </div>
               </div>
             )}
 
-            {/* Œ‘I‘ğ‚ÆƒTƒ}ƒŠ[ */}
+            {/* æœˆé¸æŠã¨ã‚µãƒãƒªãƒ¼ */}
             <div className="mt-4 px-4">
               <div className="rounded-2xl border border-white/10 bg-white/5" style={{ padding: '24px' }}>
-                {/* Œ‘I‘ğ */}
+                {/* æœˆé¸æŠ */}
                 <div className="flex items-center justify-between" style={{ marginBottom: '20px' }}>
                   <button
                     onClick={goToPrevMonth}
@@ -918,7 +918,7 @@ function App() {
                     &lt;
                   </button>
                   <span className="font-semibold text-white" style={{ fontSize: '22px' }}>
-                    {selectedMonth.replace('-', '”N')}Œ
+                    {selectedMonth.replace('-', 'å¹´')}æœˆ
                   </span>
                   <button
                     onClick={goToNextMonth}
@@ -934,22 +934,22 @@ function App() {
                     &gt;
                   </button>
                 </div>
-                {/* ‡Œv‹àŠz */}
+                {/* åˆè¨ˆé‡‘é¡ */}
                 <div className="rounded-xl border border-mint/30 bg-mint/10" style={{ padding: '24px', marginBottom: '16px' }}>
                   <p className="text-center font-bold text-mint" style={{ fontSize: '18px' }}>
                     {formatCurrency(selectedMonthTotal)}
                   </p>
                 </div>
-                {/* ˆù‚İ‰ïE©•  */}
+                {/* é£²ã¿ä¼šãƒ»è‡ªè…¹ */}
                 <div className="grid grid-cols-2 gap-3">
                   <div className="rounded-xl border border-white/10 bg-white/5" style={{ padding: '16px' }}>
-                    <p className="text-slate-400" style={{ fontSize: '14px' }}>?? ˆù‚İ‰ï</p>
+                    <p className="text-slate-400" style={{ fontSize: '14px' }}>ğŸº é£²ã¿ä¼š</p>
                     <p className="font-bold text-amber-400" style={{ fontSize: '18px', marginTop: '8px' }}>
                       {formatCurrency(selectedMonthNomikai)}
                     </p>
                   </div>
                   <div className="rounded-xl border border-white/10 bg-white/5" style={{ padding: '16px' }}>
-                    <p className="text-slate-400" style={{ fontSize: '14px' }}>?? ©• </p>
+                    <p className="text-slate-400" style={{ fontSize: '14px' }}>ğŸ‘› è‡ªè…¹</p>
                     <p className="font-bold text-rose-400" style={{ fontSize: '18px', marginTop: '8px' }}>
                       {formatCurrency(selectedMonthJibara)}
                     </p>
@@ -958,19 +958,19 @@ function App() {
               </div>
             </div>
 
-            {/* “ü—ÍƒtƒH[ƒ€iƒVƒ“ƒvƒ‹”Åj*/}
+            {/* å…¥åŠ›ãƒ•ã‚©ãƒ¼ãƒ ï¼ˆã‚·ãƒ³ãƒ—ãƒ«ç‰ˆï¼‰*/}
             <div className="mt-4 space-y-4 px-4">
               <div className="rounded-2xl border border-white/10 bg-white/5" style={{ padding: '28px' }}>
-                <h3 style={{ fontSize: '22px', marginBottom: '24px' }} className="font-semibold text-white">xoî•ñ“ü—Í</h3>
+                <h3 style={{ fontSize: '22px', marginBottom: '24px' }} className="font-semibold text-white">æ”¯å‡ºæƒ…å ±å…¥åŠ›</h3>
                 <div className="space-y-4">
                   <input
                     className="w-full rounded-xl border border-white/10 bg-white/5 text-white placeholder-slate-500"
                     style={{ fontSize: '18px', padding: '24px', minHeight: '80px' }}
                     value={draft.storeName}
                     onChange={(e) => setDraft((prev) => ({ ...prev, storeName: e.target.value }))}
-                    placeholder="“X–¼"
+                    placeholder="åº—å"
                   />
-                  {/* “ú•t - 1—ñ */}
+                  {/* æ—¥ä»˜ - 1åˆ— */}
                   <input
                     type="date"
                     className="w-full rounded-xl border border-white/10 bg-white/5 text-white"
@@ -978,9 +978,9 @@ function App() {
                     value={draft.visitedAt}
                     onChange={(e) => setDraft((prev) => ({ ...prev, visitedAt: e.target.value }))}
                   />
-                  {/* ‹àŠz - 1—ñ */}
+                  {/* é‡‘é¡ - 1åˆ— */}
                   <div className="flex items-center rounded-xl border-2 border-mint/50 bg-mint/10" style={{ padding: '20px 24px', minHeight: '80px' }}>
-                    <span style={{ fontSize: '14px' }} className="font-bold text-mint/70">\</span>
+                    <span style={{ fontSize: '14px' }} className="font-bold text-mint/70">Â¥</span>
                     <input
                       inputMode="numeric"
                       className="w-full bg-transparent font-bold text-mint placeholder-mint/50 outline-none"
@@ -990,7 +990,7 @@ function App() {
                       placeholder="0"
                     />
                   </div>
-                  {/* ˆù‚İ‰ïE©• ƒgƒOƒ‹ */}
+                  {/* é£²ã¿ä¼šãƒ»è‡ªè…¹ãƒˆã‚°ãƒ« */}
                   <div className="grid grid-cols-2 gap-3">
                     <button
                       onClick={() => setDraft((prev) => ({ ...prev, isNomikai: !prev.isNomikai, isJibara: false }))}
@@ -1002,7 +1002,7 @@ function App() {
                       )}
                       style={{ fontSize: '18px', padding: '20px' }}
                     >
-                      ?? ˆù‚İ‰ï
+                      ğŸº é£²ã¿ä¼š
                     </button>
                     <button
                       onClick={() => setDraft((prev) => ({ ...prev, isJibara: !prev.isJibara, isNomikai: false }))}
@@ -1014,7 +1014,7 @@ function App() {
                       )}
                       style={{ fontSize: '18px', padding: '20px' }}
                     >
-                      ?? ©• 
+                      ğŸ‘› è‡ªè…¹
                     </button>
                   </div>
                   <select
@@ -1023,19 +1023,19 @@ function App() {
                     value={draft.category}
                     onChange={(e) => setDraft((prev) => ({ ...prev, category: e.target.value }))}
                   >
-                    <option value="">•ª—Ş‚ğ‘I‘ğ</option>
+                    <option value="">åˆ†é¡ã‚’é¸æŠ</option>
                     {categories.map((cat) => (
                       <option key={cat.id} value={cat.name}>
                         {cat.name}
                       </option>
                     ))}
                   </select>
-                  {/* Ú×•\¦ƒ{ƒ^ƒ“ */}
+                  {/* è©³ç´°è¡¨ç¤ºãƒœã‚¿ãƒ³ */}
                   {draft.lineItems && draft.lineItems.length > 0 && (
                     <button
                       onClick={() => setDetailReceipt({
                         id: 'draft',
-                        storeName: draft.storeName || '(–¢“ü—Í)',
+                        storeName: draft.storeName || '(æœªå…¥åŠ›)',
                         visitedAt: draft.visitedAt || '',
                         total: parseInt(draft.total) || 0,
                         category: draft.category || '',
@@ -1051,10 +1051,10 @@ function App() {
                       className="w-full rounded-xl border border-blue-500/30 bg-blue-500/10 text-blue-300"
                       style={{ fontSize: '18px', padding: '20px', minHeight: '70px' }}
                     >
-                      “Ç‚İæ‚èÚ×‚ğŠm”F
+                      èª­ã¿å–ã‚Šè©³ç´°ã‚’ç¢ºèª
                     </button>
                   )}
-                  {/* ‰æ‘œ•Û‘¶ƒIƒvƒVƒ‡ƒ“ - ƒŒƒV[ƒgî•ñ“à‚ÉˆÚ“® */}
+                  {/* ç”»åƒä¿å­˜ã‚ªãƒ—ã‚·ãƒ§ãƒ³ - ãƒ¬ã‚·ãƒ¼ãƒˆæƒ…å ±å†…ã«ç§»å‹• */}
                   <label className="flex items-center gap-4 text-slate-300" style={{ fontSize: '18px', marginTop: '8px' }}>
                     <input
                       type="checkbox"
@@ -1063,13 +1063,13 @@ function App() {
                       className="rounded"
                       style={{ width: '40px', height: '40px' }}
                     />
-                    ƒJƒƒ‰‰æ‘œ‚à•Û‘¶‚·‚é
+                    ã‚«ãƒ¡ãƒ©ç”»åƒã‚‚ä¿å­˜ã™ã‚‹
                   </label>
                 </div>
               </div>
             </div>
 
-            {/* •i–Ú•\¦ƒ‚[ƒ_ƒ‹ */}
+            {/* å“ç›®è¡¨ç¤ºãƒ¢ãƒ¼ãƒ€ãƒ« */}
             {selectedReceipt && (
               <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 px-4" onClick={() => setSelectedReceipt(null)}>
                 <div className="w-full rounded-2xl border border-white/10 bg-fog" style={{ padding: '32px', maxWidth: '92vw', maxHeight: '80vh', overflow: 'auto' }} onClick={(e) => e.stopPropagation()}>
@@ -1081,17 +1081,17 @@ function App() {
                         <div key={item.id || idx} className="flex items-center justify-between rounded-xl bg-white/5" style={{ padding: '20px' }}>
                           <div>
                             <p className="text-white" style={{ fontSize: '18px' }}>{item.name}</p>
-                            {item.quantity > 1 && <p className="text-slate-400" style={{ fontSize: '13px' }}>~{item.quantity}</p>}
+                            {item.quantity > 1 && <p className="text-slate-400" style={{ fontSize: '13px' }}>Ã—{item.quantity}</p>}
                           </div>
                           <p className="font-semibold text-mint" style={{ fontSize: '18px' }}>{formatCurrency(item.price)}</p>
                         </div>
                       ))
                     ) : (
-                      <p className="text-center text-slate-400" style={{ fontSize: '18px', padding: '32px' }}>•i–Úƒf[ƒ^‚ª‚ ‚è‚Ü‚¹‚ñ</p>
+                      <p className="text-center text-slate-400" style={{ fontSize: '18px', padding: '32px' }}>å“ç›®ãƒ‡ãƒ¼ã‚¿ãŒã‚ã‚Šã¾ã›ã‚“</p>
                     )}
                   </div>
                   <div className="flex items-center justify-between border-t border-white/10" style={{ marginTop: '24px', paddingTop: '24px' }}>
-                    <span className="text-slate-300" style={{ fontSize: '18px' }}>‡ŒviÅj</span>
+                    <span className="text-slate-300" style={{ fontSize: '18px' }}>åˆè¨ˆï¼ˆç¨è¾¼ï¼‰</span>
                     <span className="font-bold text-mint" style={{ fontSize: '13px' }}>{formatCurrency(selectedReceipt.total)}</span>
                   </div>
                   <button
@@ -1099,19 +1099,19 @@ function App() {
                     className="w-full rounded-xl bg-white/10 text-white"
                     style={{ fontSize: '18px', padding: '20px', marginTop: '24px' }}
                   >
-                    •Â‚¶‚é
+                    é–‰ã˜ã‚‹
                   </button>
                 </div>
               </div>
             )}
 
-            {/* íœŠm”Fƒ‚[ƒ_ƒ‹ */}
+            {/* å‰Šé™¤ç¢ºèªãƒ¢ãƒ¼ãƒ€ãƒ« */}
             {deleteTargetId && (
               <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 px-4">
                 <div className="w-full rounded-2xl border border-white/10 bg-fog" style={{ padding: '32px', maxWidth: '92vw' }}>
-                  <h3 className="font-bold text-white" style={{ fontSize: '22px' }}>íœ‚ÌŠm”F</h3>
+                  <h3 className="font-bold text-white" style={{ fontSize: '22px' }}>å‰Šé™¤ã®ç¢ºèª</h3>
                   <p className="text-slate-300" style={{ fontSize: '18px', marginTop: '20px', lineHeight: '1.5' }}>
-                    ‚±‚ÌƒŒƒV[ƒg‚ğíœ‚µ‚Ü‚·‚©H‚±‚Ì‘€ì‚Íæ‚èÁ‚¹‚Ü‚¹‚ñB
+                    ã“ã®ãƒ¬ã‚·ãƒ¼ãƒˆã‚’å‰Šé™¤ã—ã¾ã™ã‹ï¼Ÿã“ã®æ“ä½œã¯å–ã‚Šæ¶ˆã›ã¾ã›ã‚“ã€‚
                   </p>
                   <div className="grid grid-cols-2 gap-4" style={{ marginTop: '28px' }}>
                     <button
@@ -1119,7 +1119,7 @@ function App() {
                       className="rounded-xl bg-white/10 text-white"
                       style={{ fontSize: '18px', padding: '22px', minHeight: '80px' }}
                     >
-                      ƒLƒƒƒ“ƒZƒ‹
+                      ã‚­ãƒ£ãƒ³ã‚»ãƒ«
                     </button>
                     <button
                       onClick={async () => {
@@ -1129,21 +1129,21 @@ function App() {
                       className="rounded-xl bg-red-500 font-bold text-white"
                       style={{ fontSize: '18px', padding: '22px', minHeight: '80px' }}
                     >
-                      íœ‚·‚é
+                      å‰Šé™¤ã™ã‚‹
                     </button>
                   </div>
                 </div>
               </div>
             )}
 
-            {/* •ÒWƒ‚[ƒ_ƒ‹ */}
+            {/* ç·¨é›†ãƒ¢ãƒ¼ãƒ€ãƒ« */}
             {editingReceipt && (
               <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 px-4">
                 <div className="w-full rounded-2xl border border-white/10 bg-fog" style={{ padding: '32px', maxWidth: '92vw' }}>
-                  <h3 className="font-bold text-white" style={{ fontSize: '22px' }}>xo•ÒW</h3>
+                  <h3 className="font-bold text-white" style={{ fontSize: '22px' }}>æ”¯å‡ºç·¨é›†</h3>
                   <div className="mt-6 space-y-5">
                     <label className="block">
-                      <span className="text-slate-200" style={{ fontSize: '18px' }}>“X–¼</span>
+                      <span className="text-slate-200" style={{ fontSize: '18px' }}>åº—å</span>
                       <input
                         type="text"
                         value={editingReceipt.storeName}
@@ -1153,7 +1153,7 @@ function App() {
                       />
                     </label>
                     <label className="block">
-                      <span className="text-slate-200" style={{ fontSize: '18px' }}>‡Œv‹àŠz</span>
+                      <span className="text-slate-200" style={{ fontSize: '18px' }}>åˆè¨ˆé‡‘é¡</span>
                       <input
                         type="number"
                         value={editingReceipt.total}
@@ -1162,9 +1162,9 @@ function App() {
                         style={{ fontSize: '18px', padding: '20px' }}
                       />
                     </label>
-                    {/* ˆù‚İ‰ï/©• ƒgƒOƒ‹ */}
+                    {/* é£²ã¿ä¼š/è‡ªè…¹ãƒˆã‚°ãƒ« */}
                     <div>
-                      <span className="text-slate-200" style={{ fontSize: '18px' }}>•ª—Ş</span>
+                      <span className="text-slate-200" style={{ fontSize: '18px' }}>åˆ†é¡</span>
                       <div className="mt-2 flex gap-4">
                         <button
                           type="button"
@@ -1176,7 +1176,7 @@ function App() {
                           }`}
                           style={{ fontSize: '18px', padding: '16px' }}
                         >
-                          ?? ˆù‚İ‰ï
+                          ğŸº é£²ã¿ä¼š
                         </button>
                         <button
                           type="button"
@@ -1188,7 +1188,7 @@ function App() {
                           }`}
                           style={{ fontSize: '18px', padding: '16px' }}
                         >
-                          ?? ©• 
+                          ğŸ‘› è‡ªè…¹
                         </button>
                       </div>
                     </div>
@@ -1199,37 +1199,37 @@ function App() {
                       className="rounded-xl bg-white/10 text-white"
                       style={{ fontSize: '18px', padding: '22px', minHeight: '80px' }}
                     >
-                      ƒLƒƒƒ“ƒZƒ‹
+                      ã‚­ãƒ£ãƒ³ã‚»ãƒ«
                     </button>
                     <button
                       onClick={() => handleUpdateReceipt(editingReceipt.id, editingReceipt.storeName, editingReceipt.total, editingReceipt.isNomikai, editingReceipt.isJibara)}
                       className="rounded-xl bg-mint font-bold text-fog"
                       style={{ fontSize: '18px', padding: '22px', minHeight: '80px' }}
                     >
-                      •Û‘¶
+                      ä¿å­˜
                     </button>
                   </div>
                 </div>
               </div>
             )}
 
-            {/* Ú×•\¦ƒ‚[ƒ_ƒ‹ */}
+            {/* è©³ç´°è¡¨ç¤ºãƒ¢ãƒ¼ãƒ€ãƒ« */}
             {detailReceipt && (
               <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 px-4">
                 <div className="w-full max-h-[85vh] overflow-y-auto rounded-2xl border border-white/10 bg-fog" style={{ padding: '32px', maxWidth: '92vw' }}>
-                  <h3 className="font-bold text-white" style={{ fontSize: '22px' }}>ƒŒƒV[ƒgÚ×</h3>
+                  <h3 className="font-bold text-white" style={{ fontSize: '22px' }}>ãƒ¬ã‚·ãƒ¼ãƒˆè©³ç´°</h3>
                   <div className="mt-6 space-y-4">
                     <div>
-                      <p className="text-slate-400" style={{ fontSize: '14px' }}>“X–¼</p>
+                      <p className="text-slate-400" style={{ fontSize: '14px' }}>åº—å</p>
                       <p className="text-white" style={{ fontSize: '18px', marginTop: '8px' }}>{detailReceipt.storeName}</p>
                     </div>
                     <div>
-                      <p className="text-slate-400" style={{ fontSize: '14px' }}>‡Œv‹àŠz</p>
+                      <p className="text-slate-400" style={{ fontSize: '14px' }}>åˆè¨ˆé‡‘é¡</p>
                       <p className="font-bold text-mint" style={{ fontSize: '24px', marginTop: '8px' }}>{formatCurrency(detailReceipt.total)}</p>
                     </div>
                     {detailReceipt.lineItems.length > 0 && (
                       <div>
-                        <p className="text-slate-400" style={{ fontSize: '14px', marginBottom: '16px' }}>–¾×</p>
+                        <p className="text-slate-400" style={{ fontSize: '14px', marginBottom: '16px' }}>æ˜ç´°</p>
                         <div className="space-y-3">
                           {detailReceipt.lineItems.map((item) => (
                             <div key={item.id} className="rounded-xl border border-white/10 bg-white/5" style={{ padding: '16px' }}>
@@ -1243,7 +1243,7 @@ function App() {
                                 <div className="text-right">
                                   <p className="font-bold text-white" style={{ fontSize: '18px' }}>{formatCurrency(item.price)}</p>
                                   {item.quantity > 1 && (
-                                    <p className="text-slate-400" style={{ fontSize: '13px' }}>~ {item.quantity}</p>
+                                    <p className="text-slate-400" style={{ fontSize: '13px' }}>Ã— {item.quantity}</p>
                                   )}
                                 </div>
                               </div>
@@ -1258,25 +1258,25 @@ function App() {
                     className="w-full rounded-xl bg-white/10 text-white"
                     style={{ fontSize: '18px', padding: '22px', marginTop: '28px' }}
                   >
-                    •Â‚¶‚é
+                    é–‰ã˜ã‚‹
                   </button>
                 </div>
               </div>
             )}
 
-            {/* xoˆê—— */}
+            {/* æ”¯å‡ºä¸€è¦§ */}
             <div className="mt-5 px-4">
               <div className="rounded-2xl border border-white/10 bg-white/5" style={{ padding: '24px' }}>
                 <div className="flex items-center justify-between">
                   <h3 className="font-semibold text-white" style={{ fontSize: '22px' }}>
-                    {selectedMonth.replace('-', '”N')}Œ‚Ìxoˆê——
+                    {selectedMonth.replace('-', 'å¹´')}æœˆã®æ”¯å‡ºä¸€è¦§
                   </h3>
-                  <span className="text-slate-400" style={{ fontSize: '18px' }}>{filteredReceipts.length}Œ</span>
+                  <span className="text-slate-400" style={{ fontSize: '18px' }}>{filteredReceipts.length}ä»¶</span>
                 </div>
                 <div className="mt-4 space-y-4">
                 {filteredReceipts.length === 0 ? (
                   <p className="rounded-2xl bg-white/5 text-center text-slate-400" style={{ fontSize: '18px', padding: '48px 24px' }}>
-                    ‚±‚ÌŒ‚Ìxo‚Í‚ ‚è‚Ü‚¹‚ñ
+                    ã“ã®æœˆã®æ”¯å‡ºã¯ã‚ã‚Šã¾ã›ã‚“
                   </p>
                 ) : (
                   displayedReceipts.map((receipt) => (
@@ -1295,10 +1295,10 @@ function App() {
                           <p className="font-semibold text-white underline" style={{ fontSize: '22px', marginTop: '8px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', lineHeight: '1.4', paddingTop: '4px', paddingBottom: '4px' }}>{receipt.storeName}</p>
                           <div className="flex items-center gap-2" style={{ marginTop: '14px' }}>
                             <span className="inline-block rounded-full bg-white/10 text-slate-300" style={{ fontSize: '14px', padding: '12px 24px' }}>
-                              {receipt.category || '–¢•ª—Ş'}
+                              {receipt.category || 'æœªåˆ†é¡'}
                             </span>
-                            {receipt.isNomikai && <span style={{ fontSize: '18px' }}>??</span>}
-                            {receipt.isJibara && <span style={{ fontSize: '18px' }}>??</span>}
+                            {receipt.isNomikai && <span style={{ fontSize: '18px' }}>ğŸº</span>}
+                            {receipt.isJibara && <span style={{ fontSize: '18px' }}>ğŸ‘›</span>}
                           </div>
                         </div>
                         <div className="text-right">
@@ -1311,14 +1311,14 @@ function App() {
                               className="text-yellow-400"
                               style={{ fontSize: '18px', padding: '10px 16px' }}
                             >
-                              •ÒW
+                              ç·¨é›†
                             </button>
                             <button
                               onClick={() => setDeleteTargetId(receipt.id)}
                               className="text-red-400"
                               style={{ fontSize: '18px', padding: '10px 16px' }}
                             >
-                              íœ
+                              å‰Šé™¤
                             </button>
                           </div>
                         </div>
@@ -1332,7 +1332,7 @@ function App() {
                     className="w-full rounded-xl border border-white/10 bg-white/5 font-semibold text-white"
                     style={{ fontSize: '18px', padding: '28px', minHeight: '90px' }}
                   >
-                    ‚à‚Á‚ÆŒ©‚é
+                    ã‚‚ã£ã¨è¦‹ã‚‹
                   </button>
                 )}
                 {filteredReceipts.length > 0 && visibleCount > 20 && (
@@ -1341,20 +1341,20 @@ function App() {
                     className="w-full rounded-xl border border-white/10 bg-white/5 font-semibold text-slate-400"
                     style={{ fontSize: '18px', padding: '28px', minHeight: '90px' }}
                   >
-                    £ 20Œ•\¦‚É–ß‚·
+                    â–² 20ä»¶è¡¨ç¤ºã«æˆ»ã™
                   </button>
                 )}
-                {/* CSV‘€ì - ƒŒƒV[ƒgˆê——“à‚ÉˆÚ“® */}
+                {/* CSVæ“ä½œ - ãƒ¬ã‚·ãƒ¼ãƒˆä¸€è¦§å†…ã«ç§»å‹• */}
                 <div className="mt-4 grid grid-cols-2 gap-3">
                   <button
                     onClick={handleExport}
                     className="rounded-xl border border-white/15 bg-white/10 font-semibold text-white"
                     style={{ fontSize: '18px', padding: '24px', minHeight: '80px' }}
                   >
-                    CSV‚ğ•Û‘¶
+                    CSVã‚’ä¿å­˜
                   </button>
                   <label className="flex cursor-pointer items-center justify-center rounded-xl border border-white/15 bg-white/10 font-semibold text-white" style={{ fontSize: '18px', padding: '24px', minHeight: '80px' }}>
-                    CSV‚ğ“Ç
+                    CSVã‚’èª­è¾¼
                     <input
                       type="file"
                       accept=".csv,text/csv"
@@ -1372,15 +1372,15 @@ function App() {
               </div>
             </div>
 
-            {/* İ’èƒZƒNƒVƒ‡ƒ“ */}
+            {/* è¨­å®šã‚»ã‚¯ã‚·ãƒ§ãƒ³ */}
             <div className="mt-5 px-4 pb-6">
               <div className="rounded-2xl border border-white/10 bg-white/5" style={{ padding: '24px' }}>
-                <h3 className="font-semibold text-white" style={{ fontSize: '22px', marginBottom: '20px' }}>İ’è</h3>
+                <h3 className="font-semibold text-white" style={{ fontSize: '22px', marginBottom: '20px' }}>è¨­å®š</h3>
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="font-semibold text-white" style={{ fontSize: '18px' }}>Gemini AI”F¯</p>
+                    <p className="font-semibold text-white" style={{ fontSize: '18px' }}>Gemini AIèªè­˜</p>
                     <p className="text-slate-400" style={{ fontSize: '14px', marginTop: '6px' }}>
-                      {hasApiKey() ? "? İ’èÏ‚İ" : "? –¢İ’è"}
+                      {hasApiKey() ? "âœ… è¨­å®šæ¸ˆã¿" : "âŒ æœªè¨­å®š"}
                     </p>
                   </div>
                   <div className="flex items-center gap-3">
@@ -1401,7 +1401,7 @@ function App() {
                       className="rounded-full border border-white/20 bg-white/10 text-white"
                       style={{ fontSize: '18px', padding: '18px 24px', minHeight: '72px' }}
                     >
-                      ??
+                      âš™ï¸
                     </button>
                   </div>
                 </div>
@@ -1410,7 +1410,7 @@ function App() {
           </div>
         )}
 
-        {/* ƒXƒ}ƒz—pŒÅ’èƒtƒbƒ^[ */}
+        {/* ã‚¹ãƒãƒ›ç”¨å›ºå®šãƒ•ãƒƒã‚¿ãƒ¼ */}
         {session && (
           <div className="fixed inset-x-0 bottom-0 z-30 border-t border-white/10 bg-fog/95 backdrop-blur-lg safe-area-pb" style={{ padding: '20px 24px' }}>
             <div className="flex items-center gap-4">
@@ -1424,7 +1424,7 @@ function App() {
                 )}
                 style={{ minHeight: '135px', fontSize: '18px' }}
               >
-                {cameraActive ? "ƒJƒƒ‰OFF" : "ƒJƒƒ‰ON"}
+                {cameraActive ? "ã‚«ãƒ¡ãƒ©OFF" : "ã‚«ãƒ¡ãƒ©ON"}
               </button>
               <button
                 onClick={captureFromCamera}
@@ -1437,7 +1437,7 @@ function App() {
                 )}
                 style={{ minHeight: '150px', fontSize: '22px' }}
               >
-                {isProcessing ? "ˆ—’†..." : "B‰e"}
+                {isProcessing ? "å‡¦ç†ä¸­..." : "æ’®å½±"}
               </button>
               <button
                 onClick={handleSaveReceipt}
@@ -1449,7 +1449,7 @@ function App() {
                 )}
                 style={{ minHeight: '135px', fontSize: '18px' }}
               >
-                •Û‘¶
+                ä¿å­˜
               </button>
             </div>
           </div>
@@ -1458,17 +1458,17 @@ function App() {
     )
   }
 
-  // ========== PC—pUI (]—ˆ‚ÌƒŒƒCƒAƒEƒg) ==========
+  // ========== PCç”¨UI (å¾“æ¥ã®ãƒ¬ã‚¤ã‚¢ã‚¦ãƒˆ) ==========
   return (
     <div className="min-h-screen text-sand">
-      {/* •ÒWƒ‚[ƒ_ƒ‹ (PC”Å) */}
+      {/* ç·¨é›†ãƒ¢ãƒ¼ãƒ€ãƒ« (PCç‰ˆ) */}
       {editingReceipt && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70">
           <div className="w-full max-w-md rounded-2xl border border-white/10 bg-fog p-6">
-            <h3 className="text-xl font-bold text-white">xo•ÒW</h3>
+            <h3 className="text-xl font-bold text-white">æ”¯å‡ºç·¨é›†</h3>
             <div className="mt-4 space-y-4">
               <label className="block">
-                <span className="text-sm text-slate-200">“X–¼</span>
+                <span className="text-sm text-slate-200">åº—å</span>
                 <input
                   type="text"
                   value={editingReceipt.storeName}
@@ -1477,7 +1477,7 @@ function App() {
                 />
               </label>
               <label className="block">
-                <span className="text-sm text-slate-200">‡Œv‹àŠz</span>
+                <span className="text-sm text-slate-200">åˆè¨ˆé‡‘é¡</span>
                 <input
                   type="number"
                   value={editingReceipt.total}
@@ -1485,9 +1485,9 @@ function App() {
                   className="mt-2 w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-white outline-none ring-mint/30 focus:ring-2"
                 />
               </label>
-              {/* ˆù‚İ‰ï/©• ƒgƒOƒ‹ */}
+              {/* é£²ã¿ä¼š/è‡ªè…¹ãƒˆã‚°ãƒ« */}
               <div>
-                <span className="text-sm text-slate-200">•ª—Ş</span>
+                <span className="text-sm text-slate-200">åˆ†é¡</span>
                 <div className="mt-2 flex gap-3">
                   <button
                     type="button"
@@ -1498,7 +1498,7 @@ function App() {
                         : 'border-white/10 bg-white/5 text-slate-400 hover:bg-white/10'
                     }`}
                   >
-                    ?? ˆù‚İ‰ï
+                    ğŸº é£²ã¿ä¼š
                   </button>
                   <button
                     type="button"
@@ -1509,7 +1509,7 @@ function App() {
                         : 'border-white/10 bg-white/5 text-slate-400 hover:bg-white/10'
                     }`}
                   >
-                    ?? ©• 
+                    ğŸ‘› è‡ªè…¹
                   </button>
                 </div>
               </div>
@@ -1519,36 +1519,36 @@ function App() {
                 onClick={() => setEditingReceipt(null)}
                 className="flex-1 rounded-xl bg-white/10 px-4 py-2 text-sm text-white hover:bg-white/15"
               >
-                ƒLƒƒƒ“ƒZƒ‹
+                ã‚­ãƒ£ãƒ³ã‚»ãƒ«
               </button>
               <button
                 onClick={() => handleUpdateReceipt(editingReceipt.id, editingReceipt.storeName, editingReceipt.total, editingReceipt.isNomikai, editingReceipt.isJibara)}
                 className="flex-1 rounded-xl bg-mint px-4 py-2 text-sm font-semibold text-fog hover:bg-mint/90"
               >
-                •Û‘¶
+                ä¿å­˜
               </button>
             </div>
           </div>
         </div>
       )}
 
-      {/* Ú×•\¦ƒ‚[ƒ_ƒ‹ (PC”Å) */}
+      {/* è©³ç´°è¡¨ç¤ºãƒ¢ãƒ¼ãƒ€ãƒ« (PCç‰ˆ) */}
       {detailReceipt && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70">
           <div className="w-full max-w-2xl max-h-[85vh] overflow-y-auto rounded-2xl border border-white/10 bg-fog p-6">
-            <h3 className="text-xl font-bold text-white">ƒŒƒV[ƒgÚ×</h3>
+            <h3 className="text-xl font-bold text-white">ãƒ¬ã‚·ãƒ¼ãƒˆè©³ç´°</h3>
             <div className="mt-4 space-y-4">
               <div>
-                <p className="text-sm text-slate-400">“X–¼</p>
+                <p className="text-sm text-slate-400">åº—å</p>
                 <p className="mt-1 text-lg text-white">{detailReceipt.storeName}</p>
               </div>
               <div>
-                <p className="text-sm text-slate-400">‡Œv‹àŠz</p>
+                <p className="text-sm text-slate-400">åˆè¨ˆé‡‘é¡</p>
                 <p className="mt-1 text-2xl font-bold text-mint">{formatCurrency(detailReceipt.total)}</p>
               </div>
               {detailReceipt.lineItems.length > 0 && (
                 <div>
-                  <p className="text-sm text-slate-400 mb-2">–¾×</p>
+                  <p className="text-sm text-slate-400 mb-2">æ˜ç´°</p>
                   <div className="space-y-2">
                     {detailReceipt.lineItems.map((item) => (
                       <div key={item.id} className="rounded-xl border border-white/10 bg-white/5 p-3">
@@ -1562,7 +1562,7 @@ function App() {
                           <div className="text-right">
                             <p className="font-semibold text-white">{formatCurrency(item.price)}</p>
                             {item.quantity > 1 && (
-                              <p className="text-xs text-slate-400">~ {item.quantity}</p>
+                              <p className="text-xs text-slate-400">Ã— {item.quantity}</p>
                             )}
                           </div>
                         </div>
@@ -1576,22 +1576,22 @@ function App() {
               onClick={() => setDetailReceipt(null)}
               className="mt-6 w-full rounded-xl bg-white/10 px-4 py-2 text-sm text-white hover:bg-white/15"
             >
-              •Â‚¶‚é
+              é–‰ã˜ã‚‹
             </button>
           </div>
         </div>
       )}
 
-      {/* PC—pAPIƒL[İ’èƒ‚[ƒ_ƒ‹ */}
+      {/* PCç”¨APIã‚­ãƒ¼è¨­å®šãƒ¢ãƒ¼ãƒ€ãƒ« */}
       {showApiKeyModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70">
           <div className="w-full max-w-md rounded-2xl border border-white/10 bg-fog p-6">
-            <h3 className="text-xl font-bold text-white">?? Gemini APIİ’è</h3>
+            <h3 className="text-xl font-bold text-white">âš™ï¸ Gemini APIè¨­å®š</h3>
             <p className="mt-3 text-sm text-slate-400">
-              Gemini APIƒL[‚ğ“ü—Í‚µ‚Ä‚­‚¾‚³‚¢BƒL[‚Í’[––“àilocalStoragej‚É‚Ì‚İ•Û‘¶‚³‚êAƒT[ƒo[‚É‚Í‘—M‚³‚ê‚Ü‚¹‚ñB
+              Gemini APIã‚­ãƒ¼ã‚’å…¥åŠ›ã—ã¦ãã ã•ã„ã€‚ã‚­ãƒ¼ã¯ç«¯æœ«å†…ï¼ˆlocalStorageï¼‰ã«ã®ã¿ä¿å­˜ã•ã‚Œã€ã‚µãƒ¼ãƒãƒ¼ã«ã¯é€ä¿¡ã•ã‚Œã¾ã›ã‚“ã€‚
             </p>
             <p className="mt-2 text-xs text-slate-500">
-              APIƒL[‚Í <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener noreferrer" className="text-mint underline">Google AI Studio</a> ‚©‚ç–³—¿‚Åæ“¾‚Å‚«‚Ü‚·B
+              APIã‚­ãƒ¼ã¯ <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener noreferrer" className="text-mint underline">Google AI Studio</a> ã‹ã‚‰ç„¡æ–™ã§å–å¾—ã§ãã¾ã™ã€‚
             </p>
             <input
               type="password"
@@ -1611,7 +1611,7 @@ function App() {
                 }}
                 className="flex-1 rounded-xl bg-mint py-3 text-sm font-bold text-fog transition hover:bg-mint/80"
               >
-                •Û‘¶
+                ä¿å­˜
               </button>
               <button
                 onClick={() => {
@@ -1621,14 +1621,14 @@ function App() {
                 }}
                 className="flex-1 rounded-xl border border-red-400/50 bg-red-400/10 py-3 text-sm font-bold text-red-300 transition hover:bg-red-400/20"
               >
-                íœ
+                å‰Šé™¤
               </button>
             </div>
             <button
               onClick={() => setShowApiKeyModal(false)}
               className="mt-3 w-full text-center text-sm text-slate-500 hover:text-slate-300"
             >
-              ƒLƒƒƒ“ƒZƒ‹
+              ã‚­ãƒ£ãƒ³ã‚»ãƒ«
             </button>
           </div>
         </div>
@@ -1641,7 +1641,7 @@ function App() {
               <div className="h-full w-full rounded-full bg-fog/90 p-[1px]">
                 <img
                   src={`${import.meta.env.BASE_URL}turtle_icon_receipt.png`}
-                  alt="ƒTƒb‚ÆƒŒƒV[ƒgƒAƒCƒRƒ“"
+                  alt="ã‚µãƒƒã¨ãƒ¬ã‚·ãƒ¼ãƒˆã‚¢ã‚¤ã‚³ãƒ³"
                   className="h-full w-full rounded-full object-cover"
                 />
               </div>
@@ -1650,9 +1650,9 @@ function App() {
               <p className="text-xs font-semibold uppercase tracking-[0.3em] text-mint">
                 Encrypted Offline Receipt Ledger
               </p>
-              <h1 className="mt-1 text-3xl font-bold text-white">ƒTƒb‚ÆƒŒƒV[ƒg</h1>
+              <h1 className="mt-1 text-3xl font-bold text-white">ã‚µãƒƒã¨ãƒ¬ã‚·ãƒ¼ãƒˆ</h1>
               <p className="text-base text-slate-300">
-                ”ƒ‚¢•¨‚²‚Æ‚ÉƒpƒVƒƒ‚ÆA’[––‚Éc‚·Bƒlƒbƒg•s—v‚ÌƒŒƒV[ƒgƒm[ƒgB
+                è²·ã„ç‰©ã”ã¨ã«ãƒ‘ã‚·ãƒ£ã¨ã€ç«¯æœ«ã«æ®‹ã™ã€‚ãƒãƒƒãƒˆä¸è¦ã®ãƒ¬ã‚·ãƒ¼ãƒˆãƒãƒ¼ãƒˆã€‚
               </p>
             </div>
           </div>
@@ -1662,7 +1662,7 @@ function App() {
                 onClick={handleLock}
                 className="rounded-full border border-white/15 bg-white/5 px-4 py-2 text-sm font-semibold text-white transition hover:border-white/25 hover:bg-white/10"
               >
-                ?? ƒƒOƒAƒEƒg
+                ğŸ”’ ãƒ­ã‚°ã‚¢ã‚¦ãƒˆ
               </button>
             </div>
           )}
@@ -1672,28 +1672,28 @@ function App() {
           <div className="grid gap-6 lg:grid-cols-[1.2fr_1fr]">
             <div className="rounded-3xl border border-white/10 bg-white/5 p-8 shadow-soft">
               <p className="text-sm text-slate-300">
-                ’[––‚É•Û‘¶‚µ‚½ƒf[ƒ^‚ğŠJ‚­‚½‚ß‚ÌƒpƒXƒtƒŒ[ƒY‚ğİ’èE“ü—Í‚µ‚Ä‚­‚¾‚³‚¢B
-                ƒT[ƒo[‚É‚Í‘—M‚¹‚¸AWebCrypto + IndexedDB ‚ÅˆÃ†‰»‚³‚ê‚Ü‚·B
+                ç«¯æœ«ã«ä¿å­˜ã—ãŸãƒ‡ãƒ¼ã‚¿ã‚’é–‹ããŸã‚ã®ãƒ‘ã‚¹ãƒ•ãƒ¬ãƒ¼ã‚ºã‚’è¨­å®šãƒ»å…¥åŠ›ã—ã¦ãã ã•ã„ã€‚
+                ã‚µãƒ¼ãƒãƒ¼ã«ã¯é€ä¿¡ã›ãšã€WebCrypto + IndexedDB ã§æš—å·åŒ–ã•ã‚Œã¾ã™ã€‚
               </p>
               <UnlockPanel onUnlock={handleUnlock} unlocking={unlocking} error={unlockError} isFirstTime={isFirstTime} onReset={handleReset} />
               <div className="mt-6 flex flex-wrap items-center gap-2 text-xs text-slate-400">
-                <Pill>ƒ[ƒJƒ‹ˆÃ†‰»</Pill>
-                <Pill>ƒIƒtƒ‰ƒCƒ““®ì</Pill>
-                <Pill>GitHub Pages ”zM‘z’è</Pill>
+                <Pill>ãƒ­ãƒ¼ã‚«ãƒ«æš—å·åŒ–</Pill>
+                <Pill>ã‚ªãƒ•ãƒ©ã‚¤ãƒ³å‹•ä½œ</Pill>
+                <Pill>GitHub Pages é…ä¿¡æƒ³å®š</Pill>
               </div>
             </div>
             <div className="space-y-3 rounded-3xl border border-white/10 bg-white/5 p-6">
-              <p className="text-sm text-slate-200">‰^—p‚Ìƒqƒ“ƒg</p>
+              <p className="text-sm text-slate-200">é‹ç”¨ã®ãƒ’ãƒ³ãƒˆ</p>
               <ul className="list-disc space-y-2 pl-4 text-sm text-slate-400">
-                <li>ƒpƒXƒtƒŒ[ƒY‚ğ–Y‚ê‚é‚Æ•œŒ³‚Å‚«‚Ü‚¹‚ñBˆÀ‘S‚ÈêŠ‚ÉT‚¦‚Ä‚­‚¾‚³‚¢B</li>
-                <li>ƒuƒ‰ƒEƒU‚ğ•Â‚¶‚Ä‚àƒf[ƒ^‚Í’[––“à‚Éc‚è‚Ü‚·iIndexedDBjB</li>
-                <li>CSV ƒGƒNƒXƒ|[ƒg‚ÅƒoƒbƒNƒAƒbƒv‚ğ‚Æ‚ê‚Ü‚·B</li>
+                <li>ãƒ‘ã‚¹ãƒ•ãƒ¬ãƒ¼ã‚ºã‚’å¿˜ã‚Œã‚‹ã¨å¾©å…ƒã§ãã¾ã›ã‚“ã€‚å®‰å…¨ãªå ´æ‰€ã«æ§ãˆã¦ãã ã•ã„ã€‚</li>
+                <li>ãƒ–ãƒ©ã‚¦ã‚¶ã‚’é–‰ã˜ã¦ã‚‚ãƒ‡ãƒ¼ã‚¿ã¯ç«¯æœ«å†…ã«æ®‹ã‚Šã¾ã™ï¼ˆIndexedDBï¼‰ã€‚</li>
+                <li>CSV ã‚¨ã‚¯ã‚¹ãƒãƒ¼ãƒˆã§ãƒãƒƒã‚¯ã‚¢ãƒƒãƒ—ã‚’ã¨ã‚Œã¾ã™ã€‚</li>
               </ul>
               <button
                 onClick={handleReset}
                 className="text-left text-xs text-slate-400 underline hover:text-slate-200"
               >
-                ƒf[ƒ^‚ğ‰Šú‰»‚·‚é
+                ãƒ‡ãƒ¼ã‚¿ã‚’åˆæœŸåŒ–ã™ã‚‹
               </button>
             </div>
           </div>
@@ -1703,21 +1703,21 @@ function App() {
               <div className="rounded-3xl border border-white/10 bg-white/5 p-6 shadow-soft space-y-4">
                 <div className="flex items-start justify-between">
                   <div>
-                    <h2 className="text-xl font-semibold text-white">B‰e / ƒAƒbƒvƒ[ƒh</h2>
+                    <h2 className="text-xl font-semibold text-white">æ’®å½± / ã‚¢ãƒƒãƒ—ãƒ­ãƒ¼ãƒ‰</h2>
                     <p className="text-sm text-slate-400">
-                      ‚Ü‚¸‚±‚±‚©‚çB‰æ‘œ‚ğ‘I‚Ô‚ÆOCR‚µ‚Ä‰º‚Ì“ü—Í—“‚É©“®”½‰f‚µ‚Ü‚·B
+                      ã¾ãšã“ã“ã‹ã‚‰ã€‚ç”»åƒã‚’é¸ã¶ã¨OCRã—ã¦ä¸‹ã®å…¥åŠ›æ¬„ã«è‡ªå‹•åæ˜ ã—ã¾ã™ã€‚
                     </p>
                   </div>
                   <div className="flex flex-wrap items-center gap-2 text-xs text-slate-300">
-                    {lastUploadedName && <Pill>‘I‘ğ’†: {lastUploadedName}</Pill>}
-                    <Pill>ƒvƒŒƒrƒ…[“ú•t: {draft.visitedAt || "–¢İ’è"}</Pill>
+                    {lastUploadedName && <Pill>é¸æŠä¸­: {lastUploadedName}</Pill>}
+                    <Pill>ãƒ—ãƒ¬ãƒ“ãƒ¥ãƒ¼æ—¥ä»˜: {draft.visitedAt || "æœªè¨­å®š"}</Pill>
                   </div>
                 </div>
 
                 <div className="flex flex-col gap-4">
                   <div className="grid gap-4 md:grid-cols-2">
                     <label className="flex flex-col gap-2 text-sm text-slate-200">
-                      ‰æ‘œƒAƒbƒvƒ[ƒh / B‰e
+                      ç”»åƒã‚¢ãƒƒãƒ—ãƒ­ãƒ¼ãƒ‰ / æ’®å½±
                       <input
                         type="file"
                         accept="image/*"
@@ -1744,7 +1744,7 @@ function App() {
                           onClick={cameraActive ? stopCamera : startCamera}
                           className="flex-1 rounded-xl border border-white/15 bg-white/5 px-4 py-2 text-sm font-semibold text-white transition hover:border-white/25 hover:bg-white/10"
                         >
-                          {cameraActive ? "ƒJƒƒ‰’â~" : "ƒJƒƒ‰‚ğ‹N“®"}
+                          {cameraActive ? "ã‚«ãƒ¡ãƒ©åœæ­¢" : "ã‚«ãƒ¡ãƒ©ã‚’èµ·å‹•"}
                         </button>
                         <button
                           onClick={captureFromCamera}
@@ -1756,7 +1756,7 @@ function App() {
                               : "border-mint/60 bg-mint/10 text-mint hover:bg-mint/20"
                           )}
                         >
-                          {isProcessing ? "”F¯’†..." : "ƒVƒƒƒbƒ^["}
+                          {isProcessing ? "èªè­˜ä¸­..." : "ã‚·ãƒ£ãƒƒã‚¿ãƒ¼"}
                         </button>
                       </div>
                       <label className="flex items-center gap-2">
@@ -1765,15 +1765,15 @@ function App() {
                           checked={saveImage}
                           onChange={(e) => setSaveImage(e.target.checked)}
                         />
-                        ˆ³k‰æ‘œ‚ğ•Û‘¶ (’·•Ó1280px / JPEG 0.6)
+                        åœ§ç¸®ç”»åƒã‚’ä¿å­˜ (é•·è¾º1280px / JPEG 0.6)
                       </label>
-                      {/* Gemini AIİ’è */}
+                      {/* Gemini AIè¨­å®š */}
                       <div className="flex items-center justify-between rounded-xl border border-white/10 bg-white/5 px-3 py-2">
                         <div className="flex items-center gap-2">
-                          <span>??</span>
+                          <span>ğŸ¤–</span>
                           <span className="text-white">Gemini AI</span>
                           <span className={hasApiKey() ? "text-mint" : "text-slate-500"}>
-                            {hasApiKey() ? "?" : "?"}
+                            {hasApiKey() ? "âœ…" : "âŒ"}
                           </span>
                         </div>
                         <div className="flex items-center gap-2">
@@ -1792,7 +1792,7 @@ function App() {
                             onClick={() => setShowApiKeyModal(true)}
                             className="rounded-full border border-white/20 bg-white/10 px-2 py-1 text-xs text-white hover:bg-white/20"
                           >
-                            ??
+                            âš™ï¸
                           </button>
                         </div>
                       </div>
@@ -1801,13 +1801,13 @@ function App() {
                           onClick={clearDraft}
                           className="flex-1 rounded-xl border border-white/15 bg-white/5 px-4 py-2 text-sm font-semibold text-white transition hover:border-white/25 hover:bg-white/10"
                         >
-                          ƒvƒŒƒrƒ…[‚ğƒNƒŠƒA
+                          ãƒ—ãƒ¬ãƒ“ãƒ¥ãƒ¼ã‚’ã‚¯ãƒªã‚¢
                         </button>
                         <button
                           onClick={handleCleanupImages}
                           className="flex-1 rounded-xl border border-white/15 bg-white/5 px-4 py-2 text-sm font-semibold text-white transition hover:border-white/25 hover:bg-white/10"
                         >
-                          ‰æ‘œ‚Ì‚İƒNƒŠ[ƒ“ƒAƒbƒv
+                          ç”»åƒã®ã¿ã‚¯ãƒªãƒ¼ãƒ³ã‚¢ãƒƒãƒ—
                         </button>
                       </div>
                     </div>
@@ -1826,7 +1826,7 @@ function App() {
                       />
                       {!cameraReady && (
                         <p className="px-3 py-2 text-xs text-slate-400 bg-white/5 border-t border-white/10">
-                          ƒJƒƒ‰€”õ’†...
+                          ã‚«ãƒ¡ãƒ©æº–å‚™ä¸­...
                         </p>
                       )}
                       {cameraError && (
@@ -1843,21 +1843,21 @@ function App() {
 
                 <div className="grid gap-3 grid-cols-3">
                   <div className="rounded-xl bg-white/5 p-3">
-                    <p className="text-xs text-slate-400">“X–¼</p>
+                    <p className="text-xs text-slate-400">åº—å</p>
                     <p className="text-sm font-semibold text-white">
-                      {draft.storeName || "–¢İ’è"}
+                      {draft.storeName || "æœªè¨­å®š"}
                     </p>
                   </div>
                   <div className="rounded-xl bg-white/5 p-3">
-                    <p className="text-xs text-slate-400">“ú•t</p>
+                    <p className="text-xs text-slate-400">æ—¥ä»˜</p>
                     <p className="text-sm font-semibold text-white">
-                      {draft.visitedAt || "–¢İ’è"}
+                      {draft.visitedAt || "æœªè¨­å®š"}
                     </p>
                   </div>
                   <div className="rounded-xl bg-white/5 p-3">
-                    <p className="text-xs text-slate-400">‡Œv</p>
+                    <p className="text-xs text-slate-400">åˆè¨ˆ</p>
                     <p className="text-sm font-semibold text-mint">
-                      {draft.total ? `${draft.total} ‰~` : "–¢İ’è"}
+                      {draft.total ? `${draft.total} å††` : "æœªè¨­å®š"}
                     </p>
                   </div>
                 </div>
@@ -1866,26 +1866,26 @@ function App() {
                   <div className="overflow-hidden rounded-2xl border border-white/10 bg-black/20">
                     <img
                       src={draft.imageData}
-                      alt="ƒŒƒV[ƒg‰æ‘œ"
+                      alt="ãƒ¬ã‚·ãƒ¼ãƒˆç”»åƒ"
                       className="max-h-80 w-full object-contain"
                     />
                   </div>
                 )}
                 {ocrText && (
-                  <p className="text-xs text-slate-400">OCR’ŠoƒeƒLƒXƒg: {ocrText.slice(0, 120)}...</p>
+                  <p className="text-xs text-slate-400">OCRæŠ½å‡ºãƒ†ã‚­ã‚¹ãƒˆ: {ocrText.slice(0, 120)}...</p>
                 )}
               </div>
 
               <div className="rounded-3xl border border-white/10 bg-white/5 p-6">
-                <h2 className="text-xl font-semibold text-white">ƒŒƒV[ƒgÚ×E•ÒW</h2>
-                <p className="text-sm text-slate-400">“X–¼E“ú•tE‡Œv‚ğŠm”F‚µA•K—v‚É‰‚¶‚Äƒƒ‚‚ğ’Ç‰ÁB</p>
+                <h2 className="text-xl font-semibold text-white">ãƒ¬ã‚·ãƒ¼ãƒˆè©³ç´°ãƒ»ç·¨é›†</h2>
+                <p className="text-sm text-slate-400">åº—åãƒ»æ—¥ä»˜ãƒ»åˆè¨ˆã‚’ç¢ºèªã—ã€å¿…è¦ã«å¿œã˜ã¦ãƒ¡ãƒ¢ã‚’è¿½åŠ ã€‚</p>
                 
-                {/* “Ç‚İæ‚èÚ×Šm”Fƒ{ƒ^ƒ“ */}
+                {/* èª­ã¿å–ã‚Šè©³ç´°ç¢ºèªãƒœã‚¿ãƒ³ */}
                 {draft.lineItems && draft.lineItems.length > 0 && (
                   <button
                     onClick={() => setDetailReceipt({
                       id: 'draft',
-                      storeName: draft.storeName || '(–¢“ü—Í)',
+                      storeName: draft.storeName || '(æœªå…¥åŠ›)',
                       visitedAt: draft.visitedAt || '',
                       total: parseInt(draft.total) || 0,
                       category: draft.category || '',
@@ -1900,22 +1900,22 @@ function App() {
                     })}
                     className="mt-4 w-full rounded-xl border border-blue-500/30 bg-blue-500/10 px-4 py-3 text-sm font-semibold text-blue-300 transition hover:bg-blue-500/20"
                   >
-                    “Ç‚İæ‚èÚ×‚ğŠm”F
+                    èª­ã¿å–ã‚Šè©³ç´°ã‚’ç¢ºèª
                   </button>
                 )}
 
                 <div className="mt-4 grid gap-4 md:grid-cols-2">
                   <label className="flex flex-col gap-2 text-sm text-slate-200">
-                    “X–¼
+                    åº—å
                     <input
                       className="w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-white outline-none ring-mint/30 focus:ring-2"
                       value={draft.storeName}
                       onChange={(e) => setDraft((prev) => ({ ...prev, storeName: e.target.value }))}
-                      placeholder="ƒX[ƒp[ABC"
+                      placeholder="ã‚¹ãƒ¼ãƒ‘ãƒ¼ABC"
                     />
                   </label>
                   <label className="flex flex-col gap-2 text-sm text-slate-200">
-                    “ú•t
+                    æ—¥ä»˜
                     <input
                       type="date"
                       className="w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-white outline-none ring-mint/30 focus:ring-2"
@@ -1924,9 +1924,9 @@ function App() {
                     />
                   </label>
                   <label className="flex flex-col gap-2 text-sm text-slate-200">
-                    ‡Œv
+                    åˆè¨ˆ
                     <div className="flex items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-3 py-2">
-                      <span className="text-mint font-semibold">\</span>
+                      <span className="text-mint font-semibold">Â¥</span>
                       <input
                         inputMode="numeric"
                         className="w-full bg-transparent text-white outline-none"
@@ -1937,13 +1937,13 @@ function App() {
                     </div>
                   </label>
                   <label className="flex flex-col gap-2 text-sm text-slate-200">
-                    •ª—Ş
+                    åˆ†é¡
                     <select
                       className="w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-white outline-none ring-mint/30 focus:ring-2"
                       value={draft.category}
                       onChange={(e) => setDraft((prev) => ({ ...prev, category: e.target.value }))}
                     >
-                      <option value="">•ª—Ş‚ğ‘I‘ğ</option>
+                      <option value="">åˆ†é¡ã‚’é¸æŠ</option>
                       {categories.map((cat) => (
                         <option key={cat.id} value={cat.name}>
                           {cat.name}
@@ -1953,9 +1953,9 @@ function App() {
                   </label>
                 </div>
 
-                {/* ˆù‚İ‰ï/©• ƒgƒOƒ‹ */}
+                {/* é£²ã¿ä¼š/è‡ªè…¹ãƒˆã‚°ãƒ« */}
                 <div className="mt-4">
-                  <span className="text-sm text-slate-200">ƒ^ƒO</span>
+                  <span className="text-sm text-slate-200">ã‚¿ã‚°</span>
                   <div className="mt-2 flex gap-3">
                     <button
                       type="button"
@@ -1966,7 +1966,7 @@ function App() {
                           : 'border-white/10 bg-white/5 text-slate-400 hover:bg-white/10'
                       }`}
                     >
-                      ?? ˆù‚İ‰ï
+                      ğŸº é£²ã¿ä¼š
                     </button>
                     <button
                       type="button"
@@ -1977,20 +1977,20 @@ function App() {
                           : 'border-white/10 bg-white/5 text-slate-400 hover:bg-white/10'
                       }`}
                     >
-                      ?? ©• 
+                      ğŸ‘› è‡ªè…¹
                     </button>
                   </div>
                 </div>
 
                 <div className="mt-4">
                   <label className="flex flex-col gap-2 text-sm text-slate-200">
-                    ƒƒ‚ (”CˆÓ)
+                    ãƒ¡ãƒ¢ (ä»»æ„)
                     <textarea
                       rows={3}
                       className="w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-white outline-none ring-mint/30 focus:ring-2"
                       value={draft.note}
                       onChange={(e) => setDraft((prev) => ({ ...prev, note: e.target.value }))}
-                      placeholder="ƒƒ‚‚âƒ^ƒO‚ğ’Ç‰Á"
+                      placeholder="ãƒ¡ãƒ¢ã‚„ã‚¿ã‚°ã‚’è¿½åŠ "
                     />
                   </label>
                 </div>
@@ -2005,14 +2005,14 @@ function App() {
                         : "bg-gradient-to-r from-mint/80 to-mint text-fog"
                     )}
                   >
-                    •Û‘¶‚·‚é
+                    ä¿å­˜ã™ã‚‹
                   </button>
                 </div>
               </div>
 
             </section>
             <aside className="order-2 lg:order-none lg:col-start-2 lg:row-start-1 lg:row-span-2 space-y-4 rounded-3xl border border-white/10 bg-white/5 p-6">
-              {/* Œ‘I‘ğ */}
+              {/* æœˆé¸æŠ */}
               <div className="flex items-center justify-center gap-4">
                 <button
                   onClick={goToPrevMonth}
@@ -2030,7 +2030,7 @@ function App() {
                 </button>
                 <div className="text-center">
                   <p className="text-lg font-bold text-white">
-                    {parseInt(selectedMonth.split('-')[0])}”N{parseInt(selectedMonth.split('-')[1])}Œ
+                    {parseInt(selectedMonth.split('-')[0])}å¹´{parseInt(selectedMonth.split('-')[1])}æœˆ
                   </p>
                 </div>
                 <button
@@ -2049,25 +2049,25 @@ function App() {
                 </button>
               </div>
 
-              {/* ŒŠÔ‡Œv */}
+              {/* æœˆé–“åˆè¨ˆ */}
               <div className="rounded-2xl border border-mint/30 bg-mint/10 p-4 text-center">
                 <p className="text-3xl font-bold text-mint">{formatCurrency(selectedMonthTotal)}</p>
               </div>
 
-              {/* ˆù‚İ‰ï/©•  “à–ó */}
+              {/* é£²ã¿ä¼š/è‡ªè…¹ å†…è¨³ */}
               <div className="grid grid-cols-2 gap-3">
                 <div className="rounded-xl border border-amber-400/30 bg-amber-400/10 p-3 text-center">
-                  <p className="text-sm text-amber-300">?? ˆù‚İ‰ï</p>
+                  <p className="text-sm text-amber-300">ğŸº é£²ã¿ä¼š</p>
                   <p className="text-lg font-bold text-amber-200">{formatCurrency(selectedMonthNomikai)}</p>
                 </div>
                 <div className="rounded-xl border border-emerald-400/30 bg-emerald-400/10 p-3 text-center">
-                  <p className="text-sm text-emerald-300">?? ©• </p>
+                  <p className="text-sm text-emerald-300">ğŸ‘› è‡ªè…¹</p>
                   <p className="text-lg font-bold text-emerald-200">{formatCurrency(selectedMonthJibara)}</p>
                 </div>
               </div>
 
               <div className="flex items-center justify-between">
-                <h2 className="text-lg font-semibold text-white">Ú×</h2>
+                <h2 className="text-lg font-semibold text-white">è©³ç´°</h2>
                 <div className="flex gap-2">
                   <button
                     onClick={() => setSummaryTab("overview")}
@@ -2078,7 +2078,7 @@ function App() {
                         : "bg-white/5 text-slate-300 border border-white/10",
                     )}
                   >
-                    ”N•Ê
+                    å¹´åˆ¥
                   </button>
                   <button
                     onClick={() => setSummaryTab("monthly")}
@@ -2089,7 +2089,7 @@ function App() {
                         : "bg-white/5 text-slate-300 border border-white/10",
                     )}
                   >
-                    Œ•Ê
+                    æœˆåˆ¥
                   </button>
                 </div>
               </div>
@@ -2097,8 +2097,8 @@ function App() {
               {summaryTab === "overview" ? (
                 <>
                   <div className="rounded-2xl border border-white/10 bg-white/5 p-4 text-sm text-slate-300">
-                    <p className="font-semibold text-white">”N•Ê ‡Œv</p>
-                    {yearlyTotals.length === 0 && <p className="text-slate-400">‚Ü‚¾‚ ‚è‚Ü‚¹‚ñ</p>}
+                    <p className="font-semibold text-white">å¹´åˆ¥ åˆè¨ˆ</p>
+                    {yearlyTotals.length === 0 && <p className="text-slate-400">ã¾ã ã‚ã‚Šã¾ã›ã‚“</p>}
                     {yearlyTotals.map((entry) => (
                       <div key={entry.year} className="flex items-center justify-between py-1">
                         <span className="text-white">{entry.year}</span>
@@ -2109,14 +2109,14 @@ function App() {
                 </>
               ) : (
                 <div className="rounded-2xl border border-white/10 bg-white/5 p-4 text-sm text-slate-300">
-                  <p className="font-semibold text-white">Œ•Êˆê——</p>
-                  {monthlyTotals.length === 0 && <p className="text-slate-400">‚Ü‚¾‚ ‚è‚Ü‚¹‚ñ</p>}
+                  <p className="font-semibold text-white">æœˆåˆ¥ä¸€è¦§</p>
+                  {monthlyTotals.length === 0 && <p className="text-slate-400">ã¾ã ã‚ã‚Šã¾ã›ã‚“</p>}
                   {monthlyTotals.map((entry) => (
                     <div key={entry.month} className="flex items-center justify-between py-1">
                       <div className="text-white">{entry.month}</div>
                       <div className="text-right">
                         <p className="text-mint font-semibold">{formatCurrency(entry.total)}</p>
-                        <p className="text-xs text-slate-400">{entry.count} Œ</p>
+                        <p className="text-xs text-slate-400">{entry.count} ä»¶</p>
                       </div>
                     </div>
                   ))}
@@ -2125,16 +2125,16 @@ function App() {
 
               <div className="rounded-2xl border border-white/10 bg-white/5 p-4 text-sm text-slate-300">
                 <p className="font-semibold text-white">CSV</p>
-                <p className="text-slate-400">ˆÃ†‰»‰ğœÏ‚İƒf[ƒ^‚ğ’[––“à‚ÅCSV‰»‚µA‚»‚Ì‚Ü‚Üƒ_ƒEƒ“ƒ[ƒh‚µ‚Ü‚·B</p>
+                <p className="text-slate-400">æš—å·åŒ–è§£é™¤æ¸ˆã¿ãƒ‡ãƒ¼ã‚¿ã‚’ç«¯æœ«å†…ã§CSVåŒ–ã—ã€ãã®ã¾ã¾ãƒ€ã‚¦ãƒ³ãƒ­ãƒ¼ãƒ‰ã—ã¾ã™ã€‚</p>
                 <div className="mt-3 grid gap-2 sm:grid-cols-2">
                   <button
                     onClick={handleExport}
                     className="rounded-xl border border-white/15 bg-white/10 px-4 py-2 text-sm font-semibold text-white hover:border-white/25 hover:bg-white/15"
                   >
-                    CSV‚ğ•Û‘¶
+                    CSVã‚’ä¿å­˜
                   </button>
                   <label className="flex cursor-pointer items-center justify-center rounded-xl border border-white/15 bg-white/10 px-4 py-2 text-sm font-semibold text-white hover:border-white/25 hover:bg-white/15">
-                    CSV‚ğ“Ç
+                    CSVã‚’èª­è¾¼
                     <input
                       type="file"
                       accept=".csv,text/csv"
@@ -2154,14 +2154,14 @@ function App() {
               <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
                 <div>
                   <h2 className="text-xl font-semibold text-white">
-                    {parseInt(selectedMonth.split('-')[0])}”N{parseInt(selectedMonth.split('-')[1])}Œ‚Ìxoˆê——
+                    {parseInt(selectedMonth.split('-')[0])}å¹´{parseInt(selectedMonth.split('-')[1])}æœˆã®æ”¯å‡ºä¸€è¦§
                   </h2>
-                  <p className="text-sm text-slate-400">ŒŸõ‚ÆƒJƒeƒSƒŠƒtƒBƒ‹ƒ^‚Åi‚è‚İ‚Å‚«‚Ü‚·B</p>
+                  <p className="text-sm text-slate-400">æ¤œç´¢ã¨ã‚«ãƒ†ã‚´ãƒªãƒ•ã‚£ãƒ«ã‚¿ã§çµã‚Šè¾¼ã¿ã§ãã¾ã™ã€‚</p>
                 </div>
                 <div className="flex flex-wrap gap-2">
                   <input
                     className="w-48 rounded-full border border-white/15 bg-white/10 px-3 py-2 text-sm text-white outline-none ring-mint/30 focus:ring-2"
-                    placeholder="“X–¼Eƒƒ‚‚ÅŒŸõ"
+                    placeholder="åº—åãƒ»ãƒ¡ãƒ¢ã§æ¤œç´¢"
                     value={filters.query}
                     onChange={(e) => setFilters((prev) => ({ ...prev, query: e.target.value }))}
                   />
@@ -2170,7 +2170,7 @@ function App() {
                     value={filters.category}
                     onChange={(e) => setFilters((prev) => ({ ...prev, category: e.target.value }))}
                   >
-                    <option value="all">‚·‚×‚Ä</option>
+                    <option value="all">ã™ã¹ã¦</option>
                     {categories.map((cat) => (
                       <option key={cat.id} value={cat.name}>
                         {cat.name}
@@ -2182,7 +2182,7 @@ function App() {
                       onClick={() => setVisibleCount((v) => v + 20)}
                       className="rounded-full border border-white/15 bg-white/10 px-3 py-2 text-sm font-semibold text-white hover:border-white/25 hover:bg-white/15"
                     >
-                      ‚à‚Á‚ÆŒ©‚é
+                      ã‚‚ã£ã¨è¦‹ã‚‹
                     </button>
                   )}
                   {filteredReceipts.length > 0 && visibleCount > 20 && (
@@ -2190,7 +2190,7 @@ function App() {
                       onClick={() => setVisibleCount(20)}
                       className="rounded-full border border-white/15 bg-white/10 px-3 py-2 text-sm font-semibold text-white hover:border-white/25 hover:bg-white/15"
                     >
-                      æ“ª‚É–ß‚·
+                      å…ˆé ­ã«æˆ»ã™
                     </button>
                   )}
                 </div>
@@ -2198,7 +2198,7 @@ function App() {
 
               <div className="mt-4 space-y-4">
                 {filteredReceipts.length === 0 && (
-                  <p className="text-sm text-slate-400">‚±‚ÌŒ‚Ìxoƒf[ƒ^‚Í‚ ‚è‚Ü‚¹‚ñB</p>
+                  <p className="text-sm text-slate-400">ã“ã®æœˆã®æ”¯å‡ºãƒ‡ãƒ¼ã‚¿ã¯ã‚ã‚Šã¾ã›ã‚“ã€‚</p>
                 )}
                 {displayedReceipts.map((receipt) => (
                   <article
@@ -2209,8 +2209,8 @@ function App() {
                       <div>
                         <p className="text-sm uppercase tracking-[0.15em] text-slate-400">
                           {receipt.visitedAt}
-                          {receipt.isNomikai && <span className="ml-2">??</span>}
-                          {receipt.isJibara && <span className="ml-2">??</span>}
+                          {receipt.isNomikai && <span className="ml-2">ğŸº</span>}
+                          {receipt.isJibara && <span className="ml-2">ğŸ‘›</span>}
                         </p>
                         <h3 className="text-xl font-semibold text-white">
                           {receipt.storeName}
@@ -2220,7 +2220,7 @@ function App() {
                             {receipt.category}
                           </span>
                         )}
-                        <p className="text-slate-400">{receipt.note ?? "ƒƒ‚‚È‚µ"}</p>
+                        <p className="text-slate-400">{receipt.note ?? "ãƒ¡ãƒ¢ãªã—"}</p>
                       </div>
                       <div className="flex items-center gap-3">
                         <div className="text-right">
@@ -2235,20 +2235,20 @@ function App() {
                           onClick={() => setEditingReceipt(receipt)}
                           className="rounded-full border border-yellow-500/40 bg-yellow-500/10 px-3 py-2 text-xs font-semibold text-yellow-100 transition hover:bg-yellow-500/20"
                         >
-                          •ÒW
+                          ç·¨é›†
                         </button>
                         <button
                           onClick={() => handleDeleteReceipt(receipt.id)}
                           className="rounded-full border border-red-500/40 bg-red-500/10 px-3 py-2 text-xs font-semibold text-red-100 transition hover:bg-red-500/20"
                         >
-                          íœ
+                          å‰Šé™¤
                         </button>
                       </div>
                     </div>
                     {receipt.imageData && (
                       <div className="mt-3 overflow-hidden rounded-xl border border-white/10 bg-black/30">
                         <div className="flex items-center justify-between px-3 py-2">
-                          <p className="text-sm text-slate-200">‰æ‘œ</p>
+                          <p className="text-sm text-slate-200">ç”»åƒ</p>
                           <button
                             onClick={() =>
                               setExpandedImages((prev) => {
@@ -2260,13 +2260,13 @@ function App() {
                             }
                             className="rounded-full border border-white/15 bg-white/5 px-3 py-1 text-xs font-semibold text-white hover:border-white/25 hover:bg-white/10"
                           >
-                            {expandedImages.has(receipt.id) ? "•Â‚¶‚é" : "•\¦"}
+                            {expandedImages.has(receipt.id) ? "é–‰ã˜ã‚‹" : "è¡¨ç¤º"}
                           </button>
                         </div>
                         {expandedImages.has(receipt.id) && (
                           <img
                             src={receipt.imageData}
-                            alt="ƒŒƒV[ƒg‰æ‘œ"
+                            alt="ãƒ¬ã‚·ãƒ¼ãƒˆç”»åƒ"
                             className="max-h-64 w-full object-contain"
                           />
                         )}
@@ -2316,12 +2316,12 @@ const UnlockPanel = ({
   isFirstTime: boolean
   onReset: () => void
 }) => {
-  // •Û‘¶‚³‚ê‚½ƒpƒXƒtƒŒ[ƒY‚ª‚ ‚ê‚ÎA“ü—Í—“‚É‚àƒZƒbƒg
+  // ä¿å­˜ã•ã‚ŒãŸãƒ‘ã‚¹ãƒ•ãƒ¬ãƒ¼ã‚ºãŒã‚ã‚Œã°ã€å…¥åŠ›æ¬„ã«ã‚‚ã‚»ãƒƒãƒˆ
   const savedPassphrase = getSavedPassphrase()
   const [value, setValue] = useState(savedPassphrase ?? "")
-  // •Û‘¶‚³‚ê‚½ƒpƒXƒtƒŒ[ƒY‚ª‚ ‚ê‚ÎAƒ`ƒFƒbƒN‚ğON‚Å•\¦
+  // ä¿å­˜ã•ã‚ŒãŸãƒ‘ã‚¹ãƒ•ãƒ¬ãƒ¼ã‚ºãŒã‚ã‚Œã°ã€ãƒã‚§ãƒƒã‚¯ã‚’ONã§è¡¨ç¤º
   const [rememberMe, setRememberMe] = useState(savedPassphrase !== null)
-  // ƒXƒ}ƒz”»’è (ˆÀ‘S‚Èƒwƒ‹ƒp[ŠÖ”‚ğg—p)
+  // ã‚¹ãƒãƒ›åˆ¤å®š (å®‰å…¨ãªãƒ˜ãƒ«ãƒ‘ãƒ¼é–¢æ•°ã‚’ä½¿ç”¨)
   const [isMobile, setIsMobile] = useState(detectMobile)
   useEffect(() => {
     setIsMobile(detectMobile())
@@ -2331,26 +2331,26 @@ const UnlockPanel = ({
   }, [])
 
   if (isMobile) {
-    // ƒXƒ}ƒz—pUI
+    // ã‚¹ãƒãƒ›ç”¨UI
     return (
       <div className="flex flex-col gap-6">
         <p className="text-slate-300" style={{ fontSize: '30px', lineHeight: '1.6' }}>
           {isFirstTime 
-            ? "‰‰ñ‹N“®‚Å‚·BƒpƒXƒtƒŒ[ƒY‚ğİ’è‚µ‚Ä‚­‚¾‚³‚¢i4•¶šˆÈãjB"
-            : "ƒpƒXƒtƒŒ[ƒY‚ğ“ü—Í‚µ‚Äƒf[ƒ^‚ğŠJ‚¢‚Ä‚­‚¾‚³‚¢B"}
+            ? "åˆå›èµ·å‹•ã§ã™ã€‚ãƒ‘ã‚¹ãƒ•ãƒ¬ãƒ¼ã‚ºã‚’è¨­å®šã—ã¦ãã ã•ã„ï¼ˆ4æ–‡å­—ä»¥ä¸Šï¼‰ã€‚"
+            : "ãƒ‘ã‚¹ãƒ•ãƒ¬ãƒ¼ã‚ºã‚’å…¥åŠ›ã—ã¦ãƒ‡ãƒ¼ã‚¿ã‚’é–‹ã„ã¦ãã ã•ã„ã€‚"}
         </p>
         <label className="text-slate-200" style={{ fontSize: '18px' }}>
-          ?? ƒpƒXƒtƒŒ[ƒY
+          ğŸ”‘ ãƒ‘ã‚¹ãƒ•ãƒ¬ãƒ¼ã‚º
           <input
             type="password"
             className="w-full rounded-xl border border-white/10 bg-white/5 text-white outline-none ring-mint/30 focus:ring-2"
             style={{ fontSize: '18px', padding: '24px', marginTop: '20px', minHeight: '90px' }}
-            placeholder="ƒpƒXƒtƒŒ[ƒY‚ğ“ü—Í"
+            placeholder="ãƒ‘ã‚¹ãƒ•ãƒ¬ãƒ¼ã‚ºã‚’å…¥åŠ›"
             value={value}
             onChange={(e) => setValue(e.target.value)}
           />
         </label>
-        {/* Ÿ‰ñ‚©‚çÈ—ªƒIƒvƒVƒ‡ƒ“ */}
+        {/* æ¬¡å›ã‹ã‚‰çœç•¥ã‚ªãƒ—ã‚·ãƒ§ãƒ³ */}
         <label 
           className="flex items-center gap-4 text-slate-300 cursor-pointer"
           style={{ fontSize: '14px' }}
@@ -2362,11 +2362,11 @@ const UnlockPanel = ({
             className="rounded"
             style={{ width: '36px', height: '36px' }}
           />
-          Ÿ‰ñ‚©‚ç“ü—Í‚ğÈ—ª‚·‚é
+          æ¬¡å›ã‹ã‚‰å…¥åŠ›ã‚’çœç•¥ã™ã‚‹
         </label>
         {rememberMe && (
           <p className="text-yellow-400/80" style={{ fontSize: '24px', lineHeight: '1.4' }}>
-            ?? ’[––‚ğ‘¼l‚Æ‹¤—L‚µ‚Ä‚¢‚éê‡‚Í”ñ„§
+            âš ï¸ ç«¯æœ«ã‚’ä»–äººã¨å…±æœ‰ã—ã¦ã„ã‚‹å ´åˆã¯éæ¨å¥¨
           </p>
         )}
         {error && <p className="text-red-300" style={{ fontSize: '18px' }}>{error}</p>}
@@ -2376,42 +2376,42 @@ const UnlockPanel = ({
           className="w-full rounded-xl bg-gradient-to-r from-mint/70 to-mint font-bold text-fog shadow-soft transition hover:translate-y-[-1px] disabled:cursor-not-allowed disabled:opacity-60"
           style={{ fontSize: '22px', padding: '28px', minHeight: '100px' }}
         >
-          {unlocking ? "?? •œ†’†..." : "?? ƒf[ƒ^‚ğŠJ‚­"}
+          {unlocking ? "ğŸ”“ å¾©å·ä¸­..." : "ğŸ” ãƒ‡ãƒ¼ã‚¿ã‚’é–‹ã"}
         </button>
         <button
           onClick={() => {
-            if (confirm("‚·‚×‚Ä‚Ìƒf[ƒ^‚ğíœ‚µ‚Ä‰Šú‰»‚µ‚Ü‚·‚©H")) {
+            if (confirm("ã™ã¹ã¦ã®ãƒ‡ãƒ¼ã‚¿ã‚’å‰Šé™¤ã—ã¦åˆæœŸåŒ–ã—ã¾ã™ã‹ï¼Ÿ")) {
               onReset()
             }
           }}
           className="text-slate-500 underline"
           style={{ fontSize: '18px', padding: '16px' }}
         >
-          ƒf[ƒ^‚ğ‰Šú‰»
+          ãƒ‡ãƒ¼ã‚¿ã‚’åˆæœŸåŒ–
         </button>
       </div>
     )
   }
 
-  // PC—pUI
+  // PCç”¨UI
   return (
     <div className="mt-6 flex flex-col gap-3">
       <p className="text-sm text-slate-300">
         {isFirstTime 
-          ? "‰‰ñ‹N“®‚Å‚·BƒpƒXƒtƒŒ[ƒY‚ğİ’è‚µ‚Ä‚­‚¾‚³‚¢i4•¶šˆÈãjB"
-          : "ƒpƒXƒtƒŒ[ƒY‚ğ“ü—Í‚µ‚Äƒf[ƒ^‚ğŠJ‚¢‚Ä‚­‚¾‚³‚¢B"}
+          ? "åˆå›èµ·å‹•ã§ã™ã€‚ãƒ‘ã‚¹ãƒ•ãƒ¬ãƒ¼ã‚ºã‚’è¨­å®šã—ã¦ãã ã•ã„ï¼ˆ4æ–‡å­—ä»¥ä¸Šï¼‰ã€‚"
+          : "ãƒ‘ã‚¹ãƒ•ãƒ¬ãƒ¼ã‚ºã‚’å…¥åŠ›ã—ã¦ãƒ‡ãƒ¼ã‚¿ã‚’é–‹ã„ã¦ãã ã•ã„ã€‚"}
       </p>
       <label className="text-sm text-slate-200">
-        ƒpƒXƒtƒŒ[ƒY
+        ãƒ‘ã‚¹ãƒ•ãƒ¬ãƒ¼ã‚º
         <input
           type="password"
           className="mt-2 w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-white outline-none ring-mint/30 focus:ring-2"
-          placeholder="4•¶šˆÈã‚Å“ü—Í"
+          placeholder="4æ–‡å­—ä»¥ä¸Šã§å…¥åŠ›"
           value={value}
           onChange={(e) => setValue(e.target.value)}
         />
       </label>
-      {/* Ÿ‰ñ‚©‚çÈ—ªƒIƒvƒVƒ‡ƒ“ */}
+      {/* æ¬¡å›ã‹ã‚‰çœç•¥ã‚ªãƒ—ã‚·ãƒ§ãƒ³ */}
       <label className="flex items-center gap-2 text-sm text-slate-300 cursor-pointer">
         <input
           type="checkbox"
@@ -2419,11 +2419,11 @@ const UnlockPanel = ({
           onChange={(e) => setRememberMe(e.target.checked)}
           className="rounded"
         />
-        Ÿ‰ñ‚©‚ç“ü—Í‚ğÈ—ª‚·‚é
+        æ¬¡å›ã‹ã‚‰å…¥åŠ›ã‚’çœç•¥ã™ã‚‹
       </label>
       {rememberMe && (
         <p className="text-xs text-yellow-400/80">
-          ?? ’[––‚ğ‘¼l‚Æ‹¤—L‚µ‚Ä‚¢‚éê‡‚Í”ñ„§
+          âš ï¸ ç«¯æœ«ã‚’ä»–äººã¨å…±æœ‰ã—ã¦ã„ã‚‹å ´åˆã¯éæ¨å¥¨
         </p>
       )}
       {error && <p className="text-sm text-red-300">{error}</p>}
@@ -2432,7 +2432,7 @@ const UnlockPanel = ({
         disabled={unlocking || value.length < 4}
         className="rounded-2xl bg-gradient-to-r from-mint/70 to-mint px-4 py-3 text-sm font-semibold text-fog shadow-soft transition hover:translate-y-[-1px] disabled:cursor-not-allowed disabled:opacity-60"
       >
-        {unlocking ? "•œ†‚µ‚Ä‚¢‚Ü‚·..." : "ƒf[ƒ^‚ğŠJ‚­"}
+        {unlocking ? "å¾©å·ã—ã¦ã„ã¾ã™..." : "ãƒ‡ãƒ¼ã‚¿ã‚’é–‹ã"}
       </button>
     </div>
   )
