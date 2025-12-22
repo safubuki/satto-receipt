@@ -901,56 +901,54 @@ function App() {
 
             {/* 月選択とサマリー */}
             <div className="mt-4 px-4">
-              <div className="rounded-2xl border border-white/10 bg-white/5" style={{ padding: '24px' }}>
+              <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
                 {/* 月選択 */}
-                <div className="flex items-center justify-between" style={{ marginBottom: '20px' }}>
+                <div className="flex items-center justify-between mb-3">
                   <button
                     onClick={goToPrevMonth}
                     disabled={!hasPrevMonth}
                     className={clsx(
-                      "rounded-xl px-6 py-3 font-bold transition",
+                      "rounded-lg px-4 py-2 font-bold transition text-xl",
                       hasPrevMonth
                         ? "bg-white/10 text-white hover:bg-white/20"
                         : "bg-white/5 text-slate-600 cursor-not-allowed"
                     )}
-                    style={{ fontSize: '18px' }}
                   >
                     &lt;
                   </button>
-                  <span className="font-semibold text-white" style={{ fontSize: '22px' }}>
+                  <span className="font-semibold text-white text-lg">
                     {selectedMonth.replace('-', '年')}月
                   </span>
                   <button
                     onClick={goToNextMonth}
                     disabled={!hasNextMonth}
                     className={clsx(
-                      "rounded-xl px-6 py-3 font-bold transition",
+                      "rounded-lg px-4 py-2 font-bold transition text-xl",
                       hasNextMonth
                         ? "bg-white/10 text-white hover:bg-white/20"
                         : "bg-white/5 text-slate-600 cursor-not-allowed"
                     )}
-                    style={{ fontSize: '18px' }}
                   >
                     &gt;
                   </button>
                 </div>
                 {/* 合計金額 */}
-                <div className="rounded-xl border border-mint/30 bg-mint/10" style={{ padding: '24px', marginBottom: '16px' }}>
-                  <p className="text-center font-bold text-mint" style={{ fontSize: '18px' }}>
+                <div className="rounded-xl border border-mint/30 bg-mint/10 p-4 mb-3">
+                  <p className="text-center font-bold text-mint text-2xl">
                     {formatCurrency(selectedMonthTotal)}
                   </p>
                 </div>
                 {/* 飲み会・自腹 */}
                 <div className="grid grid-cols-2 gap-3">
-                  <div className="rounded-xl border border-white/10 bg-white/5" style={{ padding: '16px' }}>
-                    <p className="text-slate-400" style={{ fontSize: '14px' }}>🍺 飲み会</p>
-                    <p className="font-bold text-amber-400" style={{ fontSize: '18px', marginTop: '8px' }}>
+                  <div className="rounded-xl border border-white/10 bg-white/5 p-3">
+                    <p className="text-slate-400 text-sm">🍺 飲み会</p>
+                    <p className="font-bold text-amber-400 text-lg mt-1">
                       {formatCurrency(selectedMonthNomikai)}
                     </p>
                   </div>
-                  <div className="rounded-xl border border-white/10 bg-white/5" style={{ padding: '16px' }}>
-                    <p className="text-slate-400" style={{ fontSize: '14px' }}>👛 自腹</p>
-                    <p className="font-bold text-rose-400" style={{ fontSize: '18px', marginTop: '8px' }}>
+                  <div className="rounded-xl border border-white/10 bg-white/5 p-3">
+                    <p className="text-slate-400 text-sm">👛 自腹</p>
+                    <p className="font-bold text-rose-400 text-lg mt-1">
                       {formatCurrency(selectedMonthJibara)}
                     </p>
                   </div>
@@ -960,12 +958,11 @@ function App() {
 
             {/* 入力フォーム（シンプル版）*/}
             <div className="mt-4 space-y-4 px-4">
-              <div className="rounded-2xl border border-white/10 bg-white/5" style={{ padding: '28px' }}>
-                <h3 style={{ fontSize: '22px', marginBottom: '24px' }} className="font-semibold text-white">支出情報入力</h3>
-                <div className="space-y-4">
+              <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
+                <h3 className="font-semibold text-white text-lg mb-4">支出情報入力</h3>
+                <div className="space-y-3">
                   <input
-                    className="w-full rounded-xl border border-white/10 bg-white/5 text-white placeholder-slate-500"
-                    style={{ fontSize: '18px', padding: '24px', minHeight: '80px' }}
+                    className="w-full rounded-xl border border-white/10 bg-white/5 text-white placeholder-slate-500 px-4 py-3 text-base"
                     value={draft.storeName}
                     onChange={(e) => setDraft((prev) => ({ ...prev, storeName: e.target.value }))}
                     placeholder="店名"
@@ -973,18 +970,16 @@ function App() {
                   {/* 日付 - 1列 */}
                   <input
                     type="date"
-                    className="w-full rounded-xl border border-white/10 bg-white/5 text-white"
-                    style={{ fontSize: '18px', padding: '24px', minHeight: '80px' }}
+                    className="w-full rounded-xl border border-white/10 bg-white/5 text-white px-4 py-3 text-base"
                     value={draft.visitedAt}
                     onChange={(e) => setDraft((prev) => ({ ...prev, visitedAt: e.target.value }))}
                   />
                   {/* 金額 - 1列 */}
-                  <div className="flex items-center rounded-xl border-2 border-mint/50 bg-mint/10" style={{ padding: '20px 24px', minHeight: '80px' }}>
-                    <span style={{ fontSize: '14px' }} className="font-bold text-mint/70">¥</span>
+                  <div className="flex items-center rounded-xl border-2 border-mint/50 bg-mint/10 px-4 py-3">
+                    <span className="font-bold text-mint/70 text-xl">¥</span>
                     <input
                       inputMode="numeric"
-                      className="w-full bg-transparent font-bold text-mint placeholder-mint/50 outline-none"
-                      style={{ fontSize: '14px' }}
+                      className="w-full bg-transparent font-bold text-mint placeholder-mint/50 outline-none text-xl"
                       value={draft.total}
                       onChange={(e) => setDraft((prev) => ({ ...prev, total: e.target.value }))}
                       placeholder="0"
@@ -995,31 +990,28 @@ function App() {
                     <button
                       onClick={() => setDraft((prev) => ({ ...prev, isNomikai: !prev.isNomikai, isJibara: false }))}
                       className={clsx(
-                        "rounded-xl border-2 py-4 font-semibold transition",
+                        "rounded-xl border py-3 font-semibold transition text-sm",
                         draft.isNomikai
                           ? "border-amber-500 bg-amber-500/20 text-amber-400"
                           : "border-white/10 bg-white/5 text-slate-400"
                       )}
-                      style={{ fontSize: '18px', padding: '20px' }}
                     >
                       🍺 飲み会
                     </button>
                     <button
                       onClick={() => setDraft((prev) => ({ ...prev, isJibara: !prev.isJibara, isNomikai: false }))}
                       className={clsx(
-                        "rounded-xl border-2 py-4 font-semibold transition",
+                        "rounded-xl border py-3 font-semibold transition text-sm",
                         draft.isJibara
                           ? "border-rose-500 bg-rose-500/20 text-rose-400"
                           : "border-white/10 bg-white/5 text-slate-400"
                       )}
-                      style={{ fontSize: '18px', padding: '20px' }}
                     >
                       👛 自腹
                     </button>
                   </div>
                   <select
-                    className="w-full rounded-xl border border-white/10 bg-white/5 text-white"
-                    style={{ fontSize: '18px', padding: '24px', minHeight: '80px' }}
+                    className="w-full rounded-xl border border-white/10 bg-white/5 text-white px-4 py-3 text-base"
                     value={draft.category}
                     onChange={(e) => setDraft((prev) => ({ ...prev, category: e.target.value }))}
                   >
@@ -1412,17 +1404,16 @@ function App() {
 
         {/* スマホ用固定フッター */}
         {session && (
-          <div className="fixed inset-x-0 bottom-0 z-30 border-t border-white/10 bg-fog/95 backdrop-blur-lg safe-area-pb" style={{ padding: '20px 24px' }}>
-            <div className="flex items-center gap-4">
+          <div className="fixed inset-x-0 bottom-0 z-30 border-t border-white/10 bg-fog/95 backdrop-blur-lg safe-area-pb px-4 py-3">
+            <div className="flex items-center gap-3">
               <button
                 onClick={cameraActive ? stopCamera : startCamera}
                 className={clsx(
-                  "flex-1 rounded-2xl font-bold",
+                  "flex-1 rounded-xl font-semibold py-4 text-sm whitespace-nowrap",
                   cameraActive
-                    ? "border-2 border-white/30 bg-white/10 text-white"
-                    : "border-2 border-mint/60 bg-mint/20 text-mint"
+                    ? "border border-white/30 bg-white/10 text-white"
+                    : "border border-mint/60 bg-mint/20 text-mint"
                 )}
-                style={{ minHeight: '135px', fontSize: '18px' }}
               >
                 {cameraActive ? "カメラOFF" : "カメラON"}
               </button>
@@ -1430,24 +1421,22 @@ function App() {
                 onClick={captureFromCamera}
                 disabled={!cameraActive || isProcessing}
                 className={clsx(
-                  "flex-[2] rounded-2xl border-2 font-bold shadow-lg disabled:opacity-50",
+                  "flex-[2] rounded-xl font-bold py-4 text-base shadow-lg disabled:opacity-50",
                   isProcessing
-                    ? "animate-pulse border-yellow-400 bg-yellow-400/30 text-yellow-200"
-                    : "border-mint bg-mint text-fog"
+                    ? "animate-pulse border border-yellow-400 bg-yellow-400/30 text-yellow-200"
+                    : "border border-mint bg-mint text-fog"
                 )}
-                style={{ minHeight: '150px', fontSize: '22px' }}
               >
                 {isProcessing ? "処理中..." : "撮影"}
               </button>
               <button
                 onClick={handleSaveReceipt}
                 className={clsx(
-                  "flex-1 rounded-2xl border-2 font-bold transition-all",
+                  "flex-1 rounded-xl font-semibold py-4 text-sm transition-all",
                   hasDraftData
-                    ? "animate-pulse border-mint bg-mint/30 text-mint shadow-lg shadow-mint/30"
-                    : "border-white/30 bg-white/15 text-white"
+                    ? "animate-pulse border border-mint bg-mint/30 text-mint shadow-lg shadow-mint/30"
+                    : "border border-white/30 bg-white/15 text-white"
                 )}
-                style={{ minHeight: '135px', fontSize: '18px' }}
               >
                 保存
               </button>
