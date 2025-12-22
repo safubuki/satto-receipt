@@ -42,11 +42,13 @@ export const importCsvToReceipts = (csv: string): Receipt[] => {
 
   const rows: Row[] = dataLines.map((line) => {
     const cols = parseCsvLine(line)
-    // Our export: date, store, item, category, quantity, price, receipt_total, note
+    // CSV columns: date, store, store_category, item_name, item_category, quantity, unit_price, subtotal, receipt_total, note
+    // Index:       0     1      2               3          4              5         6           7         8              9
     const date = cols[0] ?? ""
     const store = cols[1] ?? ""
-    const total = Number(cols[6] ?? cols[2] ?? 0) || 0
-    const note = cols[7] || undefined
+    // receipt_total is at index 8
+    const total = Number(cols[8] ?? cols[6] ?? 0) || 0
+    const note = cols[9] || undefined
     return { date, store, total, note }
   })
 
