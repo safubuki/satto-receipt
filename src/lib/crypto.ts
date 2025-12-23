@@ -7,6 +7,34 @@ const decoder = new TextDecoder()
 
 const iterations = 200_000
 
+// localStorageが使えない環境でも落ちないようにメモリ上にフォールバック
+const memoryStore = new Map<string, string>()
+const safeGetItem = (key: string): string | null => {
+  try {
+    return localStorage.getItem(key)
+  } catch {
+    return memoryStore.get(key) ?? null
+  }
+}
+
+const safeSetItem = (key: string, value: string): void => {
+  try {
+    localStorage.setItem(key, value)
+    memoryStore.delete(key)
+  } catch {
+    memoryStore.set(key, value)
+  }
+}
+
+const safeRemoveItem = (key: string): void => {
+  try {
+    localStorage.removeItem(key)
+  } catch {
+    // ignore
+  }
+  memoryStore.delete(key)
+}
+
 export const bytesToBase64 = (bytes: Uint8Array): string =>
   btoa(String.fromCharCode(...bytes))
 
@@ -14,26 +42,26 @@ export const base64ToBytes = (value: string): Uint8Array =>
   new Uint8Array(atob(value).split('').map((c) => c.charCodeAt(0)))
 
 export const getOrCreateSalt = (): Uint8Array => {
-  const stored = localStorage.getItem(SALT_KEY)
+  const stored = safeGetItem(SALT_KEY)
   if (stored) return base64ToBytes(stored)
 
   const salt = crypto.getRandomValues(new Uint8Array(16))
-  localStorage.setItem(SALT_KEY, bytesToBase64(salt))
+  safeSetItem(SALT_KEY, bytesToBase64(salt))
   return salt
 }
 
 export const clearSalt = (): void => {
-  localStorage.removeItem(SALT_KEY)
+  safeRemoveItem(SALT_KEY)
 }
 
 // パスフレーズ記憶機能
 export const savePassphrase = (passphrase: string): void => {
   // Base64エンコードして保存（平文ではなく軽い難読化）
-  localStorage.setItem(PASSPHRASE_KEY, btoa(encodeURIComponent(passphrase)))
+  safeSetItem(PASSPHRASE_KEY, btoa(encodeURIComponent(passphrase)))
 }
 
 export const getSavedPassphrase = (): string | null => {
-  const stored = localStorage.getItem(PASSPHRASE_KEY)
+  const stored = safeGetItem(PASSPHRASE_KEY)
   if (!stored) return null
   try {
     return decodeURIComponent(atob(stored))
@@ -43,11 +71,11 @@ export const getSavedPassphrase = (): string | null => {
 }
 
 export const clearSavedPassphrase = (): void => {
-  localStorage.removeItem(PASSPHRASE_KEY)
+  safeRemoveItem(PASSPHRASE_KEY)
 }
 
 export const hasRememberedPassphrase = (): boolean => {
-  return localStorage.getItem(PASSPHRASE_KEY) !== null
+  return safeGetItem(PASSPHRASE_KEY) !== null
 }
 
 export const deriveKey = async (
