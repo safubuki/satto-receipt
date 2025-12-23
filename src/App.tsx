@@ -973,11 +973,11 @@ function App() {
                     onChange={(e) => setDraft((prev) => ({ ...prev, visitedAt: e.target.value }))}
                   />
                   {/* 金額 - 1列 */}
-                  <div className="flex items-center rounded-xl border-2 border-mint/50 bg-mint/10 px-3 py-2">
-                    <span className="font-bold text-mint/70 text-xl">¥</span>
+                  <div className="flex items-center rounded-xl border-2 border-mint/50 bg-mint/10 px-3 py-1">
+                    <span className="font-bold text-mint/70 text-lg">¥</span>
                     <input
                       inputMode="numeric"
-                      className="w-full bg-transparent font-bold text-mint placeholder-mint/50 outline-none text-xl"
+                      className="w-full bg-transparent font-bold text-mint placeholder-mint/50 outline-none text-lg"
                       value={draft.total}
                       onChange={(e) => setDraft((prev) => ({ ...prev, total: e.target.value }))}
                       placeholder="0"
@@ -1262,28 +1262,28 @@ function App() {
                   displayedReceipts.map((receipt) => (
                     <div
                       key={receipt.id}
-                      className="rounded-xl border border-white/10 bg-white/5 p-3"
+                      className="rounded-xl border border-white/10 bg-white/5 px-3 py-2"
                     >
-                      <div className="flex items-start justify-between gap-2">
+                      <div className="flex items-start justify-between gap-1">
                         <div 
                           className="cursor-pointer flex-1 min-w-0"
                           onClick={() => setSelectedReceipt(receipt)}
                         >
                           <p className="text-slate-400 text-xs">{receipt.visitedAt}</p>
-                          <p className="font-semibold text-white underline text-xs mt-1 truncate">{receipt.storeName}</p>
-                          <div className="flex items-center gap-1 mt-2">
-                            <span className="inline-block rounded-full bg-white/10 text-slate-300 text-xs px-2 py-1">
+                          <p className="font-semibold text-white underline text-xs mt-0.5" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '180px' }}>{receipt.storeName}</p>
+                          <div className="flex items-center gap-1 mt-1">
+                            <span className="inline-block rounded-full bg-white/10 text-slate-300 text-xs px-2 py-0.5">
                               {receipt.category || '未分類'}
                             </span>
-                            {receipt.isNomikai && <span className="text-sm">🍺</span>}
-                            {receipt.isJibara && <span className="text-sm">👛</span>}
+                            {receipt.isNomikai && <span className="text-xs">🍺</span>}
+                            {receipt.isJibara && <span className="text-xs">👛</span>}
                           </div>
                         </div>
-                        <div className="text-right shrink-0">
-                          <p className="font-bold text-mint text-lg">
+                        <div className="text-right shrink-0 flex flex-col items-end">
+                          <p className="font-bold text-mint text-base">
                             {formatCurrency(receipt.total)}
                           </p>
-                          <div className="flex gap-1 justify-end mt-1">
+                          <div className="flex gap-2 mt-0.5">
                             <button
                               onClick={() => setEditingReceipt(receipt)}
                               className="text-yellow-400 text-xs"
@@ -1307,7 +1307,7 @@ function App() {
                   <button
                     onClick={() => setVisibleCount((v) => v + 20)}
                     className="w-full rounded-xl border border-white/10 bg-white/5 font-semibold text-white mt-2"
-                    style={{ fontSize: '14px', padding: '12px' }}
+                    style={{ fontSize: '12px', padding: '8px' }}
                   >
                     もっと見る
                   </button>
@@ -1359,7 +1359,7 @@ function App() {
                       {hasApiKey() ? "✅ 設定済み" : "❌ 未設定"}
                     </p>
                   </div>
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-3">
                     <button
                       onClick={() => setUseGemini(!useGemini)}
                       className={clsx(
@@ -1368,14 +1368,14 @@ function App() {
                           ? "bg-mint text-fog"
                           : "border border-white/20 bg-white/10 text-white"
                       )}
-                      style={{ fontSize: '12px', padding: '4px 12px' }}
+                      style={{ fontSize: '11px', padding: '2px 10px' }}
                     >
                       {useGemini ? "ON" : "OFF"}
                     </button>
                     <button
                       onClick={() => setShowApiKeyModal(true)}
                       className="rounded-full border border-white/20 bg-white/10 text-white"
-                      style={{ fontSize: '12px', padding: '4px 8px' }}
+                      style={{ fontSize: '11px', padding: '2px 6px' }}
                     >
                       ⚙️
                     </button>
@@ -1388,12 +1388,12 @@ function App() {
 
         {/* スマホ用固定フッター */}
         {session && (
-          <div className="fixed inset-x-0 bottom-0 z-30 border-t border-white/10 bg-fog/95 backdrop-blur-lg safe-area-pb px-4 py-2">
+          <div className="fixed inset-x-0 bottom-0 z-30 border-t border-white/10 bg-fog/95 backdrop-blur-lg safe-area-pb px-4 py-3">
             <div className="flex items-center justify-center gap-2">
               <button
                 onClick={cameraActive ? stopCamera : startCamera}
                 className={clsx(
-                  "w-20 rounded-lg font-semibold py-2 text-xs whitespace-nowrap",
+                  "w-20 rounded-lg font-semibold py-2 text-xs whitespace-nowrap flex items-center justify-center",
                   cameraActive
                     ? "border border-white/30 bg-white/10 text-white"
                     : "border border-mint/60 bg-mint/20 text-mint"
@@ -1405,7 +1405,7 @@ function App() {
                 onClick={captureFromCamera}
                 disabled={!cameraActive || isProcessing}
                 className={clsx(
-                  "flex-1 max-w-[180px] rounded-lg font-bold py-2 text-sm shadow-lg disabled:opacity-50",
+                  "flex-1 max-w-[180px] rounded-lg font-bold py-3 text-sm shadow-lg disabled:opacity-50",
                   isProcessing
                     ? "animate-pulse border border-yellow-400 bg-yellow-400/30 text-yellow-200"
                     : "border border-mint bg-mint text-fog"
