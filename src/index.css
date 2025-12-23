@@ -127,6 +127,12 @@ option {
 
 /* iPhone safe area対応 */
 .safe-area-pb {
-  padding-bottom: 12px; /* フォールバック */
-  padding-bottom: env(safe-area-inset-bottom, 12px);
+  padding-bottom: 20px; /* フォールバック（セーフエリアがない端末用） */
+  padding-bottom: max(20px, env(safe-area-inset-bottom));
+}
+
+/* フッターボタン専用: グローバルなmin-height/paddingをリセット */
+.footer-btn {
+  min-height: unset !important;
+  padding: 0 !important;
 }

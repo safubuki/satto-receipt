@@ -456,12 +456,12 @@ function App() {
     await persistVault(nextVault, session.key)
   }
 
-  const handleUpdateReceipt = async (id: string, storeName: string, total: number, isNomikai?: boolean, isJibara?: boolean) => {
+  const handleUpdateReceipt = async (id: string, storeName: string, total: number, visitedAt: string, category?: string, isNomikai?: boolean, isJibara?: boolean) => {
     if (!session) return
     const nextVault = {
       ...session.vault,
       receipts: session.vault.receipts.map((r) =>
-        r.id === id ? { ...r, storeName, total, isNomikai, isJibara, updatedAt: new Date().toISOString() } : r
+        r.id === id ? { ...r, storeName, total, visitedAt, category, isNomikai, isJibara, updatedAt: new Date().toISOString() } : r
       ),
     }
     await persistVault(nextVault, session.key)
@@ -986,7 +986,7 @@ function App() {
                   {/* 飲み会・自腹トグル */}
                   <div className="grid grid-cols-2 gap-3">
                     <button
-                      onClick={() => setDraft((prev) => ({ ...prev, isNomikai: !prev.isNomikai, isJibara: false }))}
+                      onClick={() => setDraft((prev) => ({ ...prev, isNomikai: !prev.isNomikai }))}
                       className={clsx(
                         "rounded-xl border py-3 font-semibold transition text-sm",
                         draft.isNomikai
@@ -997,7 +997,7 @@ function App() {
                       🍺 飲み会
                     </button>
                     <button
-                      onClick={() => setDraft((prev) => ({ ...prev, isJibara: !prev.isJibara, isNomikai: false }))}
+                      onClick={() => setDraft((prev) => ({ ...prev, isJibara: !prev.isJibara }))}
                       className={clsx(
                         "rounded-xl border py-3 font-semibold transition text-sm",
                         draft.isJibara
@@ -1126,9 +1126,18 @@ function App() {
             {/* 編集モーダル */}
             {editingReceipt && (
               <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 px-4">
-                <div className="w-full rounded-2xl border border-white/10 bg-fog p-5" style={{ maxWidth: '92vw' }}>
+                <div className="w-full max-h-[85vh] overflow-y-auto rounded-2xl border border-white/10 bg-fog p-5" style={{ maxWidth: '92vw' }}>
                   <h3 className="font-bold text-white text-base">支出編集</h3>
                   <div className="mt-4 space-y-3">
+                    <label className="block">
+                      <span className="text-slate-200 text-sm">日付</span>
+                      <input
+                        type="date"
+                        value={editingReceipt.visitedAt}
+                        onChange={(e) => setEditingReceipt({ ...editingReceipt, visitedAt: e.target.value })}
+                        className="mt-1 w-full rounded-lg border border-white/10 bg-white/5 text-white outline-none ring-mint/30 focus:ring-2 px-3 py-2 text-sm"
+                      />
+                    </label>
                     <label className="block">
                       <span className="text-slate-200 text-sm">店名</span>
                       <input
@@ -1147,13 +1156,28 @@ function App() {
                         className="mt-1 w-full rounded-lg border border-white/10 bg-white/5 text-white outline-none ring-mint/30 focus:ring-2 px-3 py-2 text-sm"
                       />
                     </label>
+                    <label className="block">
+                      <span className="text-slate-200 text-sm">カテゴリ</span>
+                      <select
+                        value={editingReceipt.category || ''}
+                        onChange={(e) => setEditingReceipt({ ...editingReceipt, category: e.target.value || undefined })}
+                        className="mt-1 w-full rounded-lg border border-white/10 bg-white/5 text-white outline-none ring-mint/30 focus:ring-2 px-3 py-2 text-sm"
+                      >
+                        <option value="">未分類</option>
+                        {categories.map((cat) => (
+                          <option key={cat.id} value={cat.name}>
+                            {cat.name}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
                     {/* 飲み会/自腹トグル */}
                     <div>
-                      <span className="text-slate-200 text-sm">分類</span>
+                      <span className="text-slate-200 text-sm">フラグ</span>
                       <div className="mt-1 flex gap-2">
                         <button
                           type="button"
-                          onClick={() => setEditingReceipt({ ...editingReceipt, isNomikai: !editingReceipt.isNomikai, isJibara: false })}
+                          onClick={() => setEditingReceipt({ ...editingReceipt, isNomikai: !editingReceipt.isNomikai })}
                           className={`flex-1 rounded-lg border transition-all py-2 text-sm ${
                             editingReceipt.isNomikai
                               ? 'border-amber-400 bg-amber-400/20 text-amber-300'
@@ -1164,7 +1188,7 @@ function App() {
                         </button>
                         <button
                           type="button"
-                          onClick={() => setEditingReceipt({ ...editingReceipt, isJibara: !editingReceipt.isJibara, isNomikai: false })}
+                          onClick={() => setEditingReceipt({ ...editingReceipt, isJibara: !editingReceipt.isJibara })}
                           className={`flex-1 rounded-lg border transition-all py-2 text-sm ${
                             editingReceipt.isJibara
                               ? 'border-emerald-400 bg-emerald-400/20 text-emerald-300'
@@ -1184,7 +1208,7 @@ function App() {
                       キャンセル
                     </button>
                     <button
-                      onClick={() => handleUpdateReceipt(editingReceipt.id, editingReceipt.storeName, editingReceipt.total, editingReceipt.isNomikai, editingReceipt.isJibara)}
+                      onClick={() => handleUpdateReceipt(editingReceipt.id, editingReceipt.storeName, editingReceipt.total, editingReceipt.visitedAt, editingReceipt.category, editingReceipt.isNomikai, editingReceipt.isJibara)}
                       className="rounded-xl bg-mint font-bold text-fog py-3 text-sm"
                     >
                       保存
@@ -1388,12 +1412,12 @@ function App() {
 
         {/* スマホ用固定フッター */}
         {session && (
-          <div className="fixed inset-x-0 bottom-0 z-30 border-t border-white/10 bg-fog/95 backdrop-blur-lg safe-area-pb px-4 py-3">
-            <div className="flex items-center justify-center gap-2">
+          <div className="fixed inset-x-0 bottom-0 z-30 border-t border-white/10 bg-fog/95 backdrop-blur-lg safe-area-pb px-4 pt-3">
+            <div className="flex items-end justify-center gap-2">
               <button
                 onClick={cameraActive ? stopCamera : startCamera}
                 className={clsx(
-                  "w-20 rounded-lg font-semibold py-2 text-xs whitespace-nowrap flex items-center justify-center",
+                  "footer-btn w-20 h-9 rounded-lg font-semibold text-xs whitespace-nowrap flex items-center justify-center",
                   cameraActive
                     ? "border border-white/30 bg-white/10 text-white"
                     : "border border-mint/60 bg-mint/20 text-mint"
@@ -1405,7 +1429,7 @@ function App() {
                 onClick={captureFromCamera}
                 disabled={!cameraActive || isProcessing}
                 className={clsx(
-                  "flex-1 max-w-[180px] rounded-lg font-bold py-3 text-sm shadow-lg disabled:opacity-50",
+                  "footer-btn flex-1 max-w-[180px] h-11 rounded-lg font-semibold text-base leading-5 shadow-lg disabled:opacity-50 flex items-center justify-center",
                   isProcessing
                     ? "animate-pulse border border-yellow-400 bg-yellow-400/30 text-yellow-200"
                     : "border border-mint bg-mint text-fog"
@@ -1416,7 +1440,7 @@ function App() {
               <button
                 onClick={handleSaveReceipt}
                 className={clsx(
-                  "w-20 rounded-lg font-semibold py-2 text-xs transition-all whitespace-nowrap",
+                  "footer-btn w-20 h-9 rounded-lg font-semibold text-xs transition-all whitespace-nowrap flex items-center justify-center",
                   hasDraftData
                     ? "animate-pulse border border-mint bg-mint/30 text-mint shadow-lg shadow-mint/30"
                     : "border border-white/30 bg-white/15 text-white"
@@ -1437,9 +1461,18 @@ function App() {
       {/* 編集モーダル (PC版) */}
       {editingReceipt && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70">
-          <div className="w-full max-w-md rounded-2xl border border-white/10 bg-fog p-6">
+          <div className="w-full max-w-md max-h-[85vh] overflow-y-auto rounded-2xl border border-white/10 bg-fog p-6">
             <h3 className="text-xl font-bold text-white">支出編集</h3>
             <div className="mt-4 space-y-4">
+              <label className="block">
+                <span className="text-sm text-slate-200">日付</span>
+                <input
+                  type="date"
+                  value={editingReceipt.visitedAt}
+                  onChange={(e) => setEditingReceipt({ ...editingReceipt, visitedAt: e.target.value })}
+                  className="mt-2 w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-white outline-none ring-mint/30 focus:ring-2"
+                />
+              </label>
               <label className="block">
                 <span className="text-sm text-slate-200">店名</span>
                 <input
@@ -1458,13 +1491,28 @@ function App() {
                   className="mt-2 w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-white outline-none ring-mint/30 focus:ring-2"
                 />
               </label>
+              <label className="block">
+                <span className="text-sm text-slate-200">カテゴリ</span>
+                <select
+                  value={editingReceipt.category || ''}
+                  onChange={(e) => setEditingReceipt({ ...editingReceipt, category: e.target.value || undefined })}
+                  className="mt-2 w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-white outline-none ring-mint/30 focus:ring-2"
+                >
+                  <option value="">未分類</option>
+                  {categories.map((cat) => (
+                    <option key={cat.id} value={cat.name}>
+                      {cat.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
               {/* 飲み会/自腹トグル */}
               <div>
-                <span className="text-sm text-slate-200">分類</span>
+                <span className="text-sm text-slate-200">フラグ</span>
                 <div className="mt-2 flex gap-3">
                   <button
                     type="button"
-                    onClick={() => setEditingReceipt({ ...editingReceipt, isNomikai: !editingReceipt.isNomikai, isJibara: false })}
+                    onClick={() => setEditingReceipt({ ...editingReceipt, isNomikai: !editingReceipt.isNomikai })}
                     className={`flex-1 rounded-xl border px-3 py-2 text-sm transition-all ${
                       editingReceipt.isNomikai
                         ? 'border-amber-400 bg-amber-400/20 text-amber-300'
@@ -1475,7 +1523,7 @@ function App() {
                   </button>
                   <button
                     type="button"
-                    onClick={() => setEditingReceipt({ ...editingReceipt, isJibara: !editingReceipt.isJibara, isNomikai: false })}
+                    onClick={() => setEditingReceipt({ ...editingReceipt, isJibara: !editingReceipt.isJibara })}
                     className={`flex-1 rounded-xl border px-3 py-2 text-sm transition-all ${
                       editingReceipt.isJibara
                         ? 'border-emerald-400 bg-emerald-400/20 text-emerald-300'
@@ -1495,7 +1543,7 @@ function App() {
                 キャンセル
               </button>
               <button
-                onClick={() => handleUpdateReceipt(editingReceipt.id, editingReceipt.storeName, editingReceipt.total, editingReceipt.isNomikai, editingReceipt.isJibara)}
+                onClick={() => handleUpdateReceipt(editingReceipt.id, editingReceipt.storeName, editingReceipt.total, editingReceipt.visitedAt, editingReceipt.category, editingReceipt.isNomikai, editingReceipt.isJibara)}
                 className="flex-1 rounded-xl bg-mint px-4 py-2 text-sm font-semibold text-fog hover:bg-mint/90"
               >
                 保存

@@ -33,43 +33,74 @@ export const importCsvToReceipts = (csv: string): Receipt[] => {
   const header = lines[0].toLowerCase()
   const dataLines = header.includes("store") ? lines.slice(1) : lines
 
+  type LineItemRow = {
+    name: string
+    category: string
+    price: number
+    quantity: number
+  }
+
   type Row = {
     date: string
     store: string
+    storeCategory: string
     total: number
     note?: string
     isNomikai?: boolean
     isJibara?: boolean
+    lineItems: LineItemRow[]
   }
 
-  const rows: Row[] = dataLines.map((line) => {
+  // CSV columns: date, store, store_category, item_name, item_category, quantity, unit_price, subtotal, receipt_total, note, is_nomikai, is_jibara
+  // Index:       0     1      2               3          4              5         6           7         8              9     10          11
+
+  // Group by date + store + total to aggregate line items
+  const map = new Map<string, Row>()
+  
+  dataLines.forEach((line) => {
     const cols = parseCsvLine(line)
-    // CSV columns: date, store, store_category, item_name, item_category, quantity, unit_price, subtotal, receipt_total, note, is_nomikai, is_jibara
-    // Index:       0     1      2               3          4              5         6           7         8              9     10          11
     const date = cols[0] ?? ""
     const store = cols[1] ?? ""
+    const storeCategory = cols[2] ?? ""
+    const itemName = cols[3] ?? ""
+    const itemCategory = cols[4] ?? ""
+    const quantity = Number(cols[5]) || 1
+    const unitPrice = Number(cols[6]) || 0
     // receipt_total is at index 8
     const total = Number(cols[8] ?? cols[6] ?? 0) || 0
     const note = cols[9] || undefined
     // is_nomikai at index 10, is_jibara at index 11 (optional for backward compatibility)
     const isNomikai = cols[10] === '1' || cols[10]?.toLowerCase() === 'true'
     const isJibara = cols[11] === '1' || cols[11]?.toLowerCase() === 'true'
-    return { date, store, total, note, isNomikai, isJibara }
-  })
-
-  // Group by date + store + total + note to reduce duplicates
-  const map = new Map<string, Row>()
-  rows.forEach((row) => {
-    const key = `${row.date}||${row.store}||${row.total}||${row.note ?? ""}`
-    // Keep the first occurrence, but preserve flags if set
+    
+    const key = `${date}||${store}||${total}||${note ?? ""}`
+    
     if (!map.has(key)) {
-      map.set(key, row)
-    } else {
-      const existing = map.get(key)!
-      // If this row has flags set but existing doesn't, update
-      if ((row.isNomikai || row.isJibara) && !existing.isNomikai && !existing.isJibara) {
-        map.set(key, row)
-      }
+      map.set(key, {
+        date,
+        store,
+        storeCategory,
+        total,
+        note,
+        isNomikai,
+        isJibara,
+        lineItems: [],
+      })
+    }
+    
+    const existing = map.get(key)!
+    // Update flags if this row has them set
+    if (isNomikai) existing.isNomikai = true
+    if (isJibara) existing.isJibara = true
+    
+    // Add line item if item_name exists
+    if (itemName) {
+      existing.lineItems.push({
+        name: itemName,
+        category: itemCategory || storeCategory || '未分類',
+        price: unitPrice,
+        quantity,
+      })
     }
   })
 
@@ -80,9 +111,15 @@ export const importCsvToReceipts = (csv: string): Receipt[] => {
       storeName: row.store || "インポート",
       visitedAt: row.date || now.slice(0, 10),
       total: row.total,
-      category: undefined,
+      category: row.storeCategory || undefined,
       note: row.note,
-      lineItems: [],
+      lineItems: row.lineItems.map((item) => ({
+        id: crypto.randomUUID(),
+        name: item.name,
+        category: item.category,
+        price: item.price,
+        quantity: item.quantity,
+      })),
       isNomikai: row.isNomikai || undefined,
       isJibara: row.isJibara || undefined,
       createdAt: now,
