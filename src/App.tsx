@@ -762,10 +762,10 @@ function App() {
 
         {!session ? (
           // ========== スマホ用ログイン画面 ==========
-          <div className="flex min-h-[80vh] flex-col items-center justify-center px-4">
-            <div className="w-full rounded-2xl border border-white/10 bg-white/5 p-6" style={{ maxWidth: '92vw' }}>
-              <div className="text-center mb-6">
-                <div className="mx-auto rounded-full bg-gradient-to-r from-mint/60 to-mint/30 p-[2px] w-24 h-24 mb-4">
+          <div className="flex min-h-[60vh] flex-col items-center justify-center px-4 py-8">
+            <div className="w-full rounded-2xl border border-white/10 bg-white/5 p-4" style={{ maxWidth: '320px' }}>
+              <div className="text-center mb-4">
+                <div className="mx-auto rounded-full bg-gradient-to-r from-mint/60 to-mint/30 p-[2px] w-16 h-16 mb-3">
                   <div className="h-full w-full rounded-full bg-fog/90 p-[1px]">
                     <img
                       src={`${import.meta.env.BASE_URL}turtle_icon_receipt.png`}
@@ -774,8 +774,8 @@ function App() {
                     />
                   </div>
                 </div>
-                <h2 className="font-bold text-white text-lg">サッとレシート</h2>
-                <p className="text-slate-400 text-sm mt-2">買い物ごとにサッとパシャっと</p>
+                <h2 className="font-bold text-white text-base">サッとレシート</h2>
+                <p className="text-slate-400 text-xs mt-1">買い物ごとにサッとパシャっと</p>
               </div>
               <UnlockPanel onUnlock={handleUnlock} unlocking={unlocking} error={unlockError} isFirstTime={isFirstTime} onReset={handleReset} />
             </div>
@@ -2306,18 +2306,17 @@ const UnlockPanel = ({
   if (isMobile) {
     // スマホ用UI
     return (
-      <div className="flex flex-col gap-6">
-        <p className="text-slate-300" style={{ fontSize: '30px', lineHeight: '1.6' }}>
+      <div className="flex flex-col gap-3">
+        <p className="text-slate-300 text-sm leading-relaxed">
           {isFirstTime 
             ? "初回起動です。パスフレーズを設定してください（4文字以上）。"
             : "パスフレーズを入力してデータを開いてください。"}
         </p>
-        <label className="text-slate-200" style={{ fontSize: '18px' }}>
-          🔑 パスフレーズ
+        <label className="text-slate-200 text-xs">
+          パスフレーズ
           <input
             type="password"
-            className="w-full rounded-xl border border-white/10 bg-white/5 text-white outline-none ring-mint/30 focus:ring-2"
-            style={{ fontSize: '18px', padding: '24px', marginTop: '20px', minHeight: '90px' }}
+            className="w-full rounded-lg border border-white/10 bg-white/5 text-white outline-none ring-mint/30 focus:ring-2 px-3 py-2 mt-1 text-sm"
             placeholder="パスフレーズを入力"
             value={value}
             onChange={(e) => setValue(e.target.value)}
@@ -2325,31 +2324,29 @@ const UnlockPanel = ({
         </label>
         {/* 次回から省略オプション */}
         <label 
-          className="flex items-center gap-4 text-slate-300 cursor-pointer"
-          style={{ fontSize: '14px' }}
+          className="flex items-center gap-2 text-slate-300 cursor-pointer text-xs"
         >
           <input
             type="checkbox"
             checked={rememberMe}
             onChange={(e) => setRememberMe(e.target.checked)}
             className="rounded"
-            style={{ width: '36px', height: '36px' }}
+            style={{ width: '16px', height: '16px' }}
           />
           次回から入力を省略する
         </label>
         {rememberMe && (
-          <p className="text-yellow-400/80" style={{ fontSize: '24px', lineHeight: '1.4' }}>
+          <p className="text-yellow-400/80 text-xs leading-relaxed">
             ⚠️ 端末を他人と共有している場合は非推奨
           </p>
         )}
-        {error && <p className="text-red-300" style={{ fontSize: '18px' }}>{error}</p>}
+        {error && <p className="text-red-300 text-xs">{error}</p>}
         <button
           onClick={() => onUnlock(value, rememberMe)}
           disabled={unlocking || value.length < 4}
-          className="w-full rounded-xl bg-gradient-to-r from-mint/70 to-mint font-bold text-fog shadow-soft transition hover:translate-y-[-1px] disabled:cursor-not-allowed disabled:opacity-60"
-          style={{ fontSize: '22px', padding: '28px', minHeight: '100px' }}
+          className="w-full rounded-lg bg-gradient-to-r from-mint/70 to-mint font-bold text-fog shadow-soft transition hover:translate-y-[-1px] disabled:cursor-not-allowed disabled:opacity-60 py-2 text-sm"
         >
-          {unlocking ? "🔓 復号中..." : "🔐 データを開く"}
+          {unlocking ? "復号中..." : "データを開く"}
         </button>
         <button
           onClick={() => {
@@ -2357,8 +2354,7 @@ const UnlockPanel = ({
               onReset()
             }
           }}
-          className="text-slate-500 underline"
-          style={{ fontSize: '18px', padding: '16px' }}
+          className="text-slate-500 underline text-xs py-1"
         >
           データを初期化
         </button>
