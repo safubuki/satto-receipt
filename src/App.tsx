@@ -1020,6 +1020,14 @@ function App() {
                     <div className="h-full bg-mint" style={{ width: `${Math.round(ocrProgress * 100)}%` }} />
                   </div>
                 )}
+                {useGemini && !hasApiKey() && (
+                  <p className="hidden items-center justify-between gap-2 rounded-lg border border-amber-400/80 bg-amber-400/15 px-2.5 py-1 text-xs leading-none text-amber-200 lg:flex">
+                    <span className="truncate">APIキーを設定してください</span>
+                    <button type="button" className="shrink-0 font-semibold text-amber-100 underline" onClick={() => setShowApiKeyModal(true)}>
+                      設定
+                    </button>
+                  </p>
+                )}
                 <div className="grid gap-3 lg:grid-cols-2">
                   <label className="ui-btn ui-btn-quiet w-full cursor-pointer border-dashed px-3 py-3 text-sm">
                     画像を選ぶ
@@ -1319,7 +1327,15 @@ function App() {
             </section>
           </div>
 
-          <div className="fixed inset-x-0 bottom-0 z-30 border-t border-white/10 bg-fog/95 px-4 pt-3 backdrop-blur safe-area-pb lg:hidden">
+          <div className="fixed inset-x-0 bottom-0 z-30 border-t border-white/10 bg-fog/95 px-4 pt-2 backdrop-blur safe-area-pb lg:hidden">
+            {useGemini && !hasApiKey() && (
+              <p className="mx-auto mb-1.5 flex max-w-lg items-center justify-between gap-2 rounded-lg border border-amber-400/80 bg-amber-400/15 px-2.5 py-1 text-xs leading-none text-amber-200">
+                <span className="truncate">APIキーを設定してください</span>
+                <button type="button" className="shrink-0 font-semibold text-amber-100 underline" onClick={() => setShowApiKeyModal(true)}>
+                  設定
+                </button>
+              </p>
+            )}
             <div className="mx-auto flex max-w-lg items-center gap-2">
               <button type="button" onClick={() => void (cameraActive ? stopCamera() : startCamera())} className="footer-btn ui-btn ui-btn-secondary h-10 px-3 text-xs">
                 {cameraActive ? "カメラOFF" : "カメラON"}
