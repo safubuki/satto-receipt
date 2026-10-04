@@ -38,4 +38,6 @@ export type VaultRecord = {
   ciphertext: ArrayBuffer
   iv: Uint8Array
   version: number
+  /** Base64 salt. Stored with the ciphertext so clearing localStorage does not make the vault unreadable. */
+  salt?: string
 }

@@ -22,42 +22,37 @@ export const toCsv = (receipts: Receipt[]): string => {
     'note',
     'is_nomikai',
     'is_jibara',
+    'id',
   ]
   const rows = receipts.flatMap((receipt) => {
-    // 品目がない場合は1行で出力
-    if (!receipt.lineItems.length) {
-      return [
-        [
-          receipt.visitedAt,
-          receipt.storeName,
-          receipt.category ?? '',
-          '',
-          '',
-          '',
-          '',
-          '',
-          receipt.total,
-          receipt.note ?? '',
-          receipt.isNomikai ? '1' : '',
-          receipt.isJibara ? '1' : '',
-        ],
-      ]
-    }
-
-    // 品目ごとに1行ずつ出力
-    return receipt.lineItems.map((line) => [
+    const items = receipt.lineItems ?? []
+    const base = [
       receipt.visitedAt,
       receipt.storeName,
       receipt.category ?? '',
+    ]
+    const tail = [
+      receipt.total,
+      receipt.note ?? '',
+      receipt.isNomikai ? '1' : '',
+      receipt.isJibara ? '1' : '',
+      receipt.id,
+    ]
+
+    // 品目がない場合は1行で出力
+    if (!items.length) {
+      return [[...base, '', '', '', '', '', ...tail]]
+    }
+
+    // 品目ごとに1行ずつ出力。同じ id の行は1件のレシートに戻す。
+    return items.map((line) => [
+      ...base,
       line.name,
       line.category,
       line.quantity,
       line.price,
       line.price * line.quantity,
-      receipt.total,
-      receipt.note ?? '',
-      receipt.isNomikai ? '1' : '',
-      receipt.isJibara ? '1' : '',
+      ...tail,
     ])
   })
 

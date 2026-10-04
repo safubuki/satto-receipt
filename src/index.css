@@ -19,91 +19,12 @@ html {
   text-size-adjust: 100%;
 }
 
-/* ===========================================
-   スマホ向けスタイル (768px以下)
-   高DPIデバイス対応: vw単位を使って画面幅に比例させる
-   =========================================== */
-@media screen and (max-width: 768px) {
-  /* 基準フォントサイズ */
-  html {
-    font-size: 18px; /* フォールバック */
-    font-size: clamp(18px, 5vw, 24px);
-  }
-  
-  body {
-    font-size: 18px; /* フォールバック */
-    font-size: clamp(18px, 5vw, 24px);
-    line-height: 1.5;
-  }
-  
-  /* ボタン系 */
-  button,
-  [role="button"],
-  .btn {
-    min-height: 56px; /* フォールバック */
-    min-height: clamp(52px, 14vw, 70px);
-    font-size: 18px; /* フォールバック */
-    font-size: clamp(18px, 5vw, 24px);
-    padding: 16px 20px; /* フォールバック */
-    padding: clamp(14px, 4vw, 20px) clamp(18px, 5vw, 24px);
-  }
-  
-  /* 入力系 */
+/* iOSは16px未満の入力にフォーカスすると画面を拡大する */
+@media screen and (max-width: 767px) {
   input,
   textarea,
   select {
-    min-height: 56px; /* フォールバック */
-    min-height: clamp(52px, 14vw, 70px);
-    font-size: 18px; /* フォールバック */
-    font-size: clamp(18px, 5vw, 24px);
-    padding: 16px; /* フォールバック */
-    padding: clamp(14px, 4vw, 20px);
-  }
-  
-  /* iOS zoom防止 - 16px以上必須 */
-  input[type="text"],
-  input[type="password"],
-  input[type="email"],
-  input[type="date"],
-  input[type="number"],
-  input[inputmode="numeric"] {
-    font-size: 18px; /* フォールバック */
-    font-size: clamp(18px, 5vw, 24px);
-  }
-  
-  /* チェックボックス */
-  input[type="checkbox"] {
-    width: 32px; /* フォールバック */
-    width: clamp(28px, 8vw, 40px);
-    height: 32px; /* フォールバック */
-    height: clamp(28px, 8vw, 40px);
-    min-width: 32px; /* フォールバック */
-    min-width: clamp(28px, 8vw, 40px);
-    min-height: 32px; /* フォールバック */
-    min-height: clamp(28px, 8vw, 40px);
-  }
-  
-  /* ラベル */
-  label {
-    font-size: 18px; /* フォールバック */
-    font-size: clamp(18px, 5vw, 24px);
-  }
-  
-  /* 見出し */
-  h1 { font-size: 32px; font-size: clamp(28px, 8vw, 40px); }
-  h2 { font-size: 28px; font-size: clamp(24px, 7vw, 36px); }
-  h3 { font-size: 24px; font-size: clamp(22px, 6vw, 32px); }
-  h4, h5, h6 { font-size: 22px; font-size: clamp(20px, 5.5vw, 28px); }
-  
-  /* 段落・テキスト */
-  p {
-    font-size: 18px; /* フォールバック */
-    font-size: clamp(18px, 5vw, 24px);
-  }
-  
-  /* span - 親からの継承を優先 */
-  span {
-    font-size: inherit;
+    font-size: 16px;
   }
 }
 
@@ -125,14 +46,103 @@ option {
   color: #f8fafc;
 }
 
+/* 入力欄は暗く沈む。ボタンは浮く。同じ角丸でも面の向きで区別する。 */
+.ui-field {
+  width: 100%;
+  border-radius: 0.75rem;
+  border: 1px solid rgba(148, 163, 184, 0.45);
+  background-color: rgba(2, 6, 23, 0.55);
+  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.55);
+  color: #fff;
+  color-scheme: dark;
+}
+
+.ui-field::placeholder {
+  color: rgba(148, 163, 184, 0.9);
+}
+
+.ui-field:focus {
+  outline: none;
+  border-color: #3de0a2;
+  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.55), 0 0 0 3px rgba(61, 224, 162, 0.28);
+}
+
+select.ui-field {
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='none' stroke='%233de0a2' stroke-width='2' stroke-linecap='round'%3E%3Cpath d='M5 7.5 10 12.5 15 7.5'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 0.7rem center;
+  background-size: 1rem;
+  padding-right: 2.2rem;
+}
+
+.ui-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 0.75rem;
+  border: 1px solid transparent;
+  font-weight: 700;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.18), 0 1px 2px rgba(0, 0, 0, 0.35);
+}
+
+.ui-btn:focus-visible {
+  outline: 2px solid #3de0a2;
+  outline-offset: 2px;
+}
+
+.ui-btn:disabled {
+  box-shadow: none;
+  cursor: not-allowed;
+}
+
+.ui-btn-primary {
+  background: #3de0a2;
+  color: #0b1224;
+}
+
+.ui-btn-primary:disabled {
+  background: transparent;
+  color: rgba(61, 224, 162, 0.55);
+  border-color: rgba(61, 224, 162, 0.4);
+}
+
+.ui-btn-secondary {
+  background: #1e293b;
+  color: #f8fafc;
+  border-color: rgba(226, 232, 240, 0.35);
+}
+
+.ui-btn-secondary:disabled {
+  opacity: 0.4;
+}
+
+.ui-btn-quiet {
+  background: transparent;
+  color: #e2e8f0;
+  border-color: rgba(226, 232, 240, 0.35);
+  box-shadow: none;
+}
+
+.ui-toggle {
+  border-radius: 999px;
+  border: 1.5px dashed rgba(203, 213, 225, 0.55);
+  background: transparent;
+  color: #cbd5e1;
+  font-weight: 700;
+  box-shadow: none;
+}
+
+.ui-toggle[aria-pressed="true"] {
+  border-style: solid;
+}
+
 /* iPhone safe area対応 */
 .safe-area-pb {
   padding-bottom: 20px; /* フォールバック（セーフエリアがない端末用） */
   padding-bottom: max(20px, env(safe-area-inset-bottom));
 }
 
-/* フッターボタン専用: グローバルなmin-height/paddingをリセット */
 .footer-btn {
-  min-height: unset !important;
-  padding: 0 !important;
+  min-height: unset;
 }

@@ -1,13 +1,15 @@
 ﻿import type { ReactNode } from "react"
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
-import { clsx } from "clsx"
 import { downloadCsv, toCsv } from "./lib/csv"
 import { runOcr } from "./lib/ocr"
-import { analyzeReceiptWithGemini, saveApiKey, clearApiKey, hasApiKey } from "./lib/geminiOcr"
-import { decryptVault, deriveKey, encryptVault, getOrCreateSalt, clearSalt, savePassphrase, getSavedPassphrase, clearSavedPassphrase } from "./lib/crypto"
+import { analyzeReceiptWithGemini, saveApiKey, clearApiKey, hasApiKey, summarizeMonth, getGeminiModel, saveGeminiModel, type GeminiModelId } from "./lib/geminiOcr"
+import { decryptVault, deriveKey, encryptVault, readSalt, storeSalt, bytesToBase64, base64ToBytes, clearSalt, savePassphrase, getSavedPassphrase, clearSavedPassphrase } from "./lib/crypto"
+import { formatLocalDate, formatLocalMonth, shiftMonth } from "./lib/date"
 import { clearVault, loadVault, saveVault } from "./lib/db"
 import type { Category, LineItem, Receipt, Vault } from "./lib/types"
 import { importCsvToReceipts } from "./lib/csvImport"
+import { ReceiptFields, type ReceiptFormValue } from "./components/ReceiptFields"
+import { Dialog } from "./components/Dialog"
 
 import "./index.css"
 
@@ -16,24 +18,15 @@ type Session = {
   vault: Vault
 }
 
-type LineItemDraft = {
-  id: string
-  name: string
-  category: string
-  price: string
-  quantity: string
+type ReceiptDraft = ReceiptFormValue & {
+  imageData?: string
 }
 
-type ReceiptDraft = {
-  storeName: string
-  visitedAt: string
-  total: string
-  note: string
-  category: string
-  imageData?: string
-  lineItems: LineItemDraft[]
-  isNomikai?: boolean  // 飲み会フラグ
-  isJibara?: boolean   // 自腹フラグ
+type AppNotice = {
+  title: string
+  message: string
+  confirmLabel?: string
+  danger?: boolean
 }
 
 const defaultCategories: Category[] = [
@@ -55,7 +48,7 @@ const createVault = (): Vault => ({
 
 const initialDraft = (): ReceiptDraft => ({
   storeName: "",
-  visitedAt: new Date().toISOString().slice(0, 10),
+  visitedAt: formatLocalDate(),
   total: "",
   note: "",
   category: "",
@@ -64,18 +57,42 @@ const initialDraft = (): ReceiptDraft => ({
   isJibara: false,
 })
 
+const hasUnsavedDraft = (draft: ReceiptDraft) =>
+  draft.storeName.trim() !== "" ||
+  Number(String(draft.total).replace(/,/g, "")) > 0 ||
+  draft.lineItems.length > 0 ||
+  draft.note.trim() !== "" ||
+  draft.category.trim() !== "" ||
+  Boolean(draft.isNomikai) ||
+  Boolean(draft.isJibara)
+
+const normalizeVault = (vault: Vault): Vault => ({
+  ...vault,
+  receipts: (vault.receipts ?? []).map((receipt) => ({
+    ...receipt,
+    total: Number(receipt.total) || 0,
+    lineItems: receipt.lineItems ?? [],
+  })),
+})
+
+const isValidDate = (value: string) => /^\d{4}-\d{2}-\d{2}$/.test(value)
+
 const compressImage = async (file: File, maxSide = 1280, quality = 0.6): Promise<string> => {
   const bitmap = await createImageBitmap(file)
-  const { width, height } = bitmap
-  const scale = Math.min(1, maxSide / Math.max(width, height))
-  const canvas = document.createElement("canvas")
-  canvas.width = Math.round(width * scale)
-  canvas.height = Math.round(height * scale)
-  const ctx = canvas.getContext("2d")
-  if (ctx) ctx.drawImage(bitmap, 0, 0, canvas.width, canvas.height)
-  return canvas.toDataURL("image/jpeg", quality)
+  try {
+    const { width, height } = bitmap
+    const scale = Math.min(1, maxSide / Math.max(width, height))
+    const canvas = document.createElement("canvas")
+    canvas.width = Math.round(width * scale)
+    canvas.height = Math.round(height * scale)
+    const ctx = canvas.getContext("2d")
+    if (ctx) ctx.drawImage(bitmap, 0, 0, canvas.width, canvas.height)
+    return canvas.toDataURL("image/jpeg", quality)
+  } finally {
+    bitmap.close()
+  }
 }
-const parseReceiptText = (text: string): { items: LineItemDraft[]; total?: string; store?: string } => {
+const parseReceiptText = (text: string): { total?: string; store?: string } => {
   const lines = text
     .split("\n")
     .map((l) => l.trim())
@@ -91,7 +108,7 @@ const parseReceiptText = (text: string): { items: LineItemDraft[]; total?: strin
     }
   }
 
-  return { items: [], total, store }
+  return { total, store }
 }
 
 const formatCurrency = (value: number) =>
@@ -107,55 +124,20 @@ const Pill = ({ children }: { children: ReactNode }) => (
   </span>
 )
 
-// スマホ判定ヘルパー関数（安全に判定）
-const detectMobile = (): boolean => {
-  try {
-    if (typeof window === 'undefined') return true // SSR時はスマホ扱い
-    
-    // 画面幅判定 (最も確実)
-    const narrowScreen = window.innerWidth < 768
-    if (narrowScreen) return true
-    
-    // タッチデバイス判定
-    let hasTouch = false
-    try {
-      hasTouch = 'ontouchstart' in window || (navigator && navigator.maxTouchPoints > 0)
-    } catch {
-      // ignore
-    }
-    if (hasTouch) return true
-    
-    // User-Agent判定
-    let mobileUA = false
-    try {
-      if (navigator && navigator.userAgent) {
-        mobileUA = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)
-      }
-    } catch {
-      // ignore
-    }
-    
-    return mobileUA
-  } catch {
-    // 何かエラーがあったらスマホ扱い（安全側）
-    return true
-  }
-}
+const toLineItems = (items: ReceiptDraft["lineItems"]): LineItem[] =>
+  items
+    .filter((item) => item.name.trim() || Number(item.price))
+    .map((item) => ({
+      id: item.id || crypto.randomUUID(),
+      name: item.name.trim() || "品目",
+      category: item.category,
+      price: Number(item.price) || 0,
+      quantity: Number(item.quantity) || 1,
+    }))
 
-// スマホ判定カスタムフック
-const useIsMobile = () => {
-  const [isMobile, setIsMobile] = useState(detectMobile)
-  
-  useEffect(() => {
-    // マウント後に再判定
-    setIsMobile(detectMobile())
-    
-    const handleResize = () => setIsMobile(detectMobile())
-    window.addEventListener('resize', handleResize)
-    return () => window.removeEventListener('resize', handleResize)
-  }, [])
-  
-  return isMobile
+const formatMonthLabel = (month: string) => {
+  const [year, monthNumber] = month.split("-")
+  return `${year}年${Number(monthNumber)}月`
 }
 
 function App() {
@@ -171,17 +153,27 @@ function App() {
   const [filters, setFilters] = useState({ query: "", category: "all" })
   const [summaryTab, setSummaryTab] = useState<"overview" | "monthly">("overview")
   // 選択中の年月（YYYY-MM形式）
-  const [selectedMonth, setSelectedMonth] = useState(() => new Date().toISOString().slice(0, 7))
+  const [selectedMonth, setSelectedMonth] = useState(() => formatLocalMonth())
   const [visibleCount, setVisibleCount] = useState(20)
   const [expandedImages, setExpandedImages] = useState<Set<string>>(new Set())
-  const [selectedReceipt, setSelectedReceipt] = useState<Receipt | null>(null)
+  const [openReceiptIds, setOpenReceiptIds] = useState<Set<string>>(new Set())
   const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null)
-  const [editingReceipt, setEditingReceipt] = useState<Receipt | null>(null)
-  const [detailReceipt, setDetailReceipt] = useState<Receipt | null>(null)
-  // 常に最新のdefaultCategoriesを使用（古いvaultデータとの互換性のため）
-  const categories = defaultCategories
+  const [editDraft, setEditDraft] = useState<ReceiptDraft | null>(null)
+  const [editingId, setEditingId] = useState<string | null>(null)
+  const [monthInsight, setMonthInsight] = useState<string | null>(null)
+  const [insightLoading, setInsightLoading] = useState(false)
+  const [insightError, setInsightError] = useState<string | null>(null)
+  const categories = useMemo(() => {
+    const stored = session?.vault.categories ?? []
+    const extras = stored.filter(
+      (category) => !defaultCategories.some((base) => base.id === category.id || base.name === category.name),
+    )
+    return [...defaultCategories, ...extras]
+  }, [session])
   const videoRef = useRef<HTMLVideoElement | null>(null)
   const streamRef = useRef<MediaStream | null>(null)
+  const cameraSession = useRef(0)
+  const autoLoginStarted = useRef(false)
   const [cameraActive, setCameraActive] = useState(false)
   const [cameraError, setCameraError] = useState<string | null>(null)
   const [cameraReady, setCameraReady] = useState(false)
@@ -189,9 +181,12 @@ function App() {
   const [capturedImage, setCapturedImage] = useState<string | null>(null)
   const [isProcessing, setIsProcessing] = useState(false)
   const [useGemini, setUseGemini] = useState(true)
+  const [geminiModel, setGeminiModel] = useState<GeminiModelId>(() => getGeminiModel())
   const [showApiKeyModal, setShowApiKeyModal] = useState(false)
   const [apiKeyInput, setApiKeyInput] = useState("")
-  const isMobile = useIsMobile()
+  const [apiKeyError, setApiKeyError] = useState<string | null>(null)
+  const [notice, setNotice] = useState<AppNotice | null>(null)
+  const noticeResolver = useRef<((value: boolean) => void) | null>(null)
 
   useEffect(() => {
     const checkFirstTime = async () => {
@@ -244,8 +239,14 @@ function App() {
 
   const persistVault = async (nextVault: Vault, key: CryptoKey) => {
     const encrypted = await encryptVault(nextVault, key)
-    await saveVault({ id: "data", version: 1, ...encrypted })
-    setSession({ key, vault: nextVault })
+    const salt = readSalt()
+    await saveVault({
+      id: "data",
+      version: 1,
+      ...encrypted,
+      ...(salt ? { salt: bytesToBase64(salt) } : {}),
+    })
+    setSession({ key, vault: normalizeVault(nextVault) })
   }
 
   const handleUnlock = async (passphrase: string, rememberMe: boolean = false) => {
@@ -253,38 +254,75 @@ function App() {
     setUnlocking(true)
 
     try {
-      const salt = getOrCreateSalt()
-      const key = await deriveKey(passphrase, salt)
       const stored = await loadVault()
+      let saltFromRecord: Uint8Array | null = null
+      if (stored?.salt) {
+        try {
+          const bytes = base64ToBytes(stored.salt)
+          saltFromRecord = bytes.length > 0 ? bytes : null
+        } catch {
+          saltFromRecord = null
+        }
+      }
+      const localSalt = readSalt()
+      const salts: Uint8Array[] = []
+      for (const candidate of [saltFromRecord, localSalt]) {
+        if (!candidate) continue
+        const encoded = bytesToBase64(candidate)
+        if (salts.some((existing) => bytesToBase64(existing) === encoded)) continue
+        salts.push(candidate)
+      }
 
       if (!stored) {
-        const vault = createVault()
-        await persistVault(vault, key)
+        const salt = salts[0] ?? crypto.getRandomValues(new Uint8Array(16))
+        storeSalt(salt)
+        const key = await deriveKey(passphrase, salt)
+        await persistVault(createVault(), key)
         setDraft(initialDraft())
-        // 新規作成時もrememberMeがtrueならパスフレーズを保存
-        if (rememberMe) {
-          savePassphrase(passphrase)
-        }
+        if (rememberMe) savePassphrase(passphrase)
         return
       }
 
-      const vault = await decryptVault({
-        ciphertext: stored.ciphertext,
-        iv: stored.iv,
-        key,
-      })
+      if (!salts.length) {
+        setUnlockError("暗号化に必要なソルトが見つかりません。パスフレーズだけでは復元できません。CSVバックアップがあれば、初期化のあと読み込んでください。")
+        return
+      }
 
-      setSession({ key, vault })
-      setDraft(initialDraft())
-      
-      // ログイン成功時、rememberMeがtrueならパスフレーズを保存
-      if (rememberMe) {
-        savePassphrase(passphrase)
+      let opened = false
+      for (const salt of salts) {
+        try {
+          const key = await deriveKey(passphrase, salt)
+          const vault = normalizeVault(await decryptVault({
+            ciphertext: stored.ciphertext,
+            iv: stored.iv,
+            key,
+          }))
+          storeSalt(salt)
+          setSession({ key, vault })
+          setDraft(initialDraft())
+          const encoded = bytesToBase64(salt)
+          if (stored.salt !== encoded) {
+            try {
+              await saveVault({ ...stored, salt: encoded })
+            } catch (error) {
+              console.error(error)
+            }
+          }
+          if (rememberMe) savePassphrase(passphrase)
+          opened = true
+          break
+        } catch (error) {
+          console.error(error)
+        }
+      }
+
+      if (!opened) {
+        setUnlockError("パスフレーズが違うかデータを復号できませんでした。")
+        clearSavedPassphrase()
       }
     } catch (error) {
       console.error(error)
       setUnlockError("パスフレーズが違うかデータを復号できませんでした。")
-      // 自動ログイン失敗時は記憶を削除
       clearSavedPassphrase()
     } finally {
       setUnlocking(false)
@@ -293,16 +331,14 @@ function App() {
 
   // 自動ログイン処理
   useEffect(() => {
-    const autoLogin = async () => {
-      const savedPassphrase = getSavedPassphrase()
-      if (savedPassphrase && !session) {
-        // 保存されたパスフレーズがある場合、自動ログイン試行
-        await handleUnlock(savedPassphrase, false) // rememberMe=falseで再保存しない
-      }
+    if (autoLoginStarted.current) return
+    autoLoginStarted.current = true
+    const savedPassphrase = getSavedPassphrase()
+    if (savedPassphrase) {
+      void handleUnlock(savedPassphrase, false)
     }
-    autoLogin()
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []) // 初回マウント時のみ実行
+  }, [])
 
   const handleLock = async () => {
     stopCamera()
@@ -318,10 +354,49 @@ function App() {
     // 記憶を消すのはデータ初期化時のみ
   }
 
+  const closeNotice = (value: boolean) => {
+    const resolve = noticeResolver.current
+    noticeResolver.current = null
+    setNotice(null)
+    resolve?.(value)
+  }
+
+  const askConfirm = (message: string, options?: { title?: string; confirmLabel?: string; danger?: boolean }) =>
+    new Promise<boolean>((resolve) => {
+      if (noticeResolver.current) noticeResolver.current(false)
+      noticeResolver.current = resolve
+      setNotice({
+        title: options?.title ?? "確認",
+        message,
+        confirmLabel: options?.confirmLabel ?? "続ける",
+        danger: options?.danger,
+      })
+    })
+
+  const showNotice = (message: string, title = "お知らせ") =>
+    new Promise<void>((resolve) => {
+      if (noticeResolver.current) noticeResolver.current(false)
+      noticeResolver.current = () => resolve()
+      setNotice({ title, message })
+    })
+
+  const closeApiKeyModal = () => {
+    setApiKeyInput("")
+    setApiKeyError(null)
+    setShowApiKeyModal(false)
+  }
+
+  const closeEdit = () => {
+    setEditDraft(null)
+    setEditingId(null)
+  }
+
   const handleReset = async () => {
-    const confirmed = window.confirm(
-      '⚠️ これまで保存したすべてのデータ（レシート・設定）が完全に削除されます。\n\nこの操作は取り消しできません。\n本当に削除しますか？'
-    )
+    const confirmed = await askConfirm("保存したレシートと設定が削除されます。この操作は取り消せません。", {
+      title: "データを初期化",
+      confirmLabel: "削除する",
+      danger: true,
+    })
     if (!confirmed) return
     
     await clearVault()
@@ -335,7 +410,19 @@ function App() {
     setLastUploadedName(null)
   }
 
-  const handleOcr = async (file: File, input?: HTMLInputElement) => {
+  const handleOcr = async (file: File, input?: HTMLInputElement, alreadyConfirmed = false) => {
+    if (!alreadyConfirmed && hasUnsavedDraft(draft)) {
+      const confirmed = await askConfirm("未保存の入力があります。上書きしますか？", {
+        title: "入力の上書き",
+        confirmLabel: "上書きする",
+      })
+      if (!confirmed) {
+        if (input) input.value = ""
+        return false
+      }
+    }
+
+    setCameraError(null)
     setOcrProgress(0)
     setLastUploadedName(file.name)
     try {
@@ -356,8 +443,7 @@ function App() {
           }
         }
         
-        // 品目データをLineItemDraft形式に変換
-        const lineItemDrafts: LineItemDraft[] = (result.items || []).map((item: { name: string; price: number; quantity?: number; category?: string }, idx: number) => ({
+        const lineItemDrafts: ReceiptDraft["lineItems"] = (result.items || []).map((item: { name: string; price: number; quantity?: number; category?: string }, idx: number) => ({
           id: `item-${idx}-${Date.now()}`,
           name: item.name,
           category: item.category || selectedCategory,
@@ -368,9 +454,11 @@ function App() {
         setDraft({
           ...initialDraft(),
           storeName: result.storeName || "",
-          visitedAt: result.date || new Date().toISOString().slice(0, 10),
+          visitedAt: result.date && isValidDate(result.date) ? result.date : formatLocalDate(),
           total: result.total || "",
           category: selectedCategory,
+          note: result.highlight || "",
+          isNomikai: result.isNomikai,
           imageData: preview,
           lineItems: lineItemDrafts,
         })
@@ -386,9 +474,11 @@ function App() {
           imageData: preview,
         })
       }
+      return true
     } catch (error) {
       console.error("OCR error:", error)
       setCameraError(error instanceof Error ? error.message : "OCR処理に失敗しました")
+      return false
     } finally {
       setOcrProgress(null)
       if (input) input.value = ""
@@ -407,22 +497,18 @@ function App() {
     if (!session) return
     
     // ドラフトの品目データをLineItem形式に変換
-    const lineItems: LineItem[] = draft.lineItems.map((item) => ({
-      id: item.id,
-      name: item.name,
-      category: item.category,
-      price: Number(item.price) || 0,
-      quantity: Number(item.quantity) || 1,
-    }))
+    const lineItems = toLineItems(draft.lineItems)
 
-    const computedTotal = Number(draft.total) || 0
+    if (!hasUnsavedDraft(draft)) return
+
+    const computedTotal = Number(String(draft.total).replace(/,/g, "")) || 0
 
     const now = new Date().toISOString()
 
     const receipt: Receipt = {
       id: crypto.randomUUID(),
       storeName: draft.storeName || "無題のレシート",
-      visitedAt: draft.visitedAt || now.slice(0, 10),
+      visitedAt: draft.visitedAt || formatLocalDate(),
       total: computedTotal,
       category: draft.category,
       note: draft.note || undefined,
@@ -456,16 +542,60 @@ function App() {
     await persistVault(nextVault, session.key)
   }
 
-  const handleUpdateReceipt = async (id: string, storeName: string, total: number, visitedAt: string, category?: string, isNomikai?: boolean, isJibara?: boolean) => {
-    if (!session) return
-    const nextVault = {
-      ...session.vault,
-      receipts: session.vault.receipts.map((r) =>
-        r.id === id ? { ...r, storeName, total, visitedAt, category, isNomikai, isJibara, updatedAt: new Date().toISOString() } : r
-      ),
+  const openEdit = (receipt: Receipt) => {
+    setEditingId(receipt.id)
+    setEditDraft({
+      storeName: receipt.storeName,
+      visitedAt: receipt.visitedAt,
+      total: String(receipt.total),
+      note: receipt.note ?? "",
+      category: receipt.category ?? "",
+      isNomikai: Boolean(receipt.isNomikai),
+      isJibara: Boolean(receipt.isJibara),
+      imageData: receipt.imageData,
+      lineItems: (receipt.lineItems ?? []).map((item) => ({
+        id: item.id,
+        name: item.name,
+        category: item.category,
+        price: String(item.price),
+        quantity: String(item.quantity),
+      })),
+    })
+  }
+
+  const saveEdit = async () => {
+    if (!session || !editingId || !editDraft) return
+    const current = session.vault.receipts.find((receipt) => receipt.id === editingId)
+    if (!current) return
+    const now = new Date().toISOString()
+    const nextReceipt: Receipt = {
+      ...current,
+      storeName: editDraft.storeName || "無題のレシート",
+      visitedAt: editDraft.visitedAt || formatLocalDate(),
+      total: Number(String(editDraft.total).replace(/,/g, "")) || 0,
+      category: editDraft.category || undefined,
+      note: editDraft.note || undefined,
+      isNomikai: Boolean(editDraft.isNomikai),
+      isJibara: Boolean(editDraft.isJibara),
+      lineItems: toLineItems(editDraft.lineItems),
+      updatedAt: now,
     }
-    await persistVault(nextVault, session.key)
-    setEditingReceipt(null)
+    await persistVault({
+      ...session.vault,
+      receipts: session.vault.receipts.map((receipt) => (receipt.id === editingId ? nextReceipt : receipt)),
+    }, session.key)
+    setEditingId(null)
+    setEditDraft(null)
+  }
+
+  const handleAddCategory = async (name: string) => {
+    if (!session) return
+    const trimmed = name.trim()
+    if (!trimmed || categories.some((category) => category.name === trimmed)) return
+    await persistVault({
+      ...session.vault,
+      categories: [...categories, { id: crypto.randomUUID(), name: trimmed, color: "#94a3b8" }],
+    }, session.key)
   }
 
   const handleExport = () => {
@@ -477,18 +607,50 @@ function App() {
   }
 
   const handleImportCsv = async (file: File) => {
-    const text = await file.text()
-    const receipts = importCsvToReceipts(text)
     if (!session) return
-    const nextVault = {
-      ...session.vault,
-      receipts: [...receipts, ...session.vault.receipts],
+    try {
+      const text = await file.text()
+      const receipts = importCsvToReceipts(text)
+      if (!receipts.length) {
+        await showNotice("読み込めるレシートがありませんでした。", "読み込めませんでした")
+        return
+      }
+      const existingIds = new Set(session.vault.receipts.map((receipt) => receipt.id))
+      const fresh = receipts.filter((receipt) => !existingIds.has(receipt.id))
+      if (!fresh.length) {
+        await showNotice("このCSVのレシートはすでに読み込み済みです。", "読み込めませんでした")
+        return
+      }
+      await persistVault({
+        ...session.vault,
+        receipts: [...fresh, ...session.vault.receipts],
+      }, session.key)
+      const skipped = receipts.length - fresh.length
+      await showNotice(
+        skipped > 0
+          ? `${fresh.length}件を読み込みました。${skipped}件は重複のためスキップしました。`
+          : `${fresh.length}件を読み込みました。`,
+        "読み込み完了",
+      )
+    } catch (error) {
+      console.error(error)
+      await showNotice("CSVの読み込みに失敗しました。ファイル形式を確認してください。", "読み込めませんでした")
     }
-    await persistVault(nextVault, session.key)
   }
 
   const handleCleanupImages = async () => {
     if (!session) return
+    const hasImage = session.vault.receipts.some((receipt) => receipt.imageData)
+    if (!hasImage) {
+      await showNotice("保存されている画像はありません。")
+      return
+    }
+    const confirmed = await askConfirm("保存済みのレシート画像だけを削除します。店名や金額は残ります。", {
+      title: "画像を削除",
+      confirmLabel: "削除する",
+      danger: true,
+    })
+    if (!confirmed) return
     const cleaned = session.vault.receipts.map((r) => ({ ...r, imageData: undefined }))
     await persistVault({ ...session.vault, receipts: cleaned }, session.key)
     setExpandedImages(new Set())
@@ -532,6 +694,7 @@ function App() {
   }
 
   const stopCamera = () => {
+    cameraSession.current += 1
     streamRef.current?.getTracks().forEach((t) => t.stop())
     streamRef.current = null
     if (videoRef.current) videoRef.current.srcObject = null
@@ -540,8 +703,6 @@ function App() {
     setCameraReady(false)
     setCameraPaused(false)
     setCapturedImage(null)
-    // 撮影データを破棄し、ドラフトをリセット
-    setDraft(initialDraft())
   }
 
   // カメラを一時停止
@@ -569,6 +730,17 @@ function App() {
 
 
   const captureFromCamera = async () => {
+    if (cameraPaused) {
+      resumeCamera()
+      return
+    }
+    if (hasUnsavedDraft(draft)) {
+      const confirmed = await askConfirm("未保存の入力があります。上書きしますか？", {
+        title: "入力の上書き",
+        confirmLabel: "上書きする",
+      })
+      if (!confirmed) return
+    }
     if (!videoRef.current) {
       setCameraError("カメラが初期化されていません。起動し直してください。")
       return
@@ -579,6 +751,7 @@ function App() {
     }
     
     const video = videoRef.current
+    const session = cameraSession.current
     
     // 1. カメラを一時停止（撮影した瞬間を固定）
     pauseCamera()
@@ -600,21 +773,18 @@ function App() {
     )
     if (!blob) {
       setIsProcessing(false)
-      resumeCamera()
+      if (cameraSession.current === session) resumeCamera()
       return
     }
     
     const file = new File([blob], `capture-${Date.now()}.jpg`, { type: "image/jpeg" })
     
-    // 4. OCR処理
+    // 4. OCR処理。スマホは結果を確認できるよう停止したままにする。
     try {
-      await handleOcr(file)
+      const recognized = await handleOcr(file, undefined, true)
+      if (!recognized && cameraSession.current === session) resumeCamera()
     } finally {
       setIsProcessing(false)
-      // 処理完了後、3秒待ってからカメラを再開
-      setTimeout(() => {
-        resumeCamera()
-      }, 3000)
     }
   }
 
@@ -637,38 +807,25 @@ function App() {
       .sort((a, b) => b.visitedAt.localeCompare(a.visitedAt))
   }, [session, filters, selectedMonth])
 
-  // データが存在する月のリストを取得
-  const availableMonths = useMemo(() => {
-    if (!session) return []
-    const months = new Set<string>()
-    session.vault.receipts.forEach((r) => {
-      if (r.visitedAt) months.add(r.visitedAt.slice(0, 7))
-    })
-    return Array.from(months).sort((a, b) => b.localeCompare(a))
-  }, [session])
+  const currentMonth = formatLocalMonth()
 
-  // 前月へ移動（データがある月まで）
+  // 支出がない月にも戻れるよう、暦の1か月ずつ移動する
   const goToPrevMonth = useCallback(() => {
-    const prevMonths = availableMonths.filter((m) => m < selectedMonth)
-    if (prevMonths.length > 0) {
-      setSelectedMonth(prevMonths[0])
-      setVisibleCount(20)
-    }
-  }, [availableMonths, selectedMonth])
+    setSelectedMonth((month) => shiftMonth(month, -1))
+    setVisibleCount(20)
+  }, [])
 
-  // 次月へ移動（データがある月まで）
   const goToNextMonth = useCallback(() => {
-    const nextMonths = availableMonths.filter((m) => m > selectedMonth).reverse()
-    if (nextMonths.length > 0) {
-      setSelectedMonth(nextMonths[0])
-      setVisibleCount(20)
-    }
-  }, [availableMonths, selectedMonth])
+    setSelectedMonth((month) => {
+      if (month >= currentMonth) return month
+      const next = shiftMonth(month, 1)
+      return next > currentMonth ? month : next
+    })
+    setVisibleCount(20)
+  }, [currentMonth])
 
-  // 前月にデータがあるか
-  const hasPrevMonth = availableMonths.some((m) => m < selectedMonth)
-  // 次月にデータがあるか
-  const hasNextMonth = availableMonths.some((m) => m > selectedMonth)
+  const hasPrevMonth = selectedMonth > "2000-01"
+  const hasNextMonth = selectedMonth < currentMonth
 
   // 選択月の合計金額
   const selectedMonthTotal = useMemo(() => {
@@ -695,9 +852,7 @@ function App() {
   }, [session, selectedMonth])
 
   // ドラフトに未保存データがあるか
-  const hasDraftData = useMemo(() => {
-    return draft.storeName.trim() !== '' || (draft.total !== '' && parseInt(draft.total) > 0)
-  }, [draft.storeName, draft.total])
+  const hasDraftData = useMemo(() => hasUnsavedDraft(draft), [draft])
 
   const displayedReceipts = useMemo(
     () => (filteredReceipts.length > visibleCount ? filteredReceipts.slice(0, visibleCount) : filteredReceipts),
@@ -729,1597 +884,533 @@ function App() {
       .sort((a, b) => (a.year > b.year ? -1 : 1))
   }, [session])
 
-  // ========== スマホ専用UI ==========
-  if (isMobile) {
-    return (
-      <div className="min-h-screen bg-fog text-sand text-lg">
-        {/* スマホ用ヘッダー */}
-        <header className="sticky top-0 z-20 border-b border-white/10 bg-fog/95 backdrop-blur-lg" style={{ padding: '12px 16px' }}>
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="rounded-full bg-gradient-to-r from-mint/60 to-mint/30 p-[2px]" style={{ width: '44px', height: '44px' }}>
-                <div className="h-full w-full rounded-full bg-fog/90 p-[1px]">
-                  <img
-                    src={`${import.meta.env.BASE_URL}turtle_icon_receipt.png`}
-                    alt="アイコン"
-                    className="h-full w-full rounded-full object-cover"
-                  />
-                </div>
-              </div>
-              <h1 className="font-bold text-white whitespace-nowrap" style={{ fontSize: '18px' }}>サッとレシート</h1>
-            </div>
-            {session && (
-              <button
-                onClick={handleLock}
-                className="rounded-full border border-white/20 bg-white/10 font-semibold text-white"
-                style={{ fontSize: '11px', padding: '4px 12px' }}
-              >
-                ログアウト
-              </button>
-            )}
-          </div>
-        </header>
+  useEffect(() => {
+    setMonthInsight(null)
+    setInsightError(null)
+  }, [selectedMonth])
 
-        {!session ? (
-          // ========== スマホ用ログイン画面 ==========
-          <div className="flex min-h-[60vh] flex-col items-center justify-center px-4 py-8">
-            <div className="w-full rounded-2xl border border-white/10 bg-white/5 p-4" style={{ maxWidth: '320px' }}>
-              <div className="text-center mb-4">
-                <div className="mx-auto rounded-full bg-gradient-to-r from-mint/60 to-mint/30 p-[2px] w-16 h-16 mb-3">
-                  <div className="h-full w-full rounded-full bg-fog/90 p-[1px]">
-                    <img
-                      src={`${import.meta.env.BASE_URL}turtle_icon_receipt.png`}
-                      alt="アイコン"
-                      className="h-full w-full rounded-full object-cover"
-                    />
-                  </div>
-                </div>
-                <h2 className="font-bold text-white text-base">サッとレシート</h2>
-                <p className="text-slate-400 text-xs mt-1">買い物ごとにサッとパシャっと</p>
-              </div>
-              <UnlockPanel onUnlock={handleUnlock} unlocking={unlocking} error={unlockError} isFirstTime={isFirstTime} onReset={handleReset} />
-            </div>
-          </div>
-        ) : (
-          // ========== スマホ用メイン画面 ==========
-          <div className="pb-40">
-            {/* APIキー設定モーダル */}
-            {showApiKeyModal && (
-              <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 px-4">
-                <div className="w-full rounded-2xl border border-white/10 bg-fog p-5" style={{ maxWidth: '92vw' }}>
-                  <h3 className="font-bold text-white text-base">⚙️ API設定</h3>
-                  <p className="text-slate-300 text-sm mt-3 leading-relaxed">
-                    Gemini APIキーを入力してください。キーは端末内にのみ保存されます。
-                  </p>
-                  <p className="text-slate-400 text-sm mt-2 leading-relaxed">
-                    <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener noreferrer" className="text-mint underline">Google AI Studio</a> から無料で取得できます
-                  </p>
-                  <input
-                    type="password"
-                    className="w-full rounded-xl border border-white/10 bg-white/5 text-white placeholder-slate-500 px-4 py-3 mt-4 text-base"
-                    placeholder="AIza..."
-                    value={apiKeyInput}
-                    onChange={(e) => setApiKeyInput(e.target.value)}
-                  />
-                  <div className="grid grid-cols-2 gap-3 mt-4">
-                    <button
-                      onClick={() => {
-                        if (apiKeyInput.trim()) {
-                          saveApiKey(apiKeyInput.trim())
-                          setApiKeyInput("")
-                        }
-                        setShowApiKeyModal(false)
-                      }}
-                      className="rounded-xl bg-mint font-bold text-fog py-3 text-sm"
-                    >
-                      保存
-                    </button>
-                    <button
-                      onClick={() => {
-                        clearApiKey()
-                        setApiKeyInput("")
-                        setShowApiKeyModal(false)
-                      }}
-                      className="rounded-xl border border-red-400/50 bg-red-400/10 font-bold text-red-300 py-3 text-sm"
-                    >
-                      削除
-                    </button>
-                  </div>
-                  <button
-                    onClick={() => setShowApiKeyModal(false)}
-                    className="w-full text-center text-slate-400 text-sm mt-4 py-2"
-                  >
-                    キャンセル
-                  </button>
-                </div>
-              </div>
-            )}
-
-            {/* カメラプレビュー (大きく表示) */}
-            {cameraActive && (
-              <div className="px-4 pt-4">
-                <div className="relative overflow-hidden rounded-3xl border-2 border-mint/40 bg-black shadow-xl">
-                  {/* 撮影した画像のオーバーレイ */}
-                  {capturedImage && cameraPaused && (
-                    <div className="absolute inset-0 z-10">
-                      <img
-                        src={capturedImage}
-                        alt="撮影画像"
-                        className="h-full w-full object-cover"
-                      />
-                      <div className="absolute inset-0 flex items-center justify-center bg-black/50">
-                        {isProcessing ? (
-                          <div className="text-center">
-                            <div className="mx-auto h-16 w-16 animate-spin rounded-full border-4 border-mint border-t-transparent" />
-                            <p className="mt-4 text-3xl font-bold text-white">📝 認識中...</p>
-                          </div>
-                        ) : (
-                          <div className="text-center">
-                            <p className="text-5xl">✅</p>
-                            <p className="mt-2 text-3xl font-bold text-mint">認識完了!</p>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  )}
-                  <video
-                    ref={setVideoRef}
-                    className="aspect-[3/4] w-full object-cover"
-                    autoPlay
-                    playsInline
-                    muted
-                    style={{ backgroundColor: "#0b1224" }}
-                  />
-                  {!cameraReady && !capturedImage && (
-                    <p className="bg-white/5 px-4 py-3 text-center text-base text-slate-400">
-                      📹 カメラ準備中...
-                    </p>
-                  )}
-                  {cameraError && (
-                    <p className="bg-red-500/10 px-4 py-3 text-center text-base text-red-200">
-                      ⚠️ {cameraError}
-                    </p>
-                  )}
-                </div>
-              </div>
-            )}
-
-            {/* プレビュー画像 */}
-            {!cameraActive && draft.imageData && (
-              <div className="px-4 pt-4">
-                <div className="overflow-hidden rounded-2xl border border-white/10 bg-black/30">
-                  <img
-                    src={draft.imageData}
-                    alt="撮影画像"
-                    className="max-h-64 w-full object-contain"
-                  />
-                </div>
-              </div>
-            )}
-
-            {/* 月選択とサマリー */}
-            <div className="mt-4 px-4">
-              <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
-                {/* 月選択 */}
-                <div className="flex items-center justify-between mb-2">
-                  <button
-                    onClick={goToPrevMonth}
-                    disabled={!hasPrevMonth}
-                    className={clsx(
-                      "rounded-lg px-3 py-1 font-bold transition text-lg",
-                      hasPrevMonth
-                        ? "bg-white/10 text-white hover:bg-white/20"
-                        : "bg-white/5 text-slate-600 cursor-not-allowed"
-                    )}
-                  >
-                    &lt;
-                  </button>
-                  <span className="font-semibold text-white text-base">
-                    {selectedMonth.replace('-', '年')}月
-                  </span>
-                  <button
-                    onClick={goToNextMonth}
-                    disabled={!hasNextMonth}
-                    className={clsx(
-                      "rounded-lg px-3 py-1 font-bold transition text-lg",
-                      hasNextMonth
-                        ? "bg-white/10 text-white hover:bg-white/20"
-                        : "bg-white/5 text-slate-600 cursor-not-allowed"
-                    )}
-                  >
-                    &gt;
-                  </button>
-                </div>
-                {/* 合計金額 */}
-                <div className="rounded-xl border border-mint/30 bg-mint/10 py-2 px-3 mb-2">
-                  <p className="text-center font-bold text-mint text-xl">
-                    {formatCurrency(selectedMonthTotal)}
-                  </p>
-                </div>
-                {/* 飲み会・自腹 */}
-                <div className="grid grid-cols-2 gap-2">
-                  <div className="rounded-xl border border-white/10 bg-white/5 py-2 px-3">
-                    <p className="text-slate-400 text-xs">🍺 飲み会</p>
-                    <p className="font-bold text-amber-400 text-base">
-                      {formatCurrency(selectedMonthNomikai)}
-                    </p>
-                  </div>
-                  <div className="rounded-xl border border-white/10 bg-white/5 py-2 px-3">
-                    <p className="text-slate-400 text-xs">👛 自腹</p>
-                    <p className="font-bold text-rose-400 text-base">
-                      {formatCurrency(selectedMonthJibara)}
-                    </p>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* 入力フォーム（シンプル版）*/}
-            <div className="mt-4 space-y-4 px-4">
-              <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
-                <h3 className="font-semibold text-white text-base mb-3">支出情報入力</h3>
-                <div className="space-y-3">
-                  <input
-                    className="w-full rounded-xl border border-white/10 bg-white/5 text-white placeholder-slate-500 px-4 py-2 text-sm"
-                    value={draft.storeName}
-                    onChange={(e) => setDraft((prev) => ({ ...prev, storeName: e.target.value }))}
-                    placeholder="店名"
-                  />
-                  {/* 日付 - 1列 */}
-                  <input
-                    type="date"
-                    className="w-full rounded-xl border border-white/10 bg-white/5 text-white px-4 py-2 text-sm"
-                    value={draft.visitedAt}
-                    onChange={(e) => setDraft((prev) => ({ ...prev, visitedAt: e.target.value }))}
-                  />
-                  {/* 金額 - 1列 */}
-                  <div className="flex items-center rounded-xl border-2 border-mint/50 bg-mint/10 px-3 py-1">
-                    <span className="font-bold text-mint/70 text-lg">¥</span>
-                    <input
-                      inputMode="numeric"
-                      className="w-full bg-transparent font-bold text-mint placeholder-mint/50 outline-none text-lg"
-                      value={draft.total}
-                      onChange={(e) => setDraft((prev) => ({ ...prev, total: e.target.value }))}
-                      placeholder="0"
-                    />
-                  </div>
-                  {/* 飲み会・自腹トグル */}
-                  <div className="grid grid-cols-2 gap-3">
-                    <button
-                      onClick={() => setDraft((prev) => ({ ...prev, isNomikai: !prev.isNomikai }))}
-                      className={clsx(
-                        "rounded-xl border py-3 font-semibold transition text-sm",
-                        draft.isNomikai
-                          ? "border-amber-500 bg-amber-500/20 text-amber-400"
-                          : "border-white/10 bg-white/5 text-slate-400"
-                      )}
-                    >
-                      🍺 飲み会
-                    </button>
-                    <button
-                      onClick={() => setDraft((prev) => ({ ...prev, isJibara: !prev.isJibara }))}
-                      className={clsx(
-                        "rounded-xl border py-3 font-semibold transition text-sm",
-                        draft.isJibara
-                          ? "border-rose-500 bg-rose-500/20 text-rose-400"
-                          : "border-white/10 bg-white/5 text-slate-400"
-                      )}
-                    >
-                      👛 自腹
-                    </button>
-                  </div>
-                  <select
-                    className="w-full rounded-xl border border-white/10 bg-white/5 text-white px-4 py-3 text-base"
-                    value={draft.category}
-                    onChange={(e) => setDraft((prev) => ({ ...prev, category: e.target.value }))}
-                  >
-                    <option value="">分類を選択</option>
-                    {categories.map((cat) => (
-                      <option key={cat.id} value={cat.name}>
-                        {cat.name}
-                      </option>
-                    ))}
-                  </select>
-                  {/* 詳細表示ボタン */}
-                  {draft.lineItems && draft.lineItems.length > 0 && (
-                    <button
-                      onClick={() => setDetailReceipt({
-                        id: 'draft',
-                        storeName: draft.storeName || '(未入力)',
-                        visitedAt: draft.visitedAt || '',
-                        total: parseInt(draft.total) || 0,
-                        category: draft.category || '',
-                        lineItems: draft.lineItems.map(item => ({
-                          ...item,
-                          price: parseInt(item.price) || 0,
-                          quantity: typeof item.quantity === 'string' ? parseInt(item.quantity) || 1 : item.quantity,
-                        })),
-                        note: draft.note,
-                        createdAt: new Date().toISOString(),
-                        updatedAt: new Date().toISOString(),
-                      })}
-                      className="w-full rounded-xl border border-blue-500/30 bg-blue-500/10 text-blue-300"
-                      style={{ fontSize: '14px', padding: '12px' }}
-                    >
-                      読み取り詳細を確認
-                    </button>
-                  )}
-                  {/* 画像保存オプション - レシート情報内に移動 */}
-                  <label className="flex items-center gap-2 text-slate-300" style={{ fontSize: '14px', marginTop: '8px' }}>
-                    <input
-                      type="checkbox"
-                      checked={saveImage}
-                      onChange={(e) => setSaveImage(e.target.checked)}
-                      className="rounded"
-                      style={{ width: '20px', height: '20px' }}
-                    />
-                    カメラ画像も保存する
-                  </label>
-                </div>
-              </div>
-            </div>
-
-            {/* 品目表示モーダル */}
-            {selectedReceipt && (
-              <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 px-4" onClick={() => setSelectedReceipt(null)}>
-                <div className="w-full rounded-2xl border border-white/10 bg-fog p-5" style={{ maxWidth: '92vw', maxHeight: '80vh', overflow: 'auto' }} onClick={(e) => e.stopPropagation()}>
-                  <h3 className="font-bold text-white text-base leading-snug break-words">{selectedReceipt.storeName}</h3>
-                  <p className="text-slate-400 text-sm mt-2">{selectedReceipt.visitedAt}</p>
-                  <div className="mt-4 space-y-2">
-                    {selectedReceipt.lineItems && selectedReceipt.lineItems.length > 0 ? (
-                      selectedReceipt.lineItems.map((item, idx) => (
-                        <div key={item.id || idx} className="flex items-center justify-between rounded-lg bg-white/5 px-3 py-2">
-                          <div>
-                            <p className="text-white text-sm">{item.name}</p>
-                            {item.quantity > 1 && <p className="text-slate-400 text-xs">×{item.quantity}</p>}
-                          </div>
-                          <p className="font-semibold text-mint text-sm">{formatCurrency(item.price)}</p>
-                        </div>
-                      ))
-                    ) : (
-                      <p className="text-center text-slate-400 text-sm py-6">品目データがありません</p>
-                    )}
-                  </div>
-                  <div className="flex items-center justify-between border-t border-white/10 mt-4 pt-3">
-                    <span className="text-slate-300 text-sm">合計（税込）</span>
-                    <span className="font-bold text-mint text-lg">{formatCurrency(selectedReceipt.total)}</span>
-                  </div>
-                  <button
-                    onClick={() => setSelectedReceipt(null)}
-                    className="w-full rounded-xl bg-white/10 text-white py-3 mt-4 text-sm"
-                  >
-                    閉じる
-                  </button>
-                </div>
-              </div>
-            )}
-
-            {/* 削除確認モーダル */}
-            {deleteTargetId && (
-              <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 px-4">
-                <div className="w-full rounded-2xl border border-white/10 bg-fog p-5" style={{ maxWidth: '92vw' }}>
-                  <h3 className="font-bold text-white text-base">削除の確認</h3>
-                  <p className="text-slate-300 text-sm mt-3 leading-relaxed">
-                    このレシートを削除しますか？この操作は取り消せません。
-                  </p>
-                  <div className="grid grid-cols-2 gap-3 mt-4">
-                    <button
-                      onClick={() => setDeleteTargetId(null)}
-                      className="rounded-xl bg-white/10 text-white py-3 text-sm"
-                    >
-                      キャンセル
-                    </button>
-                    <button
-                      onClick={async () => {
-                        await handleDeleteReceipt(deleteTargetId)
-                        setDeleteTargetId(null)
-                      }}
-                      className="rounded-xl bg-red-500 font-bold text-white py-3 text-sm"
-                    >
-                      削除する
-                    </button>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* 編集モーダル */}
-            {editingReceipt && (
-              <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 px-4">
-                <div className="w-full max-h-[85vh] overflow-y-auto rounded-2xl border border-white/10 bg-fog p-5" style={{ maxWidth: '92vw' }}>
-                  <h3 className="font-bold text-white text-base">支出編集</h3>
-                  <div className="mt-4 space-y-3">
-                    <label className="block">
-                      <span className="text-slate-200 text-sm">日付</span>
-                      <input
-                        type="date"
-                        value={editingReceipt.visitedAt}
-                        onChange={(e) => setEditingReceipt({ ...editingReceipt, visitedAt: e.target.value })}
-                        className="mt-1 w-full rounded-lg border border-white/10 bg-white/5 text-white outline-none ring-mint/30 focus:ring-2 px-3 py-2 text-sm"
-                      />
-                    </label>
-                    <label className="block">
-                      <span className="text-slate-200 text-sm">店名</span>
-                      <input
-                        type="text"
-                        value={editingReceipt.storeName}
-                        onChange={(e) => setEditingReceipt({ ...editingReceipt, storeName: e.target.value })}
-                        className="mt-1 w-full rounded-lg border border-white/10 bg-white/5 text-white outline-none ring-mint/30 focus:ring-2 px-3 py-2 text-sm"
-                      />
-                    </label>
-                    <label className="block">
-                      <span className="text-slate-200 text-sm">合計金額</span>
-                      <input
-                        type="number"
-                        value={editingReceipt.total}
-                        onChange={(e) => setEditingReceipt({ ...editingReceipt, total: Number(e.target.value) })}
-                        className="mt-1 w-full rounded-lg border border-white/10 bg-white/5 text-white outline-none ring-mint/30 focus:ring-2 px-3 py-2 text-sm"
-                      />
-                    </label>
-                    <label className="block">
-                      <span className="text-slate-200 text-sm">カテゴリ</span>
-                      <select
-                        value={editingReceipt.category || ''}
-                        onChange={(e) => setEditingReceipt({ ...editingReceipt, category: e.target.value || undefined })}
-                        className="mt-1 w-full rounded-lg border border-white/10 bg-white/5 text-white outline-none ring-mint/30 focus:ring-2 px-3 py-2 text-sm"
-                      >
-                        <option value="">未分類</option>
-                        {categories.map((cat) => (
-                          <option key={cat.id} value={cat.name}>
-                            {cat.name}
-                          </option>
-                        ))}
-                      </select>
-                    </label>
-                    {/* 飲み会/自腹トグル */}
-                    <div>
-                      <span className="text-slate-200 text-sm">フラグ</span>
-                      <div className="mt-1 flex gap-2">
-                        <button
-                          type="button"
-                          onClick={() => setEditingReceipt({ ...editingReceipt, isNomikai: !editingReceipt.isNomikai })}
-                          className={`flex-1 rounded-lg border transition-all py-2 text-sm ${
-                            editingReceipt.isNomikai
-                              ? 'border-amber-400 bg-amber-400/20 text-amber-300'
-                              : 'border-white/10 bg-white/5 text-slate-400'
-                          }`}
-                        >
-                          🍺 飲み会
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setEditingReceipt({ ...editingReceipt, isJibara: !editingReceipt.isJibara })}
-                          className={`flex-1 rounded-lg border transition-all py-2 text-sm ${
-                            editingReceipt.isJibara
-                              ? 'border-emerald-400 bg-emerald-400/20 text-emerald-300'
-                              : 'border-white/10 bg-white/5 text-slate-400'
-                          }`}
-                        >
-                          👛 自腹
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                  <div className="grid grid-cols-2 gap-3 mt-4">
-                    <button
-                      onClick={() => setEditingReceipt(null)}
-                      className="rounded-xl bg-white/10 text-white py-3 text-sm"
-                    >
-                      キャンセル
-                    </button>
-                    <button
-                      onClick={() => handleUpdateReceipt(editingReceipt.id, editingReceipt.storeName, editingReceipt.total, editingReceipt.visitedAt, editingReceipt.category, editingReceipt.isNomikai, editingReceipt.isJibara)}
-                      className="rounded-xl bg-mint font-bold text-fog py-3 text-sm"
-                    >
-                      保存
-                    </button>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* 詳細表示モーダル */}
-            {detailReceipt && (
-              <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 px-4">
-                <div className="w-full max-h-[85vh] overflow-y-auto rounded-2xl border border-white/10 bg-fog p-5" style={{ maxWidth: '92vw' }}>
-                  <h3 className="font-bold text-white text-base">レシート詳細</h3>
-                  <div className="mt-4 space-y-3">
-                    <div>
-                      <p className="text-slate-400 text-xs">店名</p>
-                      <p className="text-white text-sm mt-1">{detailReceipt.storeName}</p>
-                    </div>
-                    <div>
-                      <p className="text-slate-400 text-xs">合計金額</p>
-                      <p className="font-bold text-mint text-xl mt-1">{formatCurrency(detailReceipt.total)}</p>
-                    </div>
-                    {detailReceipt.lineItems.length > 0 && (
-                      <div>
-                        <p className="text-slate-400 text-xs mb-2">明細</p>
-                        <div className="space-y-2">
-                          {detailReceipt.lineItems.map((item) => (
-                            <div key={item.id} className="rounded-lg border border-white/10 bg-white/5 px-3 py-2">
-                              <div className="flex items-start justify-between">
-                                <div>
-                                  <p className="text-white text-sm">{item.name}</p>
-                                  {item.category && (
-                                    <p className="text-slate-400 text-xs mt-1">{item.category}</p>
-                                  )}
-                                </div>
-                                <div className="text-right">
-                                  <p className="font-bold text-white text-sm">{formatCurrency(item.price)}</p>
-                                  {item.quantity > 1 && (
-                                    <p className="text-slate-400 text-xs">× {item.quantity}</p>
-                                  )}
-                                </div>
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                  <button
-                    onClick={() => setDetailReceipt(null)}
-                    className="w-full rounded-xl bg-white/10 text-white py-3 mt-4 text-sm"
-                  >
-                    閉じる
-                  </button>
-                </div>
-              </div>
-            )}
-
-            {/* 支出一覧 */}
-            <div className="mt-4 px-4">
-              <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
-                <div className="flex items-center justify-between">
-                  <h3 className="font-semibold text-white text-base">
-                    {selectedMonth.replace('-', '年')}月の支出一覧
-                  </h3>
-                  <span className="text-slate-400 text-xs">{filteredReceipts.length}件</span>
-                </div>
-                <div className="mt-3 space-y-2">
-                {filteredReceipts.length === 0 ? (
-                  <p className="rounded-xl bg-white/5 text-center text-slate-400 text-sm py-8">
-                    この月の支出はありません
-                  </p>
-                ) : (
-                  displayedReceipts.map((receipt) => (
-                    <div
-                      key={receipt.id}
-                      className="rounded-xl border border-white/10 bg-white/5 px-3 py-2"
-                    >
-                      <div className="flex items-start justify-between gap-1">
-                        <div 
-                          className="cursor-pointer flex-1 min-w-0"
-                          onClick={() => setSelectedReceipt(receipt)}
-                        >
-                          <p className="text-slate-400 text-xs">{receipt.visitedAt}</p>
-                          <p className="font-semibold text-white underline text-xs mt-0.5" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '180px' }}>{receipt.storeName}</p>
-                          <div className="flex items-center gap-1 mt-1">
-                            <span className="inline-block rounded-full bg-white/10 text-slate-300 text-xs px-2 py-0.5">
-                              {receipt.category || '未分類'}
-                            </span>
-                            {receipt.isNomikai && <span className="text-xs">🍺</span>}
-                            {receipt.isJibara && <span className="text-xs">👛</span>}
-                          </div>
-                        </div>
-                        <div className="text-right shrink-0 flex flex-col items-end">
-                          <p className="font-bold text-mint text-base">
-                            {formatCurrency(receipt.total)}
-                          </p>
-                          <div className="flex gap-2 mt-0.5">
-                            <button
-                              onClick={() => setEditingReceipt(receipt)}
-                              className="text-yellow-400 text-xs"
-                            >
-                              編集
-                            </button>
-                            <button
-                              onClick={() => setDeleteTargetId(receipt.id)}
-                              className="text-red-400 text-xs"
-                            >
-                              削除
-                            </button>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  ))
-                )}
-                </div>
-                {filteredReceipts.length > visibleCount && (
-                  <button
-                    onClick={() => setVisibleCount((v) => v + 20)}
-                    className="w-full rounded-xl border border-white/10 bg-white/5 font-semibold text-white mt-2"
-                    style={{ fontSize: '12px', padding: '8px' }}
-                  >
-                    もっと見る
-                  </button>
-                )}
-                {filteredReceipts.length > 0 && visibleCount > 20 && (
-                  <button
-                    onClick={() => setVisibleCount(20)}
-                    className="w-full rounded-xl border border-white/10 bg-white/5 font-semibold text-slate-400"
-                    style={{ fontSize: '14px', padding: '12px' }}
-                  >
-                    ▲ 20件表示に戻す
-                  </button>
-                )}
-                {/* CSV操作 - レシート一覧内に移動 */}
-                <div className="mt-4 grid grid-cols-2 gap-2">
-                  <button
-                    onClick={handleExport}
-                    className="rounded-xl border border-white/15 bg-white/10 font-semibold text-white"
-                    style={{ fontSize: '14px', padding: '12px 16px' }}
-                  >
-                    CSVを保存
-                  </button>
-                  <label className="flex cursor-pointer items-center justify-center rounded-xl border border-white/15 bg-white/10 font-semibold text-white" style={{ fontSize: '14px', padding: '12px 16px' }}>
-                    CSVを読込
-                    <input
-                      type="file"
-                      accept=".csv,text/csv"
-                      className="hidden"
-                      onChange={(e) => {
-                        const file = e.target.files?.[0]
-                        if (!file) return
-                        handleImportCsv(file)
-                        e.target.value = ""
-                      }}
-                    />
-                  </label>
-                </div>
-              </div>
-            </div>
-
-            {/* 設定セクション */}
-            <div className="mt-4 px-4 pb-6">
-              <div className="rounded-2xl border border-white/10 bg-white/5" style={{ padding: '16px' }}>
-                <h3 className="font-semibold text-white" style={{ fontSize: '16px', marginBottom: '12px' }}>設定</h3>
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="font-semibold text-white" style={{ fontSize: '14px' }}>Gemini AI認識</p>
-                    <p className="text-slate-400" style={{ fontSize: '12px', marginTop: '4px' }}>
-                      {hasApiKey() ? "✅ 設定済み" : "❌ 未設定"}
-                    </p>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <button
-                      onClick={() => setUseGemini(!useGemini)}
-                      className={clsx(
-                        "rounded-full font-semibold",
-                        useGemini
-                          ? "bg-mint text-fog"
-                          : "border border-white/20 bg-white/10 text-white"
-                      )}
-                      style={{ fontSize: '11px', padding: '2px 10px' }}
-                    >
-                      {useGemini ? "ON" : "OFF"}
-                    </button>
-                    <button
-                      onClick={() => setShowApiKeyModal(true)}
-                      className="rounded-full border border-white/20 bg-white/10 text-white"
-                      style={{ fontSize: '11px', padding: '2px 6px' }}
-                    >
-                      ⚙️
-                    </button>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* スマホ用固定フッター */}
-        {session && (
-          <div className="fixed inset-x-0 bottom-0 z-30 border-t border-white/10 bg-fog/95 backdrop-blur-lg safe-area-pb px-4 pt-3">
-            <div className="flex items-end justify-center gap-2">
-              <button
-                onClick={cameraActive ? stopCamera : startCamera}
-                className={clsx(
-                  "footer-btn w-20 h-9 rounded-lg font-semibold text-xs whitespace-nowrap flex items-center justify-center",
-                  cameraActive
-                    ? "border border-white/30 bg-white/10 text-white"
-                    : "border border-mint/60 bg-mint/20 text-mint"
-                )}
-              >
-                {cameraActive ? "カメラOFF" : "カメラON"}
-              </button>
-              <button
-                onClick={captureFromCamera}
-                disabled={!cameraActive || isProcessing}
-                className={clsx(
-                  "footer-btn flex-1 max-w-[180px] h-11 rounded-lg font-semibold text-base leading-5 shadow-lg disabled:opacity-50 flex items-center justify-center",
-                  isProcessing
-                    ? "animate-pulse border border-yellow-400 bg-yellow-400/30 text-yellow-200"
-                    : "border border-mint bg-mint text-fog"
-                )}
-              >
-                {isProcessing ? "処理中..." : "撮影"}
-              </button>
-              <button
-                onClick={handleSaveReceipt}
-                className={clsx(
-                  "footer-btn w-20 h-9 rounded-lg font-semibold text-xs transition-all whitespace-nowrap flex items-center justify-center",
-                  hasDraftData
-                    ? "animate-pulse border border-mint bg-mint/30 text-mint shadow-lg shadow-mint/30"
-                    : "border border-white/30 bg-white/15 text-white"
-                )}
-              >
-                保存
-              </button>
-            </div>
-          </div>
-        )}
-      </div>
-    )
+  const handleMonthInsight = async () => {
+    if (!session) return
+    if (!hasApiKey()) {
+      setShowApiKeyModal(true)
+      return
+    }
+    const monthReceipts = session.vault.receipts.filter((receipt) => receipt.visitedAt.startsWith(selectedMonth))
+    const byCategory = new Map<string, { total: number; count: number }>()
+    const byStore = new Map<string, number>()
+    monthReceipts.forEach((receipt) => {
+      const name = receipt.category || "未分類"
+      const current = byCategory.get(name) ?? { total: 0, count: 0 }
+      byCategory.set(name, { total: current.total + receipt.total, count: current.count + 1 })
+      byStore.set(receipt.storeName, (byStore.get(receipt.storeName) ?? 0) + receipt.total)
+    })
+    setInsightLoading(true)
+    setInsightError(null)
+    try {
+      const text = await summarizeMonth({
+        month: formatMonthLabel(selectedMonth),
+        total: selectedMonthTotal,
+        count: monthReceipts.length,
+        nomikai: selectedMonthNomikai,
+        jibara: selectedMonthJibara,
+        byCategory: Array.from(byCategory.entries())
+          .map(([name, value]) => ({ name, total: value.total, count: value.count }))
+          .sort((a, b) => b.total - a.total),
+        topStores: Array.from(byStore.entries())
+          .map(([name, total]) => ({ name, total }))
+          .sort((a, b) => b.total - a.total)
+          .slice(0, 5),
+      })
+      setMonthInsight(text)
+    } catch (error) {
+      setInsightError(error instanceof Error ? error.message : "まとめを作れませんでした。")
+    } finally {
+      setInsightLoading(false)
+    }
   }
 
-  // ========== PC用UI (従来のレイアウト) ==========
+  const iconUrl = `${import.meta.env.BASE_URL}turtle_icon_receipt.png`
+
   return (
-    <div className="min-h-screen text-sand">
-      {/* 編集モーダル (PC版) */}
-      {editingReceipt && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70">
-          <div className="w-full max-w-md max-h-[85vh] overflow-y-auto rounded-2xl border border-white/10 bg-fog p-6">
-            <h3 className="text-xl font-bold text-white">支出編集</h3>
-            <div className="mt-4 space-y-4">
-              <label className="block">
-                <span className="text-sm text-slate-200">日付</span>
-                <input
-                  type="date"
-                  value={editingReceipt.visitedAt}
-                  onChange={(e) => setEditingReceipt({ ...editingReceipt, visitedAt: e.target.value })}
-                  className="mt-2 w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-white outline-none ring-mint/30 focus:ring-2"
-                />
-              </label>
-              <label className="block">
-                <span className="text-sm text-slate-200">店名</span>
-                <input
-                  type="text"
-                  value={editingReceipt.storeName}
-                  onChange={(e) => setEditingReceipt({ ...editingReceipt, storeName: e.target.value })}
-                  className="mt-2 w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-white outline-none ring-mint/30 focus:ring-2"
-                />
-              </label>
-              <label className="block">
-                <span className="text-sm text-slate-200">合計金額</span>
-                <input
-                  type="number"
-                  value={editingReceipt.total}
-                  onChange={(e) => setEditingReceipt({ ...editingReceipt, total: Number(e.target.value) })}
-                  className="mt-2 w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-white outline-none ring-mint/30 focus:ring-2"
-                />
-              </label>
-              <label className="block">
-                <span className="text-sm text-slate-200">カテゴリ</span>
-                <select
-                  value={editingReceipt.category || ''}
-                  onChange={(e) => setEditingReceipt({ ...editingReceipt, category: e.target.value || undefined })}
-                  className="mt-2 w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-white outline-none ring-mint/30 focus:ring-2"
-                >
-                  <option value="">未分類</option>
-                  {categories.map((cat) => (
-                    <option key={cat.id} value={cat.name}>
-                      {cat.name}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              {/* 飲み会/自腹トグル */}
-              <div>
-                <span className="text-sm text-slate-200">フラグ</span>
-                <div className="mt-2 flex gap-3">
-                  <button
-                    type="button"
-                    onClick={() => setEditingReceipt({ ...editingReceipt, isNomikai: !editingReceipt.isNomikai })}
-                    className={`flex-1 rounded-xl border px-3 py-2 text-sm transition-all ${
-                      editingReceipt.isNomikai
-                        ? 'border-amber-400 bg-amber-400/20 text-amber-300'
-                        : 'border-white/10 bg-white/5 text-slate-400 hover:bg-white/10'
-                    }`}
-                  >
-                    🍺 飲み会
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setEditingReceipt({ ...editingReceipt, isJibara: !editingReceipt.isJibara })}
-                    className={`flex-1 rounded-xl border px-3 py-2 text-sm transition-all ${
-                      editingReceipt.isJibara
-                        ? 'border-emerald-400 bg-emerald-400/20 text-emerald-300'
-                        : 'border-white/10 bg-white/5 text-slate-400 hover:bg-white/10'
-                    }`}
-                  >
-                    👛 自腹
-                  </button>
-                </div>
-              </div>
-            </div>
-            <div className="mt-6 flex gap-3">
-              <button
-                onClick={() => setEditingReceipt(null)}
-                className="flex-1 rounded-xl bg-white/10 px-4 py-2 text-sm text-white hover:bg-white/15"
-              >
-                キャンセル
-              </button>
-              <button
-                onClick={() => handleUpdateReceipt(editingReceipt.id, editingReceipt.storeName, editingReceipt.total, editingReceipt.visitedAt, editingReceipt.category, editingReceipt.isNomikai, editingReceipt.isJibara)}
-                className="flex-1 rounded-xl bg-mint px-4 py-2 text-sm font-semibold text-fog hover:bg-mint/90"
-              >
-                保存
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* 詳細表示モーダル (PC版) */}
-      {detailReceipt && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70">
-          <div className="w-full max-w-2xl max-h-[85vh] overflow-y-auto rounded-2xl border border-white/10 bg-fog p-6">
-            <h3 className="text-xl font-bold text-white">レシート詳細</h3>
-            <div className="mt-4 space-y-4">
-              <div>
-                <p className="text-sm text-slate-400">店名</p>
-                <p className="mt-1 text-lg text-white">{detailReceipt.storeName}</p>
-              </div>
-              <div>
-                <p className="text-sm text-slate-400">合計金額</p>
-                <p className="mt-1 text-2xl font-bold text-mint">{formatCurrency(detailReceipt.total)}</p>
-              </div>
-              {detailReceipt.lineItems.length > 0 && (
-                <div>
-                  <p className="text-sm text-slate-400 mb-2">明細</p>
-                  <div className="space-y-2">
-                    {detailReceipt.lineItems.map((item) => (
-                      <div key={item.id} className="rounded-xl border border-white/10 bg-white/5 p-3">
-                        <div className="flex items-start justify-between">
-                          <div>
-                            <p className="text-white">{item.name}</p>
-                            {item.category && (
-                              <p className="text-xs text-slate-400 mt-1">{item.category}</p>
-                            )}
-                          </div>
-                          <div className="text-right">
-                            <p className="font-semibold text-white">{formatCurrency(item.price)}</p>
-                            {item.quantity > 1 && (
-                              <p className="text-xs text-slate-400">× {item.quantity}</p>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </div>
-            <button
-              onClick={() => setDetailReceipt(null)}
-              className="mt-6 w-full rounded-xl bg-white/10 px-4 py-2 text-sm text-white hover:bg-white/15"
-            >
-              閉じる
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* PC用APIキー設定モーダル */}
-      {showApiKeyModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70">
-          <div className="w-full max-w-md rounded-2xl border border-white/10 bg-fog p-6">
-            <h3 className="text-xl font-bold text-white">⚙️ Gemini API設定</h3>
-            <p className="mt-3 text-sm text-slate-400">
-              Gemini APIキーを入力してください。キーは端末内（localStorage）にのみ保存され、サーバーには送信されません。
-            </p>
-            <p className="mt-2 text-xs text-slate-500">
-              APIキーは <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener noreferrer" className="text-mint underline">Google AI Studio</a> から無料で取得できます。
-            </p>
-            <input
-              type="password"
-              className="mt-4 w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-base text-white placeholder-slate-500"
-              placeholder="AIza..."
-              value={apiKeyInput}
-              onChange={(e) => setApiKeyInput(e.target.value)}
-            />
-            <div className="mt-4 flex gap-3">
-              <button
-                onClick={() => {
-                  if (apiKeyInput.trim()) {
-                    saveApiKey(apiKeyInput.trim())
-                    setApiKeyInput("")
-                  }
-                  setShowApiKeyModal(false)
-                }}
-                className="flex-1 rounded-xl bg-mint py-3 text-sm font-bold text-fog transition hover:bg-mint/80"
-              >
-                保存
-              </button>
-              <button
-                onClick={() => {
-                  clearApiKey()
-                  setApiKeyInput("")
-                  setShowApiKeyModal(false)
-                }}
-                className="flex-1 rounded-xl border border-red-400/50 bg-red-400/10 py-3 text-sm font-bold text-red-300 transition hover:bg-red-400/20"
-              >
-                削除
-              </button>
-            </div>
-            <button
-              onClick={() => setShowApiKeyModal(false)}
-              className="mt-3 w-full text-center text-sm text-slate-500 hover:text-slate-300"
-            >
-              キャンセル
-            </button>
-          </div>
-        </div>
-      )}
-
-      <div className="mx-auto flex w-full max-w-6xl flex-col gap-8 px-6 pt-8 pb-8">
-        <header className="flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <div className="relative h-14 w-14 shrink-0 rounded-full bg-gradient-to-r from-mint/60 to-mint/30 p-[2px] shadow-soft">
-              <div className="h-full w-full rounded-full bg-fog/90 p-[1px]">
-                <img
-                  src={`${import.meta.env.BASE_URL}turtle_icon_receipt.png`}
-                  alt="サッとレシートアイコン"
-                  className="h-full w-full rounded-full object-cover"
-                />
-              </div>
-            </div>
-            <div className="leading-tight">
-              <p className="text-xs font-semibold uppercase tracking-[0.3em] text-mint">
-                Encrypted Offline Receipt Ledger
-              </p>
-              <h1 className="mt-1 text-3xl font-bold text-white">サッとレシート</h1>
-              <p className="text-base text-slate-300">
-                買い物ごとにパシャと、端末に残す。ネット不要のレシートノート。
-              </p>
+    <div className="min-h-screen bg-fog text-sand">
+      <header className="sticky top-0 z-20 border-b border-white/10 bg-fog/95 backdrop-blur">
+        <div className="mx-auto flex w-full max-w-6xl items-center justify-between gap-3 px-4 py-3">
+          <div className="flex items-center gap-3">
+            <img src={iconUrl} alt="" className="h-11 w-11 rounded-full object-cover" />
+            <div>
+              <h1 className="text-lg font-bold text-white sm:text-2xl">サッとレシート</h1>
+              <p className="hidden text-sm text-slate-400 sm:block">買い物ごとに、端末の中へ。</p>
             </div>
           </div>
           {session && (
-            <div className="flex flex-wrap gap-2">
-              <button
-                onClick={handleLock}
-                className="rounded-full border border-white/15 bg-white/5 px-4 py-2 text-sm font-semibold text-white transition hover:border-white/25 hover:bg-white/10"
-              >
-                🔒 ログアウト
-              </button>
-            </div>
+            <button
+              type="button"
+              onClick={() => void handleLock()}
+              className="ui-btn ui-btn-quiet px-3 py-1.5 text-xs sm:text-sm"
+            >
+              ログアウト
+            </button>
           )}
-        </header>
+        </div>
+      </header>
 
-        {!session ? (
-          <div className="grid gap-6 lg:grid-cols-[1.2fr_1fr]">
-            <div className="rounded-3xl border border-white/10 bg-white/5 p-8 shadow-soft">
-              <p className="text-sm text-slate-300">
-                端末に保存したデータを開くためのパスフレーズを設定・入力してください。
-                サーバーには送信せず、WebCrypto + IndexedDB で暗号化されます。
-              </p>
-              <UnlockPanel onUnlock={handleUnlock} unlocking={unlocking} error={unlockError} isFirstTime={isFirstTime} onReset={handleReset} />
-              <div className="mt-6 flex flex-wrap items-center gap-2 text-xs text-slate-400">
-                <Pill>ローカル暗号化</Pill>
-                <Pill>オフライン動作</Pill>
-                <Pill>GitHub Pages 配信想定</Pill>
-              </div>
-            </div>
-            <div className="space-y-3 rounded-3xl border border-white/10 bg-white/5 p-6">
-              <p className="text-sm text-slate-200">運用のヒント</p>
-              <ul className="list-disc space-y-2 pl-4 text-sm text-slate-400">
-                <li>パスフレーズを忘れると復元できません。安全な場所に控えてください。</li>
-                <li>ブラウザを閉じてもデータは端末内に残ります（IndexedDB）。</li>
-                <li>CSV エクスポートでバックアップをとれます。</li>
-              </ul>
-              <button
-                onClick={handleReset}
-                className="text-left text-xs text-slate-400 underline hover:text-slate-200"
-              >
-                データを初期化する
-              </button>
-            </div>
+      {!session ? (
+        <div className="mx-auto flex w-full max-w-3xl flex-col gap-4 px-4 py-8 lg:flex-row">
+          <div className="flex-1 rounded-3xl border border-white/10 bg-white/5 p-5 sm:p-8">
+            <UnlockPanel onUnlock={handleUnlock} unlocking={unlocking} error={unlockError} isFirstTime={isFirstTime} onReset={handleReset} />
           </div>
-        ) : (
-          <main className="grid gap-6 lg:auto-rows-min lg:grid-cols-[1.6fr_1fr]">
-            <section className="space-y-6 lg:col-start-1 lg:row-start-1 order-1">
-              <div className="rounded-3xl border border-white/10 bg-white/5 p-6 shadow-soft space-y-4">
-                <div className="flex items-start justify-between">
+          <div className="rounded-3xl border border-white/10 bg-white/5 p-5 sm:max-w-sm">
+            <p className="text-sm text-slate-200">この端末だけで開きます</p>
+            <ul className="mt-3 list-disc space-y-2 pl-4 text-sm text-slate-400">
+              <li>パスフレーズを忘れると復元できません。</li>
+              <li>データは IndexedDB に残り、CSV でバックアップできます。</li>
+              <li>Gemini を使うときだけ、画像と集計が Google に送られます。</li>
+            </ul>
+          </div>
+        </div>
+      ) : (
+        <>
+          <div className="mx-auto grid w-full max-w-6xl gap-4 px-4 py-4 pb-28 lg:grid-cols-[minmax(0,1.6fr)_22rem] lg:pb-8">
+            <section className={`${cameraActive ? "order-1" : "order-2"} space-y-4 lg:order-none lg:col-start-1 lg:row-start-1`}>
+              <div className="space-y-4 rounded-3xl border border-white/10 bg-white/5 p-4 sm:p-6">
+                <div className="flex flex-wrap items-start justify-between gap-2">
                   <div>
-                    <h2 className="text-xl font-semibold text-white">撮影 / アップロード</h2>
-                    <p className="text-sm text-slate-400">
-                      まずここから。画像を選ぶとOCRして下の入力欄に自動反映します。
-                    </p>
+                    <h2 className="text-lg font-semibold text-white sm:text-xl">撮影 / アップロード</h2>
+                    <p className="text-sm text-slate-400">画像から店名・日付・合計・明細を読み取ります。</p>
                   </div>
-                  <div className="flex flex-wrap items-center gap-2 text-xs text-slate-300">
-                    {lastUploadedName && <Pill>選択中: {lastUploadedName}</Pill>}
-                    <Pill>プレビュー日付: {draft.visitedAt || "未設定"}</Pill>
+                  <div className="flex flex-wrap gap-2">
+                    {lastUploadedName && <Pill>{lastUploadedName}</Pill>}
+                    {ocrProgress !== null && <Pill>読み取り {Math.round(ocrProgress * 100)}%</Pill>}
                   </div>
                 </div>
-
-                <div className="flex flex-col gap-4">
-                  <div className="grid gap-4 md:grid-cols-2">
-                    <label className="flex flex-col gap-2 text-sm text-slate-200">
-                      画像アップロード / 撮影
-                      <input
-                        type="file"
-                        accept="image/*"
-                        capture="environment"
-                        className="w-full cursor-pointer rounded-xl border border-dashed border-white/25 bg-white/5 px-3 py-3 text-slate-200 file:mr-3 file:cursor-pointer file:rounded-lg file:border-none file:bg-mint/20 file:px-4 file:py-2 file:font-semibold file:text-mint"
-                        onChange={(e) => {
-                          const file = e.target.files?.[0]
-                          if (!file) return
-                          handleOcr(file, e.target)
-                        }}
-                      />
-                      {ocrProgress !== null && (
-                        <div className="h-2 w-full overflow-hidden rounded-full bg-white/10">
-                          <div
-                            className="h-full bg-mint"
-                            style={{ width: `${Math.round(ocrProgress * 100)}%` }}
-                          />
-                        </div>
-                      )}
-                    </label>
-                    <div className="flex flex-col gap-2 text-sm text-slate-200">
-                      <div className="flex gap-2">
-                        <button
-                          onClick={cameraActive ? stopCamera : startCamera}
-                          className="flex-1 rounded-xl border border-white/15 bg-white/5 px-4 py-2 text-sm font-semibold text-white transition hover:border-white/25 hover:bg-white/10"
-                        >
-                          {cameraActive ? "カメラ停止" : "カメラを起動"}
-                        </button>
-                        <button
-                          onClick={captureFromCamera}
-                          disabled={!cameraActive || isProcessing}
-                          className={clsx(
-                            "flex-1 rounded-xl border px-4 py-2 text-sm font-semibold transition disabled:opacity-50 disabled:cursor-not-allowed",
-                            isProcessing
-                              ? "animate-pulse border-yellow-400/60 bg-yellow-400/20 text-yellow-200"
-                              : "border-mint/60 bg-mint/10 text-mint hover:bg-mint/20"
+                {ocrProgress !== null && (
+                  <div className="h-2 overflow-hidden rounded-full bg-white/10">
+                    <div className="h-full bg-mint" style={{ width: `${Math.round(ocrProgress * 100)}%` }} />
+                  </div>
+                )}
+                <div className="grid gap-3 lg:grid-cols-2">
+                  <label className="ui-btn ui-btn-quiet w-full cursor-pointer border-dashed px-3 py-3 text-sm">
+                    画像を選ぶ
+                    <input
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      onChange={(event) => {
+                        const file = event.target.files?.[0]
+                        if (!file) return
+                        void handleOcr(file, event.target)
+                      }}
+                    />
+                  </label>
+                  <div className="hidden grid-cols-2 gap-2 lg:grid">
+                    <button
+                      type="button"
+                      onClick={() => void (cameraActive ? stopCamera() : startCamera())}
+                      className="ui-btn ui-btn-secondary px-3 py-2 text-sm"
+                    >
+                      {cameraActive ? "カメラOFF" : "カメラON"}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => void captureFromCamera()}
+                      disabled={!cameraActive || isProcessing}
+                      className="ui-btn ui-btn-primary px-3 py-2 text-sm disabled:opacity-100"
+                    >
+                      {isProcessing ? "認識中" : cameraPaused ? "再撮影" : "撮影"}
+                    </button>
+                  </div>
+                </div>
+                <label className="flex items-center gap-2 text-sm text-slate-300">
+                  <input type="checkbox" checked={saveImage} onChange={(event) => setSaveImage(event.target.checked)} />
+                  画像も保存する（長辺1280px）
+                </label>
+                {cameraActive && (
+                  <div className="relative overflow-hidden rounded-2xl border border-mint/30 bg-black">
+                    {capturedImage && cameraPaused && (
+                      <div className="absolute inset-0 z-10">
+                        <img src={capturedImage} alt="撮影したレシート" className="h-full w-full object-cover" />
+                        <div className="absolute inset-0 flex items-center justify-center bg-black/50 px-6 text-center">
+                          {isProcessing ? (
+                            <p className="text-2xl font-bold text-white">認識中...</p>
+                          ) : cameraError ? (
+                            <p className="text-base font-bold text-red-200">{cameraError}</p>
+                          ) : (
+                            <p className="text-2xl font-bold text-mint">認識完了</p>
                           )}
-                        >
-                          {isProcessing ? "認識中..." : "シャッター"}
-                        </button>
-                      </div>
-                      <label className="flex items-center gap-2">
-                        <input
-                          type="checkbox"
-                          checked={saveImage}
-                          onChange={(e) => setSaveImage(e.target.checked)}
-                        />
-                        圧縮画像を保存 (長辺1280px / JPEG 0.6)
-                      </label>
-                      {/* Gemini AI設定 */}
-                      <div className="flex items-center justify-between rounded-xl border border-white/10 bg-white/5 px-3 py-2">
-                        <div className="flex items-center gap-2">
-                          <span>🤖</span>
-                          <span className="text-white">Gemini AI</span>
-                          <span className={hasApiKey() ? "text-mint" : "text-slate-500"}>
-                            {hasApiKey() ? "✅" : "❌"}
-                          </span>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <button
-                            onClick={() => setUseGemini(!useGemini)}
-                            className={clsx(
-                              "rounded-full px-3 py-1 text-xs font-semibold",
-                              useGemini
-                                ? "bg-mint text-fog"
-                                : "border border-white/20 bg-white/10 text-white"
-                            )}
-                          >
-                            {useGemini ? "ON" : "OFF"}
-                          </button>
-                          <button
-                            onClick={() => setShowApiKeyModal(true)}
-                            className="rounded-full border border-white/20 bg-white/10 px-2 py-1 text-xs text-white hover:bg-white/20"
-                          >
-                            ⚙️
-                          </button>
                         </div>
                       </div>
-                      <div className="flex gap-2">
-                        <button
-                          onClick={clearDraft}
-                          className="flex-1 rounded-xl border border-white/15 bg-white/5 px-4 py-2 text-sm font-semibold text-white transition hover:border-white/25 hover:bg-white/10"
-                        >
-                          プレビューをクリア
-                        </button>
-                        <button
-                          onClick={handleCleanupImages}
-                          className="flex-1 rounded-xl border border-white/15 bg-white/5 px-4 py-2 text-sm font-semibold text-white transition hover:border-white/25 hover:bg-white/10"
-                        >
-                          画像のみクリーンアップ
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-
-                  {cameraActive && (
-                    <div className="overflow-hidden rounded-2xl border border-white/10 bg-black/40">
-                      <video
-                        ref={setVideoRef}
-                        className="w-full object-contain h-64"
-                        autoPlay
-                        playsInline
-                        muted
-                        controls={false}
-                        style={{ backgroundColor: "#0b1224" }}
-                      />
-                      {!cameraReady && (
-                        <p className="px-3 py-2 text-xs text-slate-400 bg-white/5 border-t border-white/10">
-                          カメラ準備中...
-                        </p>
-                      )}
-                      {cameraError && (
-                        <p className="px-3 py-2 text-xs text-red-200 bg-red-500/10 border-t border-white/10">
-                          {cameraError}
-                        </p>
-                      )}
-                    </div>
-                  )}
-                  {!cameraActive && cameraError && (
-                    <p className="text-xs text-red-200">{cameraError}</p>
-                  )}
-                </div>
-
-                <div className="grid gap-3 grid-cols-3">
-                  <div className="rounded-xl bg-white/5 p-3">
-                    <p className="text-xs text-slate-400">店名</p>
-                    <p className="text-sm font-semibold text-white">
-                      {draft.storeName || "未設定"}
-                    </p>
-                  </div>
-                  <div className="rounded-xl bg-white/5 p-3">
-                    <p className="text-xs text-slate-400">日付</p>
-                    <p className="text-sm font-semibold text-white">
-                      {draft.visitedAt || "未設定"}
-                    </p>
-                  </div>
-                  <div className="rounded-xl bg-white/5 p-3">
-                    <p className="text-xs text-slate-400">合計</p>
-                    <p className="text-sm font-semibold text-mint">
-                      {draft.total ? `${draft.total} 円` : "未設定"}
-                    </p>
-                  </div>
-                </div>
-
-                {draft.imageData && (
-                  <div className="overflow-hidden rounded-2xl border border-white/10 bg-black/20">
-                    <img
-                      src={draft.imageData}
-                      alt="レシート画像"
-                      className="max-h-80 w-full object-contain"
-                    />
-                  </div>
-                )}
-                {ocrText && (
-                  <p className="text-xs text-slate-400">OCR抽出テキスト: {ocrText.slice(0, 120)}...</p>
-                )}
-              </div>
-
-              <div className="rounded-3xl border border-white/10 bg-white/5 p-6">
-                <h2 className="text-xl font-semibold text-white">レシート詳細・編集</h2>
-                <p className="text-sm text-slate-400">店名・日付・合計を確認し、必要に応じてメモを追加。</p>
-                
-                {/* 読み取り詳細確認ボタン */}
-                {draft.lineItems && draft.lineItems.length > 0 && (
-                  <button
-                    onClick={() => setDetailReceipt({
-                      id: 'draft',
-                      storeName: draft.storeName || '(未入力)',
-                      visitedAt: draft.visitedAt || '',
-                      total: parseInt(draft.total) || 0,
-                      category: draft.category || '',
-                      lineItems: draft.lineItems.map(item => ({
-                        ...item,
-                        price: parseInt(item.price) || 0,
-                        quantity: typeof item.quantity === 'string' ? parseInt(item.quantity) || 1 : item.quantity,
-                      })),
-                      note: draft.note,
-                      createdAt: new Date().toISOString(),
-                      updatedAt: new Date().toISOString(),
-                    })}
-                    className="mt-4 w-full rounded-xl border border-blue-500/30 bg-blue-500/10 px-4 py-3 text-sm font-semibold text-blue-300 transition hover:bg-blue-500/20"
-                  >
-                    読み取り詳細を確認
-                  </button>
-                )}
-
-                <div className="mt-4 grid gap-4 md:grid-cols-2">
-                  <label className="flex flex-col gap-2 text-sm text-slate-200">
-                    店名
-                    <input
-                      className="w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-white outline-none ring-mint/30 focus:ring-2"
-                      value={draft.storeName}
-                      onChange={(e) => setDraft((prev) => ({ ...prev, storeName: e.target.value }))}
-                      placeholder="スーパーABC"
-                    />
-                  </label>
-                  <label className="flex flex-col gap-2 text-sm text-slate-200">
-                    日付
-                    <input
-                      type="date"
-                      className="w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-white outline-none ring-mint/30 focus:ring-2"
-                      value={draft.visitedAt}
-                      onChange={(e) => setDraft((prev) => ({ ...prev, visitedAt: e.target.value }))}
-                    />
-                  </label>
-                  <label className="flex flex-col gap-2 text-sm text-slate-200">
-                    合計
-                    <div className="flex items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-3 py-2">
-                      <span className="text-mint font-semibold">¥</span>
-                      <input
-                        inputMode="numeric"
-                        className="w-full bg-transparent text-white outline-none"
-                        value={draft.total}
-                        onChange={(e) => setDraft((prev) => ({ ...prev, total: e.target.value }))}
-                        placeholder="0"
-                      />
-                    </div>
-                  </label>
-                  <label className="flex flex-col gap-2 text-sm text-slate-200">
-                    分類
-                    <select
-                      className="w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-white outline-none ring-mint/30 focus:ring-2"
-                      value={draft.category}
-                      onChange={(e) => setDraft((prev) => ({ ...prev, category: e.target.value }))}
-                    >
-                      <option value="">分類を選択</option>
-                      {categories.map((cat) => (
-                        <option key={cat.id} value={cat.name}>
-                          {cat.name}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-                </div>
-
-                {/* 飲み会/自腹トグル */}
-                <div className="mt-4">
-                  <span className="text-sm text-slate-200">タグ</span>
-                  <div className="mt-2 flex gap-3">
-                    <button
-                      type="button"
-                      onClick={() => setDraft((prev) => ({ ...prev, isNomikai: !prev.isNomikai, isJibara: false }))}
-                      className={`flex-1 rounded-xl border px-3 py-2 text-sm transition-all ${
-                        draft.isNomikai
-                          ? 'border-amber-400 bg-amber-400/20 text-amber-300'
-                          : 'border-white/10 bg-white/5 text-slate-400 hover:bg-white/10'
-                      }`}
-                    >
-                      🍺 飲み会
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setDraft((prev) => ({ ...prev, isJibara: !prev.isJibara, isNomikai: false }))}
-                      className={`flex-1 rounded-xl border px-3 py-2 text-sm transition-all ${
-                        draft.isJibara
-                          ? 'border-emerald-400 bg-emerald-400/20 text-emerald-300'
-                          : 'border-white/10 bg-white/5 text-slate-400 hover:bg-white/10'
-                      }`}
-                    >
-                      👛 自腹
-                    </button>
-                  </div>
-                </div>
-
-                <div className="mt-4">
-                  <label className="flex flex-col gap-2 text-sm text-slate-200">
-                    メモ (任意)
-                    <textarea
-                      rows={3}
-                      className="w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-white outline-none ring-mint/30 focus:ring-2"
-                      value={draft.note}
-                      onChange={(e) => setDraft((prev) => ({ ...prev, note: e.target.value }))}
-                      placeholder="メモやタグを追加"
-                    />
-                  </label>
-                </div>
-
-                <div className="mt-6 flex flex-wrap gap-3">
-                  <button
-                    onClick={handleSaveReceipt}
-                    className={clsx(
-                      "rounded-2xl px-5 py-3 text-sm font-semibold shadow-soft transition hover:translate-y-[-1px]",
-                      hasDraftData
-                        ? "animate-pulse bg-gradient-to-r from-mint to-mint/80 text-fog ring-2 ring-mint/50"
-                        : "bg-gradient-to-r from-mint/80 to-mint text-fog"
                     )}
-                  >
-                    保存する
-                  </button>
-                </div>
+                    <video
+                      ref={setVideoRef}
+                      className="aspect-[3/4] w-full object-cover sm:aspect-video"
+                      autoPlay
+                      playsInline
+                      muted
+                    />
+                  </div>
+                )}
+                {cameraError && !cameraPaused && <p className="text-sm text-red-200">{cameraError}</p>}
+                {!cameraActive && draft.imageData && (
+                  <img src={draft.imageData} alt="読み取り画像" className="max-h-80 w-full rounded-2xl object-contain" />
+                )}
+                {ocrText && <p className="text-sm text-slate-400">読み取りメモ: {ocrText}</p>}
               </div>
 
+              <div className="rounded-3xl border border-white/10 bg-white/5 p-4 sm:p-6">
+                <div className="mb-4 flex items-center justify-between gap-2">
+                  <h2 className="text-lg font-semibold text-white sm:text-xl">支出の入力</h2>
+                  {hasDraftData && (
+                    <button type="button" onClick={clearDraft} className="text-sm text-slate-400 underline">
+                      入力をクリア
+                    </button>
+                  )}
+                </div>
+                <ReceiptFields value={draft} categories={categories} onChange={setDraft} onAddCategory={(name) => void handleAddCategory(name)} />
+                <button
+                  type="button"
+                  onClick={() => void handleSaveReceipt()}
+                  disabled={!hasDraftData}
+                  className="ui-btn ui-btn-primary mt-4 hidden w-full py-3 text-sm disabled:opacity-100 lg:block"
+                >
+                  保存する
+                </button>
+              </div>
             </section>
-            <aside className="order-2 lg:order-none lg:col-start-2 lg:row-start-1 lg:row-span-2 space-y-4 rounded-3xl border border-white/10 bg-white/5 p-6">
-              {/* 月選択 */}
-              <div className="flex items-center justify-center gap-4">
-                <button
-                  onClick={goToPrevMonth}
-                  disabled={!hasPrevMonth}
-                  className={clsx(
-                    "rounded-full p-2 transition",
-                    hasPrevMonth 
-                      ? "bg-white/10 text-white hover:bg-white/20" 
-                      : "text-slate-600 cursor-not-allowed"
-                  )}
-                >
-                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-                  </svg>
-                </button>
-                <div className="text-center">
-                  <p className="text-lg font-bold text-white">
-                    {parseInt(selectedMonth.split('-')[0])}年{parseInt(selectedMonth.split('-')[1])}月
-                  </p>
-                </div>
-                <button
-                  onClick={goToNextMonth}
-                  disabled={!hasNextMonth}
-                  className={clsx(
-                    "rounded-full p-2 transition",
-                    hasNextMonth 
-                      ? "bg-white/10 text-white hover:bg-white/20" 
-                      : "text-slate-600 cursor-not-allowed"
-                  )}
-                >
-                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                  </svg>
-                </button>
-              </div>
 
-              {/* 月間合計 */}
-              <div className="rounded-2xl border border-mint/30 bg-mint/10 p-4 text-center">
-                <p className="text-3xl font-bold text-mint">{formatCurrency(selectedMonthTotal)}</p>
-              </div>
-
-              {/* 飲み会/自腹 内訳 */}
-              <div className="grid grid-cols-2 gap-3">
-                <div className="rounded-xl border border-amber-400/30 bg-amber-400/10 p-3 text-center">
-                  <p className="text-sm text-amber-300">🍺 飲み会</p>
-                  <p className="text-lg font-bold text-amber-200">{formatCurrency(selectedMonthNomikai)}</p>
-                </div>
-                <div className="rounded-xl border border-emerald-400/30 bg-emerald-400/10 p-3 text-center">
-                  <p className="text-sm text-emerald-300">👛 自腹</p>
-                  <p className="text-lg font-bold text-emerald-200">{formatCurrency(selectedMonthJibara)}</p>
-                </div>
-              </div>
-
-              <div className="flex items-center justify-between">
-                <h2 className="text-lg font-semibold text-white">詳細</h2>
-                <div className="flex gap-2">
-                  <button
-                    onClick={() => setSummaryTab("overview")}
-                    className={clsx(
-                      "rounded-full px-3 py-1 text-xs font-semibold",
-                      summaryTab === "overview"
-                        ? "bg-mint/20 text-mint border border-mint/50"
-                        : "bg-white/5 text-slate-300 border border-white/10",
-                    )}
-                  >
-                    年別
+            <aside className={`${cameraActive ? "order-2" : "order-1"} space-y-4 lg:order-none lg:col-start-2 lg:row-span-2 lg:row-start-1`}>
+              <div className="rounded-3xl border border-white/10 bg-white/5 p-4">
+                <div className="flex items-center justify-between">
+                  <button type="button" aria-label="前の月" onClick={goToPrevMonth} disabled={!hasPrevMonth} className="ui-btn ui-btn-secondary grid h-11 w-11 place-items-center rounded-full disabled:opacity-30">
+                    &lt;
                   </button>
-                  <button
-                    onClick={() => setSummaryTab("monthly")}
-                    className={clsx(
-                      "rounded-full px-3 py-1 text-xs font-semibold",
-                      summaryTab === "monthly"
-                        ? "bg-mint/20 text-mint border border-mint/50"
-                        : "bg-white/5 text-slate-300 border border-white/10",
-                    )}
-                  >
-                    月別
+                  <p className="font-bold text-white">{formatMonthLabel(selectedMonth)}</p>
+                  <button type="button" aria-label="次の月" onClick={goToNextMonth} disabled={!hasNextMonth} className="ui-btn ui-btn-secondary grid h-11 w-11 place-items-center rounded-full disabled:opacity-30">
+                    &gt;
                   </button>
                 </div>
+                <p className="mt-3 text-center text-3xl font-bold text-mint">{formatCurrency(selectedMonthTotal)}</p>
+                <div className="mt-3 grid grid-cols-2 gap-2 text-sm">
+                  <div className="rounded-xl bg-amber-400/10 p-3 text-amber-200">🍺 {formatCurrency(selectedMonthNomikai)}</div>
+                  <div className="rounded-xl bg-rose-400/10 p-3 text-rose-200">👛 {formatCurrency(selectedMonthJibara)}</div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => void handleMonthInsight()}
+                  disabled={insightLoading}
+                  className="ui-btn ui-btn-secondary mt-3 w-full py-2.5 text-sm text-mint"
+                >
+                  {insightLoading ? "まとめています..." : "AIで今月をふりかえる"}
+                </button>
+                <p className="mt-2 text-xs text-slate-500">店名と金額の集計だけを送ります。レシート画像は送りません。</p>
+                {insightError && <p className="mt-2 text-sm text-red-200">{insightError}</p>}
+                {monthInsight && <p className="mt-3 whitespace-pre-wrap text-sm leading-relaxed text-slate-200">{monthInsight}</p>}
               </div>
 
-              {summaryTab === "overview" ? (
-                <>
-                  <div className="rounded-2xl border border-white/10 bg-white/5 p-4 text-sm text-slate-300">
-                    <p className="font-semibold text-white">年別 合計</p>
-                    {yearlyTotals.length === 0 && <p className="text-slate-400">まだありません</p>}
-                    {yearlyTotals.map((entry) => (
-                      <div key={entry.year} className="flex items-center justify-between py-1">
-                        <span className="text-white">{entry.year}</span>
-                        <span className="text-mint font-semibold">{formatCurrency(entry.total)}</span>
-                      </div>
-                    ))}
-                  </div>
-                </>
-              ) : (
-                <div className="rounded-2xl border border-white/10 bg-white/5 p-4 text-sm text-slate-300">
-                  <p className="font-semibold text-white">月別一覧</p>
-                  {monthlyTotals.length === 0 && <p className="text-slate-400">まだありません</p>}
-                  {monthlyTotals.map((entry) => (
-                    <div key={entry.month} className="flex items-center justify-between py-1">
-                      <div className="text-white">{entry.month}</div>
-                      <div className="text-right">
-                        <p className="text-mint font-semibold">{formatCurrency(entry.total)}</p>
-                        <p className="text-xs text-slate-400">{entry.count} 件</p>
-                      </div>
+              <div className="rounded-3xl border border-white/10 bg-white/5 p-4 text-sm">
+                <div className="mb-2 flex gap-2">
+                  <button type="button" aria-pressed={summaryTab === "overview"} onClick={() => setSummaryTab("overview")} className={`ui-toggle px-3 py-1 text-xs ${summaryTab === "overview" ? "border-mint bg-mint text-fog" : ""}`}>年別</button>
+                  <button type="button" aria-pressed={summaryTab === "monthly"} onClick={() => setSummaryTab("monthly")} className={`ui-toggle px-3 py-1 text-xs ${summaryTab === "monthly" ? "border-mint bg-mint text-fog" : ""}`}>月別</button>
+                </div>
+                {summaryTab === "overview" ? (
+                  yearlyTotals.length === 0 ? <p className="text-slate-400">まだありません</p> : yearlyTotals.map((entry) => (
+                    <div key={entry.year} className="flex justify-between py-1">
+                      <span>{entry.year}</span>
+                      <span className="font-semibold text-mint">{formatCurrency(entry.total)}</span>
                     </div>
-                  ))}
-                </div>
-              )}
-
-              <div className="rounded-2xl border border-white/10 bg-white/5 p-4 text-sm text-slate-300">
-                <p className="font-semibold text-white">CSV</p>
-                <p className="text-slate-400">暗号化解除済みデータを端末内でCSV化し、そのままダウンロードします。</p>
-                <div className="mt-3 grid gap-2 sm:grid-cols-2">
-                  <button
-                    onClick={handleExport}
-                    className="rounded-xl border border-white/15 bg-white/10 px-4 py-2 text-sm font-semibold text-white hover:border-white/25 hover:bg-white/15"
-                  >
-                    CSVを保存
+                  ))
+                ) : monthlyTotals.length === 0 ? <p className="text-slate-400">まだありません</p> : monthlyTotals.map((entry) => (
+                  <button key={entry.month} type="button" onClick={() => setSelectedMonth(entry.month)} className="flex w-full justify-between py-1 text-left">
+                    <span>{entry.month}</span>
+                    <span className="text-mint">{formatCurrency(entry.total)} / {entry.count}件</span>
                   </button>
-                  <label className="flex cursor-pointer items-center justify-center rounded-xl border border-white/15 bg-white/10 px-4 py-2 text-sm font-semibold text-white hover:border-white/25 hover:bg-white/15">
+                ))}
+              </div>
+
+              <div className="rounded-3xl border border-white/10 bg-white/5 p-4">
+                <div className="grid grid-cols-2 gap-2">
+                  <button type="button" onClick={handleExport} className="ui-btn ui-btn-secondary py-2.5 text-sm">CSVを保存</button>
+                  <label className="ui-btn ui-btn-secondary w-full cursor-pointer py-2.5 text-sm">
                     CSVを読込
                     <input
                       type="file"
                       accept=".csv,text/csv"
                       className="hidden"
-                      onChange={(e) => {
-                        const file = e.target.files?.[0]
+                      onChange={(event) => {
+                        const file = event.target.files?.[0]
                         if (!file) return
-                        handleImportCsv(file)
-                        e.target.value = ""
+                        void handleImportCsv(file)
+                        event.target.value = ""
                       }}
                     />
                   </label>
                 </div>
               </div>
-            </aside>
-            <section className="order-3 lg:order-none lg:col-start-1 lg:row-start-2 rounded-3xl border border-white/10 bg-white/5 p-6">
-              <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-                <div>
-                  <h2 className="text-xl font-semibold text-white">
-                    {parseInt(selectedMonth.split('-')[0])}年{parseInt(selectedMonth.split('-')[1])}月の支出一覧
-                  </h2>
-                  <p className="text-sm text-slate-400">検索とカテゴリフィルタで絞り込みできます。</p>
+
+              <div className="rounded-3xl border border-white/10 bg-white/5 p-4 text-sm">
+                <div className="flex items-center justify-between gap-2">
+                  <div>
+                    <p className="font-semibold text-white">{geminiModel === "gemini-3.8-flash" ? "Gemini 3.8 Flash" : "Gemini 3.5 Flash-Lite"}</p>
+                    <p className="text-xs text-slate-400">{hasApiKey() ? "APIキー設定済み" : "APIキー未設定"}</p>
+                  </div>
+                  <div className="flex gap-2">
+                    <button type="button" aria-pressed={useGemini} onClick={() => setUseGemini((value) => !value)} className={`ui-toggle px-3 py-1 text-xs ${useGemini ? "border-mint bg-mint text-fog" : ""}`}>
+                      {useGemini ? "ON" : "OFF"}
+                    </button>
+                    <button type="button" onClick={() => setShowApiKeyModal(true)} className="ui-btn ui-btn-quiet px-3 py-1 text-xs">設定</button>
+                  </div>
                 </div>
-                <div className="flex flex-wrap gap-2">
+                <div className="mt-3 grid grid-cols-2 gap-1 rounded-xl bg-black/40 p-1" role="group" aria-label="読み取りモデル">
+                  <button
+                    type="button"
+                    aria-pressed={geminiModel === "gemini-3.5-flash-lite"}
+                    onClick={() => {
+                      saveGeminiModel("gemini-3.5-flash-lite")
+                      setGeminiModel("gemini-3.5-flash-lite")
+                    }}
+                    className={`rounded-lg px-2 py-2 text-xs font-bold ${geminiModel === "gemini-3.5-flash-lite" ? "bg-mint text-fog shadow" : "text-slate-300 hover:bg-white/5"}`}
+                  >
+                    3.5 Flash-Lite
+                  </button>
+                  <button
+                    type="button"
+                    aria-pressed={geminiModel === "gemini-3.8-flash"}
+                    onClick={() => {
+                      saveGeminiModel("gemini-3.8-flash")
+                      setGeminiModel("gemini-3.8-flash")
+                    }}
+                    className={`rounded-lg px-2 py-2 text-xs font-bold ${geminiModel === "gemini-3.8-flash" ? "bg-mint text-fog shadow" : "text-slate-300 hover:bg-white/5"}`}
+                  >
+                    3.8 Flash
+                  </button>
+                </div>
+                <p className="mt-2 text-xs text-slate-500">標準は 3.5 Flash-Lite です。AI Studio の無料枠で読み取り回数を確保するためです。薄いレシートや品目が多い写真は 3.8 Flash に切り替えられます。ONのとき、レシート画像は Google に送信されます。</p>
+                <button type="button" onClick={() => void handleCleanupImages()} className="ui-btn ui-btn-quiet mt-3 w-full py-2.5 text-sm">
+                  保存済み画像を削除
+                </button>
+              </div>
+            </aside>
+
+            <section className="order-3 rounded-3xl border border-white/10 bg-white/5 p-4 sm:p-6 lg:order-none lg:col-span-2 lg:col-start-1 lg:row-start-3">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <h2 className="text-lg font-semibold text-white">{formatMonthLabel(selectedMonth)}の支出</h2>
+                <div className="flex flex-col gap-2 sm:flex-row">
                   <input
-                    className="w-48 rounded-full border border-white/15 bg-white/10 px-3 py-2 text-sm text-white outline-none ring-mint/30 focus:ring-2"
+                    className="ui-field rounded-full px-3 py-2 text-sm"
                     placeholder="店名・メモで検索"
                     value={filters.query}
-                    onChange={(e) => setFilters((prev) => ({ ...prev, query: e.target.value }))}
+                    onChange={(event) => {
+                      setFilters((prev) => ({ ...prev, query: event.target.value }))
+                      setVisibleCount(20)
+                    }}
                   />
                   <select
-                    className="rounded-full border border-white/15 bg-white/10 px-3 py-2 text-sm text-white outline-none ring-mint/30 focus:ring-2"
+                    className="ui-field rounded-full px-3 py-2 text-sm"
                     value={filters.category}
-                    onChange={(e) => setFilters((prev) => ({ ...prev, category: e.target.value }))}
+                    onChange={(event) => setFilters((prev) => ({ ...prev, category: event.target.value }))}
                   >
-                    <option value="all">すべて</option>
-                    {categories.map((cat) => (
-                      <option key={cat.id} value={cat.name}>
-                        {cat.name}
-                      </option>
+                    <option value="all">すべての分類</option>
+                    {categories.map((category) => (
+                      <option key={category.id} value={category.name}>{category.name}</option>
                     ))}
                   </select>
-                  {filteredReceipts.length > visibleCount && (
-                    <button
-                      onClick={() => setVisibleCount((v) => v + 20)}
-                      className="rounded-full border border-white/15 bg-white/10 px-3 py-2 text-sm font-semibold text-white hover:border-white/25 hover:bg-white/15"
-                    >
-                      もっと見る
-                    </button>
-                  )}
-                  {filteredReceipts.length > 0 && visibleCount > 20 && (
-                    <button
-                      onClick={() => setVisibleCount(20)}
-                      className="rounded-full border border-white/15 bg-white/10 px-3 py-2 text-sm font-semibold text-white hover:border-white/25 hover:bg-white/15"
-                    >
-                      先頭に戻す
-                    </button>
-                  )}
                 </div>
               </div>
-
-              <div className="mt-4 space-y-4">
-                {filteredReceipts.length === 0 && (
-                  <p className="text-sm text-slate-400">この月の支出データはありません。</p>
-                )}
-                {displayedReceipts.map((receipt) => (
-                  <article
-                    key={receipt.id}
-                    className="rounded-2xl border border-white/10 bg-white/5 p-4"
-                  >
-                    <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
-                      <div>
-                        <p className="text-sm uppercase tracking-[0.15em] text-slate-400">
-                          {receipt.visitedAt}
-                          {receipt.isNomikai && <span className="ml-2">🍺</span>}
-                          {receipt.isJibara && <span className="ml-2">👛</span>}
-                        </p>
-                        <h3 className="text-xl font-semibold text-white">
-                          {receipt.storeName}
-                        </h3>
-                        {receipt.category && (
-                          <span className="mt-1 inline-block rounded-full border border-white/15 bg-white/5 px-2 py-1 text-xs text-slate-200">
-                            {receipt.category}
-                          </span>
-                        )}
-                        <p className="text-slate-400">{receipt.note ?? "メモなし"}</p>
-                      </div>
-                      <div className="flex items-center gap-3">
-                        <div className="text-right">
-                          <p className="text-2xl font-bold text-mint">
-                            {formatCurrency(receipt.total)}
+              <div className="mt-4 space-y-3">
+                {filteredReceipts.length === 0 && <p className="text-sm text-slate-400">この月の支出はありません。</p>}
+                {displayedReceipts.map((receipt) => {
+                  const open = openReceiptIds.has(receipt.id)
+                  return (
+                    <article key={receipt.id} className="rounded-2xl border border-white/10 bg-white/5 p-3 sm:p-4">
+                      <div className="flex items-start justify-between gap-3">
+                        <button type="button" aria-expanded={open} className="min-w-0 text-left" onClick={() => setOpenReceiptIds((prev) => {
+                          const next = new Set(prev)
+                          if (next.has(receipt.id)) next.delete(receipt.id)
+                          else next.add(receipt.id)
+                          return next
+                        })}>
+                          <p className="text-xs text-slate-400">{receipt.visitedAt}</p>
+                          <p className="truncate font-semibold text-white">{open ? "▾ " : "▸ "}{receipt.storeName}</p>
+                          <p className="mt-1 text-xs text-slate-300">
+                            {receipt.category || "未分類"}
+                            {receipt.isNomikai ? " 🍺" : ""}
+                            {receipt.isJibara ? " 👛" : ""}
+                            {(receipt.lineItems ?? []).length > 0 ? ` ・明細${receipt.lineItems.length}` : ""}
                           </p>
-                          {receipt.category && (
-                            <p className="text-xs text-slate-400">{receipt.category}</p>
+                        </button>
+                        <div className="text-right">
+                          <p className="text-lg font-bold text-mint">{formatCurrency(receipt.total)}</p>
+                          <div className="mt-1 flex justify-end gap-2">
+                            <button type="button" className="rounded-full px-3 py-1.5 text-sm text-yellow-300" onClick={() => openEdit(receipt)}>編集</button>
+                            <button type="button" className="rounded-full px-3 py-1.5 text-sm text-red-300" onClick={() => setDeleteTargetId(receipt.id)}>削除</button>
+                          </div>
+                        </div>
+                      </div>
+                      {open && (
+                        <div className="mt-3 space-y-2 border-t border-white/10 pt-3 text-sm">
+                          {receipt.note && <p className="text-slate-300">{receipt.note}</p>}
+                          {(receipt.lineItems ?? []).map((item) => (
+                            <div key={item.id} className="flex justify-between gap-2">
+                              <span className="text-white">{item.name} {item.quantity > 1 ? `×${item.quantity}` : ""}</span>
+                              <span className="text-mint">{formatCurrency(item.price * (item.quantity || 1))}</span>
+                            </div>
+                          ))}
+                          {receipt.imageData && (
+                            <div>
+                              <button
+                                type="button"
+                                className="text-xs text-slate-300 underline"
+                                onClick={() => setExpandedImages((prev) => {
+                                  const next = new Set(prev)
+                                  if (next.has(receipt.id)) next.delete(receipt.id)
+                                  else next.add(receipt.id)
+                                  return next
+                                })}
+                              >
+                                {expandedImages.has(receipt.id) ? "画像を閉じる" : "画像を表示"}
+                              </button>
+                              {expandedImages.has(receipt.id) && (
+                                <img src={receipt.imageData} alt="保存したレシート" className="mt-2 max-h-64 w-full object-contain" />
+                              )}
+                            </div>
                           )}
                         </div>
-                        <button
-                          onClick={() => setEditingReceipt(receipt)}
-                          className="rounded-full border border-yellow-500/40 bg-yellow-500/10 px-3 py-2 text-xs font-semibold text-yellow-100 transition hover:bg-yellow-500/20"
-                        >
-                          編集
-                        </button>
-                        <button
-                          onClick={() => handleDeleteReceipt(receipt.id)}
-                          className="rounded-full border border-red-500/40 bg-red-500/10 px-3 py-2 text-xs font-semibold text-red-100 transition hover:bg-red-500/20"
-                        >
-                          削除
-                        </button>
-                      </div>
-                    </div>
-                    {receipt.imageData && (
-                      <div className="mt-3 overflow-hidden rounded-xl border border-white/10 bg-black/30">
-                        <div className="flex items-center justify-between px-3 py-2">
-                          <p className="text-sm text-slate-200">画像</p>
-                          <button
-                            onClick={() =>
-                              setExpandedImages((prev) => {
-                                const next = new Set(prev)
-                                if (next.has(receipt.id)) next.delete(receipt.id)
-                                else next.add(receipt.id)
-                                return next
-                              })
-                            }
-                            className="rounded-full border border-white/15 bg-white/5 px-3 py-1 text-xs font-semibold text-white hover:border-white/25 hover:bg-white/10"
-                          >
-                            {expandedImages.has(receipt.id) ? "閉じる" : "表示"}
-                          </button>
-                        </div>
-                        {expandedImages.has(receipt.id) && (
-                          <img
-                            src={receipt.imageData}
-                            alt="レシート画像"
-                            className="max-h-64 w-full object-contain"
-                          />
-                        )}
-                      </div>
-                    )}
-                    {receipt.lineItems.length > 0 && (
-                      <div className="mt-3 grid gap-2 md:grid-cols-2">
-                        {receipt.lineItems.map((line) => (
-                          <div
-                            key={line.id}
-                            className="flex items-center justify-between rounded-xl border border-white/10 bg-white/5 px-3 py-2"
-                          >
-                            <div>
-                              <p className="text-sm text-white">{line.name}</p>
-                              <p className="text-xs text-slate-400">
-                                {line.category} / x{line.quantity}
-                              </p>
-                            </div>
-                            <p className="text-sm font-semibold text-mint">
-                              {formatCurrency(line.price * line.quantity)}
-                            </p>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </article>
-                ))}
+                      )}
+                    </article>
+                  )
+                })}
               </div>
+              {filteredReceipts.length > visibleCount && (
+                <button type="button" onClick={() => setVisibleCount((count) => count + 20)} className="ui-btn ui-btn-quiet mt-3 w-full py-2.5 text-sm">
+                  もっと見る
+                </button>
+              )}
             </section>
-          </main>
-        )}
-      </div>
+          </div>
+
+          <div className="fixed inset-x-0 bottom-0 z-30 border-t border-white/10 bg-fog/95 px-4 pt-3 backdrop-blur safe-area-pb lg:hidden">
+            <div className="mx-auto flex max-w-lg items-center gap-2">
+              <button type="button" onClick={() => void (cameraActive ? stopCamera() : startCamera())} className="footer-btn ui-btn ui-btn-secondary h-10 px-3 text-xs">
+                {cameraActive ? "カメラOFF" : "カメラON"}
+              </button>
+              <button type="button" onClick={() => void captureFromCamera()} disabled={!cameraActive || isProcessing} className="footer-btn ui-btn ui-btn-primary h-11 flex-1 text-sm disabled:opacity-100">
+                {isProcessing ? "認識中" : cameraPaused ? "再撮影" : "撮影"}
+              </button>
+              <button type="button" onClick={() => void handleSaveReceipt()} disabled={!hasDraftData} className="footer-btn ui-btn ui-btn-quiet h-10 border-mint px-3 text-xs text-mint disabled:opacity-40">
+                保存
+              </button>
+            </div>
+          </div>
+        </>
+      )}
+
+      {showApiKeyModal && (
+        <Dialog title="Gemini APIキー" onClose={closeApiKeyModal}>
+          <p className="text-sm text-slate-300">
+            キーはこの端末に保存します。取得は <a className="text-mint underline" href="https://aistudio.google.com/apikey" target="_blank" rel="noopener noreferrer">Google AI Studio</a> です。
+          </p>
+          <input
+            type="password"
+            autoFocus
+            className="ui-field mt-4 px-3 py-3 text-base"
+            placeholder="AIza..."
+            value={apiKeyInput}
+            onChange={(event) => {
+              setApiKeyInput(event.target.value)
+              setApiKeyError(null)
+            }}
+            onKeyDown={(event) => {
+              if (event.key !== "Enter") return
+              const key = apiKeyInput.trim()
+              if (!key) {
+                setApiKeyError("キーを入力してください。")
+                return
+              }
+              saveApiKey(key)
+              closeApiKeyModal()
+            }}
+          />
+          {apiKeyError && <p className="mt-2 text-sm text-red-300">{apiKeyError}</p>}
+          <button
+            type="button"
+            className="ui-btn ui-btn-primary mt-4 w-full py-3 text-sm"
+            onClick={() => {
+              const key = apiKeyInput.trim()
+              if (!key) {
+                setApiKeyError("キーを入力してください。")
+                return
+              }
+              saveApiKey(key)
+              closeApiKeyModal()
+            }}
+          >
+            保存
+          </button>
+          <button
+            type="button"
+            className="mt-3 w-full py-2 text-sm text-red-300"
+            onClick={() => {
+              clearApiKey()
+              closeApiKeyModal()
+            }}
+          >
+            保存済みのキーを削除
+          </button>
+        </Dialog>
+      )}
+
+      {deleteTargetId && (
+        <Dialog title="削除の確認" onClose={() => setDeleteTargetId(null)} footer={
+          <div className="grid grid-cols-2 gap-3">
+            <button type="button" className="ui-btn ui-btn-secondary py-3 text-sm" onClick={() => setDeleteTargetId(null)}>キャンセル</button>
+            <button
+              type="button"
+              className="ui-btn bg-red-500 py-3 text-sm text-white"
+              onClick={() => {
+                void handleDeleteReceipt(deleteTargetId)
+                setDeleteTargetId(null)
+              }}
+            >
+              削除する
+            </button>
+          </div>
+        }>
+          <p className="text-sm text-slate-300">このレシートを削除します。元には戻せません。</p>
+        </Dialog>
+      )}
+
+      {editDraft && editingId && (
+        <Dialog title="支出を編集" onClose={closeEdit} footer={
+          <div className="grid grid-cols-2 gap-3">
+            <button type="button" className="ui-btn ui-btn-secondary py-3 text-sm" onClick={closeEdit}>キャンセル</button>
+            <button type="button" className="ui-btn ui-btn-primary py-3 text-sm" onClick={() => void saveEdit()}>保存</button>
+          </div>
+        }>
+          <ReceiptFields value={editDraft} categories={categories} onChange={setEditDraft} onAddCategory={(name) => void handleAddCategory(name)} />
+        </Dialog>
+      )}
+
+      {notice && (
+        <Dialog title={notice.title} onClose={() => closeNotice(false)} footer={
+          notice.confirmLabel ? (
+            <div className="grid grid-cols-2 gap-3">
+              <button type="button" className="ui-btn ui-btn-secondary py-3 text-sm" onClick={() => closeNotice(false)}>キャンセル</button>
+              <button
+                type="button"
+                className={`ui-btn py-3 text-sm ${notice.danger ? "bg-red-500 text-white" : "ui-btn-primary"}`}
+                onClick={() => closeNotice(true)}
+              >
+                {notice.confirmLabel}
+              </button>
+            </div>
+          ) : (
+            <button type="button" className="ui-btn ui-btn-primary w-full py-3 text-sm" onClick={() => closeNotice(true)}>
+              OK
+            </button>
+          )
+        }>
+          <p className="whitespace-pre-wrap text-sm leading-relaxed text-slate-300">{notice.message}</p>
+        </Dialog>
+      )}
     </div>
   )
 }
@@ -2337,123 +1428,50 @@ const UnlockPanel = ({
   isFirstTime: boolean
   onReset: () => void
 }) => {
-  // 保存されたパスフレーズがあれば、入力欄にもセット
   const savedPassphrase = getSavedPassphrase()
   const [value, setValue] = useState(savedPassphrase ?? "")
-  // 保存されたパスフレーズがあれば、チェックをONで表示
   const [rememberMe, setRememberMe] = useState(savedPassphrase !== null)
-  // スマホ判定 (安全なヘルパー関数を使用)
-  const [isMobile, setIsMobile] = useState(detectMobile)
-  useEffect(() => {
-    setIsMobile(detectMobile())
-    const handleResize = () => setIsMobile(detectMobile())
-    window.addEventListener('resize', handleResize)
-    return () => window.removeEventListener('resize', handleResize)
-  }, [])
 
-  if (isMobile) {
-    // スマホ用UI
-    return (
-      <div className="flex flex-col gap-3">
-        <p className="text-slate-300 text-sm leading-relaxed">
-          {isFirstTime 
-            ? "初回起動です。パスフレーズを設定してください（4文字以上）。"
-            : "パスフレーズを入力してデータを開いてください。"}
-        </p>
-        <label className="text-slate-200 text-xs">
-          パスフレーズ
-          <input
-            type="password"
-            className="w-full rounded-lg border border-white/10 bg-white/5 text-white outline-none ring-mint/30 focus:ring-2 px-3 py-2 mt-1 text-sm"
-            placeholder="パスフレーズを入力"
-            value={value}
-            onChange={(e) => setValue(e.target.value)}
-          />
-        </label>
-        {/* 次回から省略オプション */}
-        <label 
-          className="flex items-center gap-2 text-slate-300 cursor-pointer text-xs"
-        >
-          <input
-            type="checkbox"
-            checked={rememberMe}
-            onChange={(e) => setRememberMe(e.target.checked)}
-            className="rounded"
-            style={{ width: '16px', height: '16px' }}
-          />
-          次回から入力を省略する
-        </label>
-        {rememberMe && (
-          <p className="text-yellow-400/80 text-xs leading-relaxed">
-            ⚠️ 端末を他人と共有している場合は非推奨
-          </p>
-        )}
-        {error && <p className="text-red-300 text-xs">{error}</p>}
-        <button
-          onClick={() => onUnlock(value, rememberMe)}
-          disabled={unlocking || value.length < 4}
-          className="w-full rounded-lg bg-gradient-to-r from-mint/70 to-mint font-bold text-fog shadow-soft transition hover:translate-y-[-1px] disabled:cursor-not-allowed disabled:opacity-60 py-2 text-sm"
-        >
-          {unlocking ? "復号中..." : "データを開く"}
-        </button>
-        <button
-          onClick={() => {
-            if (confirm("すべてのデータを削除して初期化しますか？")) {
-              onReset()
-            }
-          }}
-          className="text-slate-500 underline text-xs py-1"
-        >
-          データを初期化
-        </button>
-      </div>
-    )
-  }
-
-  // PC用UI
   return (
-    <div className="mt-6 flex flex-col gap-3">
-      <p className="text-sm text-slate-300">
-        {isFirstTime 
-          ? "初回起動です。パスフレーズを設定してください（4文字以上）。"
-          : "パスフレーズを入力してデータを開いてください。"}
+    <form
+      className="flex flex-col gap-3"
+      onSubmit={(event) => {
+        event.preventDefault()
+        if (unlocking || value.length < 4) return
+        onUnlock(value, rememberMe)
+      }}
+    >
+      <p className="text-sm leading-relaxed text-slate-300">
+        {isFirstTime ? "初回です。この端末用のパスフレーズを決めてください（4文字以上）。" : "パスフレーズを入力してデータを開きます。"}
       </p>
       <label className="text-sm text-slate-200">
         パスフレーズ
         <input
           type="password"
-          className="mt-2 w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-white outline-none ring-mint/30 focus:ring-2"
-          placeholder="4文字以上で入力"
+          autoFocus
+          className="ui-field mt-1 px-3 py-3 text-base"
           value={value}
-          onChange={(e) => setValue(e.target.value)}
+          onChange={(event) => setValue(event.target.value)}
         />
       </label>
-      {/* 次回から省略オプション */}
-      <label className="flex items-center gap-2 text-sm text-slate-300 cursor-pointer">
-        <input
-          type="checkbox"
-          checked={rememberMe}
-          onChange={(e) => setRememberMe(e.target.checked)}
-          className="rounded"
-        />
+      <label className="flex items-center gap-2 text-sm text-slate-300">
+        <input type="checkbox" checked={rememberMe} onChange={(event) => setRememberMe(event.target.checked)} />
         次回から入力を省略する
       </label>
-      {rememberMe && (
-        <p className="text-xs text-yellow-400/80">
-          ⚠️ 端末を他人と共有している場合は非推奨
-        </p>
-      )}
+      {rememberMe && <p className="text-xs text-yellow-200/80">このブラウザにパスフレーズを保存します。自分の端末向けです。</p>}
       {error && <p className="text-sm text-red-300">{error}</p>}
       <button
-        onClick={() => onUnlock(value, rememberMe)}
+        type="submit"
         disabled={unlocking || value.length < 4}
-        className="rounded-2xl bg-gradient-to-r from-mint/70 to-mint px-4 py-3 text-sm font-semibold text-fog shadow-soft transition hover:translate-y-[-1px] disabled:cursor-not-allowed disabled:opacity-60"
+        className="ui-btn ui-btn-primary py-3 text-sm disabled:opacity-50"
       >
         {unlocking ? "復号しています..." : "データを開く"}
       </button>
-    </div>
+      <button type="button" onClick={onReset} className="text-left text-xs text-slate-500 underline">
+        データを初期化
+      </button>
+    </form>
   )
 }
 
 export default App
-

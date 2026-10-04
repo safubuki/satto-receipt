@@ -1,36 +1,69 @@
 /**
- * Gemini SDK を使用したレシートOCR
- * 
- * ## 公式ドキュメント
- * https://ai.google.dev/gemini-api/docs
- * 
- * ## インストール方法
- * npm install @google/genai
- * 
- * ## モデル一覧
- * https://ai.google.dev/gemini-api/docs/models/gemini
- * - gemini-2.5-flash-lite: 最もコスパが良い（推奨）
- * - gemini-2.5-flash: 高精度（思考機能付き）
- * - gemini-2.5-pro: 最高精度（高コスト）
+ * Gemini API でのレシート読み取りと月次コメント。
+ * 標準は Gemini 3.5 Flash-Lite。読み取りを優先するときは 3.8 Flash。
+ * https://ai.google.dev/gemini-api/docs/models/gemini-3.5-flash-lite
+ * https://ai.google.dev/gemini-api/docs/models/gemini-3.8-flash
  */
 
-import { GoogleGenAI } from "@google/genai"
+import { GoogleGenAI, type ThinkingConfig } from "@google/genai"
 
-// 使用するモデル（変更可能）
-const MODEL_NAME = "gemini-2.5-flash-lite"
+export type GeminiModelId = "gemini-3.5-flash-lite" | "gemini-3.8-flash"
+
+const MODEL_KEY = "gemini_model"
+const DEFAULT_MODEL: GeminiModelId = "gemini-3.5-flash-lite"
+
+// 3.5 Flash-Lite は minimal が抽出向け。3.8 Flash に minimal を渡すとエラーになる。
+const MODEL_THINKING: Record<GeminiModelId, ThinkingConfig["thinkingLevel"]> = {
+  "gemini-3.5-flash-lite": "minimal" as ThinkingConfig["thinkingLevel"],
+  "gemini-3.8-flash": "low" as ThinkingConfig["thinkingLevel"],
+}
+
+export const getGeminiModel = (): GeminiModelId => {
+  try {
+    const stored = localStorage.getItem(MODEL_KEY)
+    if (stored === "gemini-3.5-flash-lite" || stored === "gemini-3.8-flash") return stored
+  } catch {
+    // localStorage が使えないときは標準の Lite を使う
+  }
+  return DEFAULT_MODEL
+}
+
+export const saveGeminiModel = (model: GeminiModelId): void => {
+  try {
+    localStorage.setItem(MODEL_KEY, model)
+  } catch {
+    // 保存できなくても、この画面の選択は呼び出し側の state で保持する
+  }
+}
+
+const thinkingFor = (model: GeminiModelId): ThinkingConfig => ({
+  thinkingLevel: MODEL_THINKING[model],
+})
 
 export interface ReceiptOcrResult {
   storeName: string
   date: string
   total: string
-  category: string  // 店舗タイプ（AI自動判定）
+  category: string
+  isNomikai: boolean
+  highlight: string
   items: Array<{
     name: string
     price: number
     quantity: number
-    category?: string  // 品目カテゴリ
+    category?: string
   }>
   rawText: string
+}
+
+export type MonthInsightInput = {
+  month: string
+  total: number
+  count: number
+  nomikai: number
+  jibara: number
+  byCategory: Array<{ name: string; total: number; count: number }>
+  topStores: Array<{ name: string; total: number }>
 }
 
 // ========== APIキー管理 ==========
@@ -132,30 +165,28 @@ export const analyzeReceiptWithGemini = async (
   onProgress?.(0.4)
 
   // 4. プロンプト（解析指示）
-  const prompt = `このレシート画像を解析してください。以下のJSON形式で回答してください。日本語のレシートです。
+  const prompt = `このレシート画像を解析してください。日本語のレシートです。税込の支払合計を total にしてください。
 
 {
-  "storeName": "店舗名",
-  "date": "YYYY-MM-DD形式の日付",
-  "total": "合計金額（数字のみ）",
-  "category": "店舗タイプ（以下から選択: スーパー, コンビニ, ドラッグストア, 飲食店, 衣料品店, 家電・雑貨, 医療・薬局, 娯楽, その他）",
+  "storeName": "屋号だけ。住所や電話番号は入れない",
+  "date": "YYYY-MM-DD。読めなければ空文字",
+  "total": "税込合計。数字のみ。読めなければ0",
+  "category": "スーパー, コンビニ, ドラッグストア, 飲食店, 衣料品店, 家電・雑貨, 医療・薬局, 娯楽, その他 のいずれか",
+  "isNomikai": "居酒屋・バー・飲み会など飲酒を伴う飲食なら true。スーパーで酒を買っただけなら false",
+  "highlight": "買った内容を20文字以内で。例: 牛乳と惣菜",
   "items": [
-    {"name": "商品名", "price": 金額, "quantity": 数量, "category": "品目カテゴリ（食品, 飲料, 日用品, 医薬品, 衣類, 雑貨, サービス, その他）"}
-  ],
-  "rawText": "レシートに記載されている全テキスト"
+    {"name": "商品名", "price": 税込単価, "quantity": 数量, "category": "食品, 飲料, 日用品, 医薬品, 衣類, 雑貨, サービス, その他"}
+  ]
 }
 
-注意事項:
-- 日付が読み取れない場合は空文字にしてください
-- 合計金額が読み取れない場合は"0"にしてください
-- 商品が読み取れない場合はitemsは空配列にしてください
-- 店舗名から店舗タイプを推測してください（例: イオン→スーパー, セブンイレブン→コンビニ）
-- JSONのみを出力し、他の説明は不要です`
+商品が読めなければ items は空配列。JSONのみ。`
+
+  const model = getGeminiModel()
 
   // 5. Gemini APIを呼び出し
   try {
     const response = await ai.models.generateContent({
-      model: MODEL_NAME,
+      model,
       contents: [
         {
           role: "user",
@@ -171,8 +202,34 @@ export const analyzeReceiptWithGemini = async (
         },
       ],
       config: {
-        temperature: 0.1,
-        maxOutputTokens: 2048,
+        maxOutputTokens: 8192,
+        thinkingConfig: thinkingFor(model),
+        responseMimeType: "application/json",
+        responseJsonSchema: {
+          type: "object",
+          properties: {
+            storeName: { type: "string" },
+            date: { type: "string" },
+            total: { type: "string" },
+            category: { type: "string" },
+            isNomikai: { type: "boolean" },
+            highlight: { type: "string" },
+            items: {
+              type: "array",
+              items: {
+                type: "object",
+                properties: {
+                  name: { type: "string" },
+                  price: { type: "number" },
+                  quantity: { type: "number" },
+                  category: { type: "string" },
+                },
+                required: ["name", "price"],
+              },
+            },
+          },
+          required: ["storeName", "date", "total", "items"],
+        },
       },
     })
 
@@ -188,31 +245,45 @@ export const analyzeReceiptWithGemini = async (
       jsonStr = jsonMatch[1].trim()
     }
 
+    let result: {
+      storeName?: string
+      date?: string
+      total?: string | number
+      category?: string
+      isNomikai?: boolean
+      highlight?: string
+      items?: ReceiptOcrResult["items"]
+      rawText?: string
+    }
     try {
-      const result = JSON.parse(jsonStr)
-      onProgress?.(1.0)
-
-      return {
-        storeName: result.storeName || '',
-        date: result.date || '',
-        total: String(result.total || '0'),
-        category: result.category || 'その他',
-        items: result.items || [],
-        rawText: result.rawText || '',
-      }
+      result = JSON.parse(jsonStr)
     } catch {
-      // JSONパースに失敗した場合
-      onProgress?.(1.0)
-      return {
-        storeName: '',
-        date: '',
-        total: '0',
-        category: 'その他',
-        items: [],
-        rawText: text,
-      }
+      throw new Error("レシートの読み取り結果を解釈できませんでした。もう一度撮影するか、手入力してください。")
+    }
+
+    const items = Array.isArray(result.items) ? result.items : []
+    const total = String(result.total ?? "").replace(/[^\d.]/g, "")
+    const storeName = result.storeName?.trim() || ""
+    const highlight = (result.highlight || "").trim().slice(0, 40)
+    if (!storeName && items.length === 0 && (!total || total === "0")) {
+      throw new Error("レシートを読み取れませんでした。全体が写るように、明るい場所でもう一度撮影してください。")
+    }
+
+    onProgress?.(1.0)
+    return {
+      storeName,
+      date: result.date || "",
+      total: total || "0",
+      category: result.category || "その他",
+      isNomikai: Boolean(result.isNomikai),
+      highlight,
+      items,
+      rawText: highlight,
     }
   } catch (error) {
+    if (error instanceof Error && error.message.startsWith("レシート")) {
+      throw error
+    }
     // APIエラーのハンドリング
     const errorMessage = error instanceof Error ? error.message : String(error)
     
@@ -227,5 +298,62 @@ export const analyzeReceiptWithGemini = async (
     }
     
     throw new Error(`Gemini API エラー: ${errorMessage}`)
+  }
+}
+
+const describeApiError = (error: unknown): Error => {
+  if (error instanceof Error && (error.message.startsWith("レシート") || error.message.startsWith("APIキー") || error.message.startsWith("Gemini"))) {
+    return error
+  }
+  const errorMessage = error instanceof Error ? error.message : String(error)
+  if (errorMessage.includes("API_KEY_INVALID") || errorMessage.includes("401")) {
+    return new Error("APIキーが無効です。正しいGemini APIキーを入力してください。")
+  }
+  if (errorMessage.includes("PERMISSION_DENIED") || errorMessage.includes("403")) {
+    return new Error("APIキーに権限がありません。Gemini APIが有効化されているか確認してください。")
+  }
+  if (errorMessage.includes("RESOURCE_EXHAUSTED") || errorMessage.includes("429")) {
+    return new Error("APIの利用制限に達しました。しばらく待ってから再試行してください。")
+  }
+  return new Error(`Gemini API エラー: ${errorMessage}`)
+}
+
+/** 集計済みの数字と店名だけを送り、今月の短いふりかえりを作る。 */
+export const summarizeMonth = async (input: MonthInsightInput): Promise<string> => {
+  const apiKey = getApiKey()
+  if (!apiKey) {
+    throw new Error("APIキーが設定されていません。設定画面からGemini APIキーを入力してください。")
+  }
+  if (input.count === 0) {
+    throw new Error("この月の支出がまだないので、まとめられません。")
+  }
+
+  const model = getGeminiModel()
+  const ai = new GoogleGenAI({ apiKey })
+  const prompt = `あなたは個人の家計メモの助手です。次の集計だけを材料に、日本語で2文か3文のふりかえりを書いてください。
+数字は材料にあるものだけを使い、足したり推測したりしないでください。説教や節約の命令はしないでください。マークダウンは使わないでください。
+
+対象月: ${input.month}
+件数: ${input.count}
+合計: ${input.total}円
+飲み会の合計: ${input.nomikai}円
+自腹の合計: ${input.jibara}円
+分類: ${input.byCategory.map((row) => `${row.name} ${row.total}円 ${row.count}件`).join("、") || "なし"}
+店別上位: ${input.topStores.map((row) => `${row.name} ${row.total}円`).join("、") || "なし"}`
+
+  try {
+    const response = await ai.models.generateContent({
+      model,
+      contents: [{ role: "user", parts: [{ text: prompt }] }],
+      config: {
+        maxOutputTokens: 512,
+        thinkingConfig: thinkingFor(model),
+      },
+    })
+    const text = (response.text || "").trim()
+    if (!text) throw new Error("まとめの文章を受け取れませんでした。")
+    return text
+  } catch (error) {
+    throw describeApiError(error)
   }
 }

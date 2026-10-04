@@ -1,11 +1,10 @@
+import { PBKDF2_ITERATIONS } from './kdf'
 import type { Vault } from './types'
 
 const SALT_KEY = 'receipt-vault-salt'
 const PASSPHRASE_KEY = 'receipt-vault-passphrase'
 const encoder = new TextEncoder()
 const decoder = new TextDecoder()
-
-const iterations = 200_000
 
 // localStorageが使えない環境でも落ちないようにメモリ上にフォールバック
 const memoryStore = new Map<string, string>()
@@ -41,12 +40,27 @@ export const bytesToBase64 = (bytes: Uint8Array): string =>
 export const base64ToBytes = (value: string): Uint8Array =>
   new Uint8Array(atob(value).split('').map((c) => c.charCodeAt(0)))
 
-export const getOrCreateSalt = (): Uint8Array => {
+export const readSalt = (): Uint8Array | null => {
   const stored = safeGetItem(SALT_KEY)
-  if (stored) return base64ToBytes(stored)
+  if (!stored) return null
+  try {
+    const bytes = base64ToBytes(stored)
+    return bytes.length > 0 ? bytes : null
+  } catch {
+    return null
+  }
+}
+
+export const storeSalt = (salt: Uint8Array): void => {
+  safeSetItem(SALT_KEY, bytesToBase64(new Uint8Array(salt)))
+}
+
+export const getOrCreateSalt = (): Uint8Array => {
+  const existing = readSalt()
+  if (existing) return existing
 
   const salt = crypto.getRandomValues(new Uint8Array(16))
-  safeSetItem(SALT_KEY, bytesToBase64(salt))
+  storeSalt(salt)
   return salt
 }
 
@@ -78,26 +92,56 @@ export const hasRememberedPassphrase = (): boolean => {
   return safeGetItem(PASSPHRASE_KEY) !== null
 }
 
-export const deriveKey = async (
-  passphrase: string,
-  salt: Uint8Array,
-): Promise<CryptoKey> => {
-  const normalizedSalt = new Uint8Array(salt)
+const importAesKey = (bits: ArrayBuffer): Promise<CryptoKey> =>
+  crypto.subtle.importKey('raw', bits, { name: 'AES-GCM' }, false, ['encrypt', 'decrypt'])
+
+const deriveBitsOnMain = async (passphrase: string, salt: Uint8Array): Promise<ArrayBuffer> => {
   const material = await crypto.subtle.importKey(
     'raw',
     encoder.encode(passphrase),
     'PBKDF2',
     false,
-    ['deriveKey'],
+    ['deriveBits'],
   )
-
-  return crypto.subtle.deriveKey(
-    { name: 'PBKDF2', salt: normalizedSalt, iterations, hash: 'SHA-256' },
+  return crypto.subtle.deriveBits(
+    { name: 'PBKDF2', salt: new Uint8Array(salt), iterations: PBKDF2_ITERATIONS, hash: 'SHA-256' },
     material,
-    { name: 'AES-GCM', length: 256 },
-    false,
-    ['encrypt', 'decrypt'],
+    256,
   )
+}
+
+const deriveBitsInWorker = (passphrase: string, salt: Uint8Array): Promise<ArrayBuffer> =>
+  new Promise((resolve, reject) => {
+    const worker = new Worker(new URL('./pbkdf2.worker.ts', import.meta.url), { type: 'module' })
+    const saltCopy = new Uint8Array(salt)
+    const timer = window.setTimeout(() => {
+      worker.terminate()
+      reject(new Error('key derivation timed out'))
+    }, 60_000)
+    worker.onmessage = (event: MessageEvent<{ bits?: ArrayBuffer; error?: string }>) => {
+      window.clearTimeout(timer)
+      worker.terminate()
+      if (event.data.bits) resolve(event.data.bits)
+      else reject(new Error(event.data.error || 'key derivation failed'))
+    }
+    worker.onerror = () => {
+      window.clearTimeout(timer)
+      worker.terminate()
+      reject(new Error('key derivation worker failed'))
+    }
+    worker.postMessage({ passphrase, salt: saltCopy.buffer }, [saltCopy.buffer])
+  })
+
+export const deriveKey = async (
+  passphrase: string,
+  salt: Uint8Array,
+): Promise<CryptoKey> => {
+  try {
+    return await importAesKey(await deriveBitsInWorker(passphrase, salt))
+  } catch (error) {
+    console.error(error)
+    return importAesKey(await deriveBitsOnMain(passphrase, salt))
+  }
 }
 
 export const encryptVault = async (
