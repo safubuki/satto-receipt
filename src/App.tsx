@@ -1183,7 +1183,7 @@ function App() {
                     3.8 Flash
                   </button>
                 </div>
-                <p className="mt-2 text-xs text-slate-500">標準は 3.5 Flash-Lite です。AI Studio の無料枠で読み取り回数を確保するためです。薄いレシートや品目が多い写真は 3.8 Flash に切り替えられます。ONのとき、レシート画像は Google に送信されます。</p>
+                <p className="mt-2 text-xs text-slate-500">ONのとき、画像は Google に送られます。</p>
                 <button type="button" onClick={() => void handleCleanupImages()} className="ui-btn ui-btn-quiet mt-3 w-full py-2.5 text-sm">
                   保存済み画像を削除
                 </button>
