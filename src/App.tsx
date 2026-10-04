@@ -513,12 +513,10 @@ function App() {
   }
 
   const handleSaveReceipt = async () => {
-    if (!session) return
+    if (!session || !canSaveReceipt) return
     
     // ドラフトの品目データをLineItem形式に変換
     const lineItems = toLineItems(draft.lineItems)
-
-    if (!hasUnsavedDraft(draft)) return
 
     const computedTotal = Number(String(draft.total).replace(/,/g, "")) || 0
 
@@ -872,6 +870,7 @@ function App() {
 
   // ドラフトに未保存データがあるか
   const hasDraftData = useMemo(() => hasUnsavedDraft(draft), [draft])
+  const canSaveReceipt = hasDraftData && !isProcessing && ocrProgress === null
 
   const displayedReceipts = useMemo(
     () => (filteredReceipts.length > visibleCount ? filteredReceipts.slice(0, visibleCount) : filteredReceipts),
@@ -1109,7 +1108,7 @@ function App() {
                 <button
                   type="button"
                   onClick={() => void handleSaveReceipt()}
-                  disabled={!hasDraftData}
+                  disabled={!canSaveReceipt}
                   className="ui-btn ui-btn-primary mt-4 hidden w-full py-3 text-sm disabled:opacity-100 lg:block"
                 >
                   保存する
@@ -1336,14 +1335,14 @@ function App() {
                 </button>
               </p>
             )}
-            <div className="mx-auto flex max-w-lg items-center gap-2">
-              <button type="button" onClick={() => void (cameraActive ? stopCamera() : startCamera())} className="footer-btn ui-btn ui-btn-secondary h-10 px-3 text-xs">
+            <div className="mx-auto grid max-w-lg grid-cols-[minmax(5rem,1fr)_minmax(0,2fr)_minmax(5rem,1fr)] items-center gap-2">
+              <button type="button" onClick={() => void (cameraActive ? stopCamera() : startCamera())} className="footer-btn ui-btn ui-btn-secondary h-10 min-w-0 whitespace-nowrap px-2 text-xs">
                 {cameraActive ? "カメラOFF" : "カメラON"}
               </button>
-              <button type="button" onClick={() => void captureFromCamera()} disabled={!cameraActive || isProcessing} className="footer-btn ui-btn ui-btn-primary h-11 flex-1 text-sm disabled:opacity-100">
+              <button type="button" onClick={() => void captureFromCamera()} disabled={!cameraActive || isProcessing} className="footer-btn ui-btn ui-btn-primary h-11 min-w-0 whitespace-nowrap text-sm disabled:opacity-100">
                 {isProcessing ? "認識中" : cameraPaused ? "再撮影" : "撮影"}
               </button>
-              <button type="button" onClick={() => void handleSaveReceipt()} disabled={!hasDraftData} className="footer-btn ui-btn ui-btn-quiet h-10 border-mint px-3 text-xs text-mint disabled:opacity-40">
+              <button type="button" onClick={() => void handleSaveReceipt()} disabled={!canSaveReceipt} title={canSaveReceipt ? "入力内容を保存できます" : isProcessing || ocrProgress !== null ? "読み取りが終わるまでお待ちください" : "保存する内容を入力してください"} className={`footer-btn footer-save-btn ui-btn ui-btn-quiet h-10 min-w-0 whitespace-nowrap px-2 text-xs disabled:opacity-40 ${canSaveReceipt && !cameraError ? "footer-save-ready" : ""}`}>
                 保存
               </button>
             </div>
