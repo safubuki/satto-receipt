@@ -962,19 +962,19 @@ function App() {
             </div>
           </div>
           {session && (
-            <div className="flex shrink-0 flex-col items-end gap-1.5 sm:flex-row sm:items-center">
+            <div className="flex shrink-0 items-center gap-1.5">
               <button
                 type="button"
                 onClick={() => void handleAppUpdate()}
                 disabled={pwaUpdating}
-                className="ui-btn ui-btn-quiet px-3 py-1.5 text-xs"
+                className="ui-btn ui-btn-quiet h-9 whitespace-nowrap px-3 text-xs"
               >
                 {pwaUpdating ? "更新しています" : "アプリ更新"}
               </button>
               <button
                 type="button"
                 onClick={() => void handleLock()}
-                className="ui-btn ui-btn-quiet px-3 py-1.5 text-xs sm:text-sm"
+                className="ui-btn ui-btn-quiet h-9 whitespace-nowrap px-3 text-xs"
               >
                 ログアウト
               </button>
