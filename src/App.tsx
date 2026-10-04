@@ -1230,7 +1230,7 @@ function App() {
               </div>
             </aside>
 
-            <section className="order-3 rounded-3xl border border-white/10 bg-white/5 p-4 sm:p-6 lg:order-none lg:col-span-2 lg:col-start-1 lg:row-start-3">
+            <section className="order-3 min-w-0 rounded-3xl border border-white/10 bg-white/5 p-4 sm:p-6 lg:order-none lg:col-span-2 lg:col-start-1 lg:row-start-3">
               <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <h2 className="text-lg font-semibold text-white">{formatMonthLabel(selectedMonth)}の支出</h2>
                 <div className="flex flex-col gap-2 sm:flex-row">
@@ -1262,22 +1262,22 @@ function App() {
                   return (
                     <article key={receipt.id} className="rounded-2xl border border-white/10 bg-white/5 p-3 sm:p-4">
                       <div className="flex items-start justify-between gap-3">
-                        <button type="button" aria-expanded={open} className="min-w-0 text-left" onClick={() => setOpenReceiptIds((prev) => {
+                        <button type="button" aria-expanded={open} className="min-w-0 flex-1 text-left" onClick={() => setOpenReceiptIds((prev) => {
                           const next = new Set(prev)
                           if (next.has(receipt.id)) next.delete(receipt.id)
                           else next.add(receipt.id)
                           return next
                         })}>
                           <p className="text-xs text-slate-400">{receipt.visitedAt}</p>
-                          <p className="truncate font-semibold text-white">{open ? "▾ " : "▸ "}{receipt.storeName}</p>
-                          <p className="mt-1 text-xs text-slate-300">
+                          <p className="truncate font-semibold text-white" title={receipt.storeName}>{open ? "▾ " : "▸ "}{receipt.storeName}</p>
+                          <p className="mt-1 truncate text-xs text-slate-300">
                             {receipt.category || "未分類"}
                             {receipt.isNomikai ? " 🍺" : ""}
                             {receipt.isJibara ? " 👛" : ""}
                             {(receipt.lineItems ?? []).length > 0 ? ` ・明細${receipt.lineItems.length}` : ""}
                           </p>
                         </button>
-                        <div className="text-right">
+                        <div className="shrink-0 whitespace-nowrap text-right">
                           <p className="text-lg font-bold text-mint">{formatCurrency(receipt.total)}</p>
                           <div className="mt-1 flex justify-end gap-2">
                             <button type="button" className="rounded-full px-3 py-1.5 text-sm text-yellow-300" onClick={() => openEdit(receipt)}>編集</button>
