@@ -10,6 +10,7 @@ import type { Category, LineItem, Receipt, Vault } from "./lib/types"
 import { importCsvToReceipts } from "./lib/csvImport"
 import { ReceiptFields, type ReceiptFormValue } from "./components/ReceiptFields"
 import { Dialog } from "./components/Dialog"
+import { updateInstalledApp } from "./lib/pwaUpdate"
 
 import "./index.css"
 
@@ -185,6 +186,7 @@ function App() {
   const [showApiKeyModal, setShowApiKeyModal] = useState(false)
   const [apiKeyInput, setApiKeyInput] = useState("")
   const [apiKeyError, setApiKeyError] = useState<string | null>(null)
+  const [pwaUpdating, setPwaUpdating] = useState(false)
   const [notice, setNotice] = useState<AppNotice | null>(null)
   const noticeResolver = useRef<((value: boolean) => void) | null>(null)
 
@@ -379,6 +381,23 @@ function App() {
       noticeResolver.current = () => resolve()
       setNotice({ title, message })
     })
+
+  const handleAppUpdate = async () => {
+    if (session && hasUnsavedDraft(draft)) {
+      const confirmed = await askConfirm("未保存の入力は消えます。アプリを更新して読み込み直しますか？", {
+        title: "アプリを更新",
+        confirmLabel: "更新する",
+      })
+      if (!confirmed) return
+    }
+    setPwaUpdating(true)
+    try {
+      await updateInstalledApp()
+    } catch {
+      setPwaUpdating(false)
+      await showNotice("更新を確認できませんでした。通信できる場所でもう一度押してください。", "更新できませんでした")
+    }
+  }
 
   const closeApiKeyModal = () => {
     setApiKeyInput("")
@@ -943,13 +962,23 @@ function App() {
             </div>
           </div>
           {session && (
-            <button
-              type="button"
-              onClick={() => void handleLock()}
-              className="ui-btn ui-btn-quiet px-3 py-1.5 text-xs sm:text-sm"
-            >
-              ログアウト
-            </button>
+            <div className="flex shrink-0 flex-col items-end gap-1.5 sm:flex-row sm:items-center">
+              <button
+                type="button"
+                onClick={() => void handleAppUpdate()}
+                disabled={pwaUpdating}
+                className="ui-btn ui-btn-quiet px-3 py-1.5 text-xs"
+              >
+                {pwaUpdating ? "更新しています" : "アプリ更新"}
+              </button>
+              <button
+                type="button"
+                onClick={() => void handleLock()}
+                className="ui-btn ui-btn-quiet px-3 py-1.5 text-xs sm:text-sm"
+              >
+                ログアウト
+              </button>
+            </div>
           )}
         </div>
       </header>
@@ -966,6 +995,9 @@ function App() {
               <li>データは IndexedDB に残り、CSV でバックアップできます。</li>
               <li>Gemini を使うときだけ、画像と集計が Google に送られます。</li>
             </ul>
+            <button type="button" onClick={() => void handleAppUpdate()} disabled={pwaUpdating} className="ui-btn ui-btn-quiet mt-4 w-full py-2.5 text-sm">
+              {pwaUpdating ? "更新しています" : "アプリ更新"}
+            </button>
           </div>
         </div>
       ) : (
