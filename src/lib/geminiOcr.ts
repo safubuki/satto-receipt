@@ -56,14 +56,24 @@ export interface ReceiptOcrResult {
   rawText: string
 }
 
+export type MonthInsightFood = {
+  name: string
+  quantity: number
+  amount: number
+}
+
 export type MonthInsightInput = {
   month: string
   total: number
   count: number
-  nomikai: number
-  jibara: number
-  byCategory: Array<{ name: string; total: number; count: number }>
-  topStores: Array<{ name: string; total: number }>
+  previous: { month: string; total: number; count: number } | null
+  largest: { name: string; total: number; percent: number } | null
+  change: { name: string; total: number; previousTotal: number; delta: number } | null
+  topStore: { name: string; total: number } | null
+  /** 3.8 Flash の食生活・健康コメントだけが使う。Lite のプロンプトには入れない。 */
+  nomikai?: number
+  foods?: MonthInsightFood[]
+  foodsOmitted?: number
 }
 
 // ========== APIキー管理 ==========
@@ -318,8 +328,73 @@ const describeApiError = (error: unknown): Error => {
   return new Error(`Gemini API エラー: ${errorMessage}`)
 }
 
-/** 集計済みの数字と店名だけを送り、今月の短いふりかえりを作る。 */
-export const summarizeMonth = async (input: MonthInsightInput): Promise<string> => {
+const signed = (value: number) => `${value > 0 ? "+" : ""}${value}`
+
+const insightFacts = (input: MonthInsightInput) => {
+  const previous = input.previous
+    ? `${input.previous.month} ${input.previous.total}円 ${input.previous.count}件`
+    : "なし"
+  const largest = input.largest
+    ? `${input.largest.name} ${input.largest.total}円 ${input.largest.percent}%`
+    : "なし"
+  const change = input.change
+    ? `${input.change.name} 今月 ${input.change.total}円 先月 ${input.change.previousTotal}円 差 ${signed(input.change.delta)}円`
+    : "なし"
+  const store = input.topStore ? `${input.topStore.name} ${input.topStore.total}円` : "なし"
+  return { previous, largest, change, store }
+}
+
+const foodFacts = (input: MonthInsightInput) => {
+  const foods = input.foods ?? []
+  if (foods.length === 0) return "なし"
+  const body = foods.map((food) => `${food.name} 数量${food.quantity} ${food.amount}円`).join("、")
+  const omitted = input.foodsOmitted ?? 0
+  return omitted > 0 ? `${body}、ほか${omitted}品` : body
+}
+
+/** Lite は2文だけ。3.8 Flash はお金・食生活・健康の短いコメントにする。 */
+export const buildMonthInsightPrompt = (
+  input: MonthInsightInput,
+  model: GeminiModelId = "gemini-3.5-flash-lite",
+): string => {
+  const facts = insightFacts(input)
+  const shared = `対象月: ${input.month}
+件数: ${input.count}
+合計: ${input.total}円
+先月: ${facts.previous}
+いちばん大きい分類: ${facts.largest}
+増減の大きい分類: ${facts.change}
+店: ${facts.store}`
+
+  if (model === "gemini-3.8-flash") {
+    return `あなたは家計メモの助手です。下の材料だけを使い、日本語で短いふりかえりを書いてください。
+見出しは「お金」「食生活」「健康」だけを使い、各本文は1文か2文にしてください。
+明細があるときは、お金、食生活、健康の順で書いてください。明細がなければお金だけを書いてください。
+
+お金では、いちばん大きい分類と、増減の大きい分類があればその差を使い、使い方の提案を1つ書いてください。新しい目標金額は作らないでください。
+食生活では、明細にある食べ物から、偏りや良い点を1つ書いてください。食べ物以外の品名には触れないでください。
+健康では、明細の食べ物と飲み会の金額から、体調面で気にするとよい点を1つ書いてください。診断、病名、治療、サプリの指示は書かないでください。
+材料にない食品、店、金額は書かないでください。数字を計算し直さないでください。マークダウンは使わないでください。
+
+${shared}
+飲み会: ${input.nomikai ?? 0}円
+明細: ${foodFacts(input)}`
+  }
+
+  return `あなたは家計メモの助手です。下の材料だけを使い、日本語で2文以内の短いふりかえりを書いてください。
+1文目は「いちばん大きい分類」だけを言う。
+2文目は「増減の大きい分類」があるときだけ、その増減を言う。なければ1文で終える。
+材料にない数字、分類、店は書かない。分類の一覧は書かない。
+原因の想像、節約の指示、予算の提案、励ましは書かない。マークダウンは使わない。
+
+${shared}`
+}
+
+/** 集計済みの結論だけを送る。Lite は2文、3.8 Flash はお金・食生活・健康の短いコメント。 */
+export const summarizeMonth = async (
+  input: MonthInsightInput,
+  model: GeminiModelId = getGeminiModel(),
+): Promise<string> => {
   const apiKey = getApiKey()
   if (!apiKey) {
     throw new Error("APIキーが設定されていません。設定画面からGemini APIキーを入力してください。")
@@ -328,25 +403,15 @@ export const summarizeMonth = async (input: MonthInsightInput): Promise<string> 
     throw new Error("この月の支出がまだないので、まとめられません。")
   }
 
-  const model = getGeminiModel()
   const ai = new GoogleGenAI({ apiKey })
-  const prompt = `あなたは個人の家計メモの助手です。次の集計だけを材料に、日本語で2文か3文のふりかえりを書いてください。
-数字は材料にあるものだけを使い、足したり推測したりしないでください。説教や節約の命令はしないでください。マークダウンは使わないでください。
-
-対象月: ${input.month}
-件数: ${input.count}
-合計: ${input.total}円
-飲み会の合計: ${input.nomikai}円
-自腹の合計: ${input.jibara}円
-分類: ${input.byCategory.map((row) => `${row.name} ${row.total}円 ${row.count}件`).join("、") || "なし"}
-店別上位: ${input.topStores.map((row) => `${row.name} ${row.total}円`).join("、") || "なし"}`
+  const prompt = buildMonthInsightPrompt(input, model)
 
   try {
     const response = await ai.models.generateContent({
       model,
       contents: [{ role: "user", parts: [{ text: prompt }] }],
       config: {
-        maxOutputTokens: 512,
+        maxOutputTokens: model === "gemini-3.8-flash" ? 2048 : 512,
         thinkingConfig: thinkingFor(model),
       },
     })

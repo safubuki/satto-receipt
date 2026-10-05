@@ -9,8 +9,10 @@ import { clearVault, loadVault, saveVault } from "./lib/db"
 import type { Category, LineItem, Receipt, Vault } from "./lib/types"
 import { importCsvToReceipts } from "./lib/csvImport"
 import { findDuplicateReceipts } from "./lib/duplicateReceipts"
+import { CategoryBreakdown } from "./components/CategoryBreakdown"
 import { ReceiptFields, type ReceiptFormValue } from "./components/ReceiptFields"
 import { Dialog } from "./components/Dialog"
+import { buildMonthBreakdown, collectMonthFoods } from "./lib/monthBreakdown"
 import { clearUpdateCompleteNotice, readUpdateCompleteNotice, updateInstalledApp } from "./lib/pwaUpdate"
 
 import "./index.css"
@@ -167,6 +169,7 @@ function App() {
   const [monthInsight, setMonthInsight] = useState<string | null>(null)
   const [insightLoading, setInsightLoading] = useState(false)
   const [insightError, setInsightError] = useState<string | null>(null)
+  const [showCategoryBreakdown, setShowCategoryBreakdown] = useState(false)
   const categories = useMemo(() => {
     const stored = session?.vault.categories ?? []
     const extras = stored.filter(
@@ -936,38 +939,62 @@ function App() {
     setInsightError(null)
   }, [selectedMonth])
 
+  const monthBreakdown = useMemo(
+    () => buildMonthBreakdown(session?.vault.receipts ?? [], selectedMonth),
+    [session, selectedMonth],
+  )
+
+  const categoryColors = useMemo(
+    () => new Map(categories.map((category) => [category.name, category.color])),
+    [categories],
+  )
+
   const handleMonthInsight = async () => {
     if (!session) return
+    setShowCategoryBreakdown(true)
+    if (monthBreakdown.count === 0) {
+      setMonthInsight(null)
+      setInsightError(null)
+      return
+    }
     if (!hasApiKey()) {
       setShowApiKeyModal(true)
       return
     }
     const monthReceipts = session.vault.receipts.filter((receipt) => receipt.visitedAt.startsWith(selectedMonth))
-    const byCategory = new Map<string, { total: number; count: number }>()
     const byStore = new Map<string, number>()
     monthReceipts.forEach((receipt) => {
-      const name = receipt.category || "未分類"
-      const current = byCategory.get(name) ?? { total: 0, count: 0 }
-      byCategory.set(name, { total: current.total + receipt.total, count: current.count + 1 })
-      byStore.set(receipt.storeName, (byStore.get(receipt.storeName) ?? 0) + receipt.total)
+      const name = receipt.storeName.trim()
+      if (!name) return
+      byStore.set(name, (byStore.get(name) ?? 0) + receipt.total)
     })
+    const topStore = Array.from(byStore.entries())
+      .map(([name, total]) => ({ name, total }))
+      .sort((a, b) => b.total - a.total || a.name.localeCompare(b.name, "ja"))[0] ?? null
+    const monthFoods = collectMonthFoods(monthReceipts, selectedMonth)
     setInsightLoading(true)
     setInsightError(null)
     try {
       const text = await summarizeMonth({
         month: formatMonthLabel(selectedMonth),
-        total: selectedMonthTotal,
-        count: monthReceipts.length,
+        total: monthBreakdown.total,
+        count: monthBreakdown.count,
+        previous: monthBreakdown.hasPrevious
+          ? {
+              month: formatMonthLabel(monthBreakdown.previousMonth),
+              total: monthBreakdown.previousTotal,
+              count: monthBreakdown.previousCount,
+            }
+          : null,
+        largest: monthBreakdown.lead
+          ? { name: monthBreakdown.lead.name, total: monthBreakdown.lead.total, percent: monthBreakdown.lead.percent }
+          : null,
+        change: monthBreakdown.leadChange,
+        topStore,
         nomikai: selectedMonthNomikai,
-        jibara: selectedMonthJibara,
-        byCategory: Array.from(byCategory.entries())
-          .map(([name, value]) => ({ name, total: value.total, count: value.count }))
-          .sort((a, b) => b.total - a.total),
-        topStores: Array.from(byStore.entries())
-          .map(([name, total]) => ({ name, total }))
-          .sort((a, b) => b.total - a.total)
-          .slice(0, 5),
-      })
+        foods: monthFoods.foods,
+        foodsOmitted: monthFoods.omitted,
+      }, geminiModel)
       setMonthInsight(text)
     } catch (error) {
       setInsightError(error instanceof Error ? error.message : "まとめを作れませんでした。")
@@ -1021,7 +1048,7 @@ function App() {
             <ul className="mt-3 list-disc space-y-2 pl-4 text-sm text-slate-400">
               <li>パスフレーズを忘れると復元できません。</li>
               <li>データは IndexedDB に残り、CSV でバックアップできます。</li>
-              <li>Gemini を使うときだけ、画像と集計が Google に送られます。</li>
+              <li>Gemini を使うときだけ、画像と集計が Google に送られます。3.8 Flash で今月をふりかえるときは、明細の品名も送ります。</li>
             </ul>
             <button type="button" onClick={() => void handleAppUpdate()} disabled={pwaUpdating} className="ui-btn ui-btn-quiet mt-4 w-full py-2.5 text-sm">
               {pwaUpdating ? "更新しています" : "アプリ更新"}
@@ -1163,13 +1190,27 @@ function App() {
                 </div>
                 <button
                   type="button"
+                  aria-expanded={showCategoryBreakdown}
+                  aria-controls="category-breakdown"
+                  onClick={() => setShowCategoryBreakdown((open) => !open)}
+                  className={`ui-btn ui-btn-secondary mt-3 w-full py-2.5 text-sm ${showCategoryBreakdown ? "border-mint text-mint" : ""}`}
+                >
+                  {showCategoryBreakdown ? "円グラフを閉じる" : "ジャンルの円グラフ"}
+                </button>
+                {showCategoryBreakdown && <CategoryBreakdown breakdown={monthBreakdown} colors={categoryColors} />}
+                <button
+                  type="button"
                   onClick={() => void handleMonthInsight()}
                   disabled={insightLoading}
                   className="ui-btn ui-btn-secondary mt-3 w-full py-2.5 text-sm text-mint"
                 >
                   {insightLoading ? "まとめています..." : "AIで今月をふりかえる"}
                 </button>
-                <p className="mt-2 text-xs text-slate-500">店名と金額の集計だけを送ります。レシート画像は送りません。</p>
+                <p className="mt-2 text-xs text-slate-500">
+                  {geminiModel === "gemini-3.8-flash"
+                    ? "店名、金額の集計、明細の品名を Google に送ります。レシート画像は送りません。お金、食生活、健康について短くコメントします。"
+                    : "店名と、今月・先月の金額の集計だけを Google に送ります。レシート画像は送りません。"}
+                </p>
                 {insightError && <p className="mt-2 text-sm text-red-200">{insightError}</p>}
                 {monthInsight && <p className="mt-3 whitespace-pre-wrap text-sm leading-relaxed text-slate-200">{monthInsight}</p>}
               </div>
