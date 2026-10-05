@@ -1228,7 +1228,9 @@ function App() {
               </div>
 
               <div className="rounded-3xl border border-white/10 bg-white/5 p-4">
-                <div className="grid grid-cols-2 gap-2">
+                <h3 className="text-base font-semibold text-white">ファイルの保存・削除</h3>
+                <p className="mt-3 text-sm text-slate-400">支出データ</p>
+                <div className="mt-2 grid grid-cols-2 gap-2">
                   <button type="button" onClick={handleExport} className="ui-btn ui-btn-secondary py-2.5 text-sm">CSVを保存</button>
                   <label className="ui-btn ui-btn-secondary w-full cursor-pointer py-2.5 text-sm">
                     CSVを読込
@@ -1245,10 +1247,15 @@ function App() {
                     />
                   </label>
                 </div>
+                <p className="mt-4 text-sm text-slate-400">レシート画像</p>
+                <button type="button" onClick={() => void handleCleanupImages()} className="ui-btn ui-btn-quiet mt-2 w-full py-2.5 text-sm">
+                  保存済み画像を削除
+                </button>
               </div>
 
               <div className="rounded-3xl border border-white/10 bg-white/5 p-4 text-sm">
-                <div className="flex items-center justify-between gap-2">
+                <h3 className="text-base font-semibold text-white">AIモデルの設定</h3>
+                <div className="mt-3 flex items-center justify-between gap-2">
                   <div>
                     <p className="font-semibold text-white">{geminiModel === "gemini-3.8-flash" ? "Gemini 3.8 Flash" : "Gemini 3.5 Flash-Lite"}</p>
                     <p className="text-xs text-slate-400">{hasApiKey() ? "APIキー設定済み" : "APIキー未設定"}</p>
@@ -1285,9 +1292,6 @@ function App() {
                   </button>
                 </div>
                 <p className="mt-2 text-xs text-slate-500">ONのとき、画像は Google に送られます。</p>
-                <button type="button" onClick={() => void handleCleanupImages()} className="ui-btn ui-btn-quiet mt-3 w-full py-2.5 text-sm">
-                  保存済み画像を削除
-                </button>
               </div>
             </aside>
 
