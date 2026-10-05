@@ -8,6 +8,7 @@ import { formatLocalDate, formatLocalMonth, shiftMonth } from "./lib/date"
 import { clearVault, loadVault, saveVault } from "./lib/db"
 import type { Category, LineItem, Receipt, Vault } from "./lib/types"
 import { importCsvToReceipts } from "./lib/csvImport"
+import { findDuplicateReceipts } from "./lib/duplicateReceipts"
 import { ReceiptFields, type ReceiptFormValue } from "./components/ReceiptFields"
 import { Dialog } from "./components/Dialog"
 import { clearUpdateCompleteNotice, readUpdateCompleteNotice, updateInstalledApp } from "./lib/pwaUpdate"
@@ -27,6 +28,7 @@ type AppNotice = {
   title: string
   message: string
   confirmLabel?: string
+  cancelLabel?: string
   danger?: boolean
   updateComplete?: boolean
 }
@@ -182,6 +184,8 @@ function App() {
   const [cameraPaused, setCameraPaused] = useState(false)
   const [capturedImage, setCapturedImage] = useState<string | null>(null)
   const [isProcessing, setIsProcessing] = useState(false)
+  const [savingReceipt, setSavingReceipt] = useState(false)
+  const receiptSaveInFlight = useRef(false)
   const [useGemini, setUseGemini] = useState(true)
   const [geminiModel, setGeminiModel] = useState<GeminiModelId>(() => getGeminiModel())
   const [showApiKeyModal, setShowApiKeyModal] = useState(false)
@@ -365,7 +369,7 @@ function App() {
     resolve?.(value)
   }
 
-  const askConfirm = (message: string, options?: { title?: string; confirmLabel?: string; danger?: boolean }) =>
+  const askConfirm = (message: string, options?: { title?: string; confirmLabel?: string; cancelLabel?: string; danger?: boolean }) =>
     new Promise<boolean>((resolve) => {
       if (noticeResolver.current) noticeResolver.current(false)
       noticeResolver.current = resolve
@@ -373,6 +377,7 @@ function App() {
         title: options?.title ?? "確認",
         message,
         confirmLabel: options?.confirmLabel ?? "続ける",
+        cancelLabel: options?.cancelLabel,
         danger: options?.danger,
       })
     })
@@ -515,43 +520,63 @@ function App() {
   }
 
   const handleSaveReceipt = async () => {
-    if (!session) return
-    
-    // ドラフトの品目データをLineItem形式に変換
-    const lineItems = toLineItems(draft.lineItems)
+    if (!session || !canSaveReceipt || receiptSaveInFlight.current) return
+    receiptSaveInFlight.current = true
+    setSavingReceipt(true)
 
-    if (!hasUnsavedDraft(draft)) return
+    try {
+      // ドラフトの品目データをLineItem形式に変換
+      const lineItems = toLineItems(draft.lineItems)
+      const computedTotal = Number(String(draft.total).replace(/,/g, "")) || 0
+      const now = new Date().toISOString()
 
-    const computedTotal = Number(String(draft.total).replace(/,/g, "")) || 0
+      const receipt: Receipt = {
+        id: crypto.randomUUID(),
+        storeName: draft.storeName || "無題のレシート",
+        visitedAt: draft.visitedAt || formatLocalDate(),
+        total: computedTotal,
+        category: draft.category,
+        note: draft.note || undefined,
+        imageData: saveImage ? draft.imageData : undefined,
+        lineItems,
+        isNomikai: draft.isNomikai || false,
+        isJibara: draft.isJibara || false,
+        createdAt: now,
+        updatedAt: now,
+      }
 
-    const now = new Date().toISOString()
+      const duplicates = findDuplicateReceipts(session.vault.receipts, {
+        storeName: draft.storeName,
+        visitedAt: receipt.visitedAt,
+        total: receipt.total,
+      })
+      if (duplicates.length) {
+        const summaries = duplicates.slice(0, 3).map((saved) =>
+          `${saved.visitedAt} / ${formatCurrency(saved.total)}\n${saved.storeName}`,
+        ).join("\n\n")
+        const more = duplicates.length > 3 ? `\n\nほか${duplicates.length - 3}件` : ""
+        const confirmed = await askConfirm(
+          `同じ店名・日付・合計金額のレシートが${duplicates.length}件あります。\n\n登録済みのレシート\n${summaries}${more}\n\n別の買い物であれば、そのまま保存できます。`,
+          { title: "同じレシートではありませんか？", confirmLabel: "それでも保存", cancelLabel: "保存しない" },
+        )
+        if (!confirmed) return
+      }
 
-    const receipt: Receipt = {
-      id: crypto.randomUUID(),
-      storeName: draft.storeName || "無題のレシート",
-      visitedAt: draft.visitedAt || formatLocalDate(),
-      total: computedTotal,
-      category: draft.category,
-      note: draft.note || undefined,
-      imageData: saveImage ? draft.imageData : undefined,
-      lineItems,
-      isNomikai: draft.isNomikai || false,
-      isJibara: draft.isJibara || false,
-      createdAt: now,
-      updatedAt: now,
+      const nextVault = {
+        ...session.vault,
+        receipts: [receipt, ...session.vault.receipts],
+      }
+
+      await persistVault(nextVault, session.key)
+      setDraft(initialDraft())
+      setOcrText("")
+      setOcrProgress(null)
+      setLastUploadedName(null)
+      stopCamera()
+    } finally {
+      receiptSaveInFlight.current = false
+      setSavingReceipt(false)
     }
-
-    const nextVault = {
-      ...session.vault,
-      receipts: [receipt, ...session.vault.receipts],
-    }
-
-    await persistVault(nextVault, session.key)
-    setDraft(initialDraft())
-    setOcrText("")
-    setOcrProgress(null)
-    setLastUploadedName(null)
-    stopCamera()
   }
 
   const handleDeleteReceipt = async (id: string) => {
@@ -874,6 +899,7 @@ function App() {
 
   // ドラフトに未保存データがあるか
   const hasDraftData = useMemo(() => hasUnsavedDraft(draft), [draft])
+  const canSaveReceipt = hasDraftData && !isProcessing && ocrProgress === null && !savingReceipt
 
   const displayedReceipts = useMemo(
     () => (filteredReceipts.length > visibleCount ? filteredReceipts.slice(0, visibleCount) : filteredReceipts),
@@ -1111,7 +1137,7 @@ function App() {
                 <button
                   type="button"
                   onClick={() => void handleSaveReceipt()}
-                  disabled={!hasDraftData}
+                  disabled={!canSaveReceipt}
                   className="ui-btn ui-btn-primary mt-4 hidden w-full py-3 text-sm disabled:opacity-100 lg:block"
                 >
                   保存する
@@ -1232,7 +1258,7 @@ function App() {
               </div>
             </aside>
 
-            <section className="order-3 rounded-3xl border border-white/10 bg-white/5 p-4 sm:p-6 lg:order-none lg:col-span-2 lg:col-start-1 lg:row-start-3">
+            <section className="order-3 min-w-0 rounded-3xl border border-white/10 bg-white/5 p-4 sm:p-6 lg:order-none lg:col-span-2 lg:col-start-1 lg:row-start-3">
               <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <h2 className="text-lg font-semibold text-white">{formatMonthLabel(selectedMonth)}の支出</h2>
                 <div className="flex flex-col gap-2 sm:flex-row">
@@ -1264,22 +1290,22 @@ function App() {
                   return (
                     <article key={receipt.id} className="rounded-2xl border border-white/10 bg-white/5 p-3 sm:p-4">
                       <div className="flex items-start justify-between gap-3">
-                        <button type="button" aria-expanded={open} className="min-w-0 text-left" onClick={() => setOpenReceiptIds((prev) => {
+                        <button type="button" aria-expanded={open} className="min-w-0 flex-1 text-left" onClick={() => setOpenReceiptIds((prev) => {
                           const next = new Set(prev)
                           if (next.has(receipt.id)) next.delete(receipt.id)
                           else next.add(receipt.id)
                           return next
                         })}>
                           <p className="text-xs text-slate-400">{receipt.visitedAt}</p>
-                          <p className="truncate font-semibold text-white">{open ? "▾ " : "▸ "}{receipt.storeName}</p>
-                          <p className="mt-1 text-xs text-slate-300">
+                          <p className="truncate font-semibold text-white" title={receipt.storeName}>{open ? "▾ " : "▸ "}{receipt.storeName}</p>
+                          <p className="mt-1 truncate text-xs text-slate-300">
                             {receipt.category || "未分類"}
                             {receipt.isNomikai ? " 🍺" : ""}
                             {receipt.isJibara ? " 👛" : ""}
                             {(receipt.lineItems ?? []).length > 0 ? ` ・明細${receipt.lineItems.length}` : ""}
                           </p>
                         </button>
-                        <div className="text-right">
+                        <div className="shrink-0 whitespace-nowrap text-right">
                           <p className="text-lg font-bold text-mint">{formatCurrency(receipt.total)}</p>
                           <div className="mt-1 flex justify-end gap-2">
                             <button type="button" className="rounded-full px-3 py-1.5 text-sm text-yellow-300" onClick={() => openEdit(receipt)}>編集</button>
@@ -1338,14 +1364,14 @@ function App() {
                 </button>
               </p>
             )}
-            <div className="mx-auto flex max-w-lg items-center gap-2">
-              <button type="button" onClick={() => void (cameraActive ? stopCamera() : startCamera())} className="footer-btn ui-btn ui-btn-secondary h-10 px-3 text-xs">
+            <div className="mx-auto grid max-w-lg grid-cols-[minmax(5rem,1fr)_minmax(0,2fr)_minmax(5rem,1fr)] items-center gap-2">
+              <button type="button" onClick={() => void (cameraActive ? stopCamera() : startCamera())} className="footer-btn ui-btn ui-btn-secondary h-10 min-w-0 whitespace-nowrap px-2 text-xs">
                 {cameraActive ? "カメラOFF" : "カメラON"}
               </button>
-              <button type="button" onClick={() => void captureFromCamera()} disabled={!cameraActive || isProcessing} className="footer-btn ui-btn ui-btn-primary h-11 flex-1 text-sm disabled:opacity-100">
+              <button type="button" onClick={() => void captureFromCamera()} disabled={!cameraActive || isProcessing} className="footer-btn ui-btn ui-btn-primary h-11 min-w-0 whitespace-nowrap text-sm disabled:opacity-100">
                 {isProcessing ? "認識中" : cameraPaused ? "再撮影" : "撮影"}
               </button>
-              <button type="button" onClick={() => void handleSaveReceipt()} disabled={!hasDraftData} className="footer-btn ui-btn ui-btn-quiet h-10 border-mint px-3 text-xs text-mint disabled:opacity-40">
+              <button type="button" onClick={() => void handleSaveReceipt()} disabled={!canSaveReceipt} title={savingReceipt ? "保存処理中です" : canSaveReceipt ? "入力内容を保存できます" : isProcessing || ocrProgress !== null ? "読み取りが終わるまでお待ちください" : "保存する内容を入力してください"} className={`footer-btn footer-save-btn ui-btn ui-btn-quiet h-10 min-w-0 whitespace-nowrap px-2 text-xs disabled:opacity-40 ${canSaveReceipt && !cameraError ? "footer-save-ready" : ""}`}>
                 保存
               </button>
             </div>
@@ -1443,7 +1469,7 @@ function App() {
         <Dialog title={notice.title} onClose={() => closeNotice(false)} footer={
           notice.confirmLabel ? (
             <div className="grid grid-cols-2 gap-3">
-              <button type="button" className="ui-btn ui-btn-secondary py-3 text-sm" onClick={() => closeNotice(false)}>キャンセル</button>
+              <button type="button" className="ui-btn ui-btn-secondary py-3 text-sm" onClick={() => closeNotice(false)}>{notice.cancelLabel ?? "キャンセル"}</button>
               <button
                 type="button"
                 className={`ui-btn py-3 text-sm ${notice.danger ? "bg-red-500 text-white" : "ui-btn-primary"}`}
@@ -1458,7 +1484,7 @@ function App() {
             </button>
           )
         }>
-          <p className="whitespace-pre-wrap text-sm leading-relaxed text-slate-300">{notice.message}</p>
+          <p className="whitespace-pre-wrap break-words text-sm leading-relaxed text-slate-300">{notice.message}</p>
         </Dialog>
       )}
     </div>
