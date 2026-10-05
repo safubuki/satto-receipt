@@ -287,7 +287,12 @@ describe("buildLineInsights", () => {
     const html = renderToStaticMarkup(createElement(LineInsightsPanel, { insights: buildLineInsights(march, "2026-03") }))
 
     expect(html).toContain("明細があるレシートは 4件 / 5件")
-    expect(html).toContain("牛乳を2回")
+    expect(html).toContain("購入金額が大きい商品")
+    expect(html).toContain("繰り返し購入している商品")
+    expect(html).toContain("別の買い物で買った回数です。")
+    expect(html).toContain("牛乳")
+    expect(html).toContain("2回")
+    expect(html).not.toContain("数量")
     expect(html).toContain("上位3品で、明細の金額の 97%")
     expect(html).not.toContain("単価の差")
     expect(html).not.toContain("健康")
@@ -321,12 +326,12 @@ describe("buildLineInsights", () => {
       }),
     ])
     const html = renderToStaticMarkup(createElement(LineInsightsPanel, { insights }))
-    expect(html).toContain("牛乳を2回")
+    expect(html).toContain("2回")
     expect(html).toContain("農協牛乳 1L、明治おいしい牛乳")
     expect(html).not.toContain("単価の差")
   })
 
-  it("shows two printed names and counts the rest", () => {
+  it("shows two printed names under the largest purchases and counts the rest", () => {
     const html = renderToStaticMarkup(createElement(LineInsightsPanel, {
       insights: {
         receiptCount: 4,
@@ -334,17 +339,24 @@ describe("buildLineInsights", () => {
         lineTotal: 400,
         namedItemCount: 1,
         topSharePercent: null,
-        topItems: [],
+        topItems: [{
+          name: "乾物",
+          quantity: 4,
+          amount: 400,
+          sources: ["カットわかめ", "大根", "豆腐", "高野豆腐"],
+        }],
         repeats: [{
           name: "乾物",
           receiptCount: 4,
-          quantity: 4,
+          quantity: 8,
           amount: 400,
           sources: ["カットわかめ", "大根", "豆腐", "高野豆腐"],
         }],
       },
     }))
     expect(html).toContain("カットわかめ、大根、ほか2品")
+    expect(html).toContain("4回")
+    expect(html).not.toContain("8")
     expect(html).not.toContain("高野豆腐")
   })
 })
