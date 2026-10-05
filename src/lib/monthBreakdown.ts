@@ -99,20 +99,6 @@ export type RepeatedItem = {
   sources: string[]
 }
 
-export type PricePoint = {
-  unitPrice: number
-  store: string
-  visitedAt: string
-}
-
-export type PriceGap = {
-  name: string
-  low: PricePoint
-  high: PricePoint
-  gap: number
-  sources: string[]
-}
-
 export type SpendRank = {
   name: string
   amount: number
@@ -130,7 +116,6 @@ export type LineInsights = {
   /** 表示している上位品が、明細金額に占める割合。品目が上位より多いときだけ意味がある。 */
   topSharePercent: number | null
   repeats: RepeatedItem[]
-  priceGaps: PriceGap[]
 }
 
 const itemName = (name: string | undefined) => name?.trim().replace(/\s+/g, " ") ?? ""
@@ -234,26 +219,6 @@ export const buildLineInsights = (
     .sort((a, b) => b.receiptCount - a.receiptCount || b.amount - a.amount || a.name.localeCompare(b.name, "ja"))
     .slice(0, 5)
 
-  const priceGaps = Array.from(byName.entries())
-    .map(([name, bucket]) => {
-      const priced = bucket.rows
-        .filter((row) => row.unitPrice > 0)
-        .sort((a, b) => a.unitPrice - b.unitPrice || a.visitedAt.localeCompare(b.visitedAt) || a.store.localeCompare(b.store, "ja"))
-      const low = priced[0]
-      const high = priced[priced.length - 1]
-      if (!low || !high || low.unitPrice === high.unitPrice) return null
-      return {
-        name,
-        low: { unitPrice: low.unitPrice, store: low.store, visitedAt: low.visitedAt },
-        high: { unitPrice: high.unitPrice, store: high.store, visitedAt: high.visitedAt },
-        gap: high.unitPrice - low.unitPrice,
-        sources: sourcesOf(bucket.sources),
-      }
-    })
-    .filter((gap): gap is PriceGap => gap !== null)
-    .sort((a, b) => b.gap - a.gap || a.name.localeCompare(b.name, "ja"))
-    .slice(0, 5)
-
   const ranked = Array.from(byName.entries())
     .map(([name, bucket]) => ({
       name,
@@ -278,7 +243,6 @@ export const buildLineInsights = (
     topItems,
     topSharePercent,
     repeats,
-    priceGaps,
   }
 }
 

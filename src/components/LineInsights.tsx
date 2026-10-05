@@ -7,20 +7,19 @@ const yen = (value: number) =>
     maximumFractionDigits: 0,
   }).format(value)
 
-const shortDate = (visitedAt: string) => {
-  const [, month, day] = visitedAt.split("-")
-  if (!month || !day) return visitedAt
-  return `${Number(month)}/${Number(day)}`
-}
-
-const place = (store: string, visitedAt: string) => {
-  const date = shortDate(visitedAt)
-  return store === "店名なし" ? date : `${date} ${store}`
-}
+const SOURCE_PREVIEW = 2
 
 const SourceNames = ({ name, sources }: { name: string; sources: string[] }) => {
-  if (sources.length === 0 || (sources.length === 1 && sources[0] === name)) return null
-  return <p className="text-xs leading-relaxed text-slate-400">{sources.join("、")}</p>
+  const printed = sources.length === 1 && sources[0] === name ? [] : sources
+  if (printed.length === 0) return null
+  const preview = printed.slice(0, SOURCE_PREVIEW)
+  const rest = printed.length - preview.length
+  return (
+    <p className="text-xs leading-relaxed text-slate-400">
+      {preview.join("、")}
+      {rest > 0 ? `、ほか${rest}品` : ""}
+    </p>
+  )
 }
 
 export const LineInsightsPanel = ({ insights }: { insights: LineInsights }) => {
@@ -30,7 +29,7 @@ export const LineInsightsPanel = ({ insights }: { insights: LineInsights }) => {
   if (insights.receiptsWithItems === 0) {
     return (
       <p id="line-insights" className="mt-3 text-sm leading-relaxed text-slate-300">
-        この月のレシートに明細がないので、同じ品の繰り返しや単価の差は見えません。
+        この月のレシートに明細がないので、品目の繰り返しは見えません。
       </p>
     )
   }
@@ -76,21 +75,6 @@ export const LineInsightsPanel = ({ insights }: { insights: LineInsights }) => {
           </ul>
         )}
       </section>
-      {insights.priceGaps.length > 0 && (
-        <section>
-          <h3 className="font-semibold text-white">同じ品の単価の差</h3>
-          <ul className="mt-1 space-y-2">
-            {insights.priceGaps.map((gap) => (
-              <li key={gap.name}>
-                <p>
-                  {gap.name}は {yen(gap.low.unitPrice)}（{place(gap.low.store, gap.low.visitedAt)}）と {yen(gap.high.unitPrice)}（{place(gap.high.store, gap.high.visitedAt)}）。差は {yen(gap.gap)} です。
-                </p>
-                <SourceNames name={gap.name} sources={gap.sources} />
-              </li>
-            ))}
-          </ul>
-        </section>
-      )}
     </div>
   )
 }

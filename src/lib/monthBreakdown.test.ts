@@ -269,10 +269,6 @@ describe("buildLineInsights", () => {
       ["牛乳", 2, 3, 580],
       ["結束スパゲッティ", 2, 3, 444],
     ])
-    expect(insights.priceGaps.map((gap) => [gap.name, gap.gap, gap.low.store, gap.high.visitedAt])).toEqual([
-      ["結束スパゲッティ", 30, "業務スーパー", "2026-03-20"],
-      ["牛乳", 20, "業務スーパー", "2026-03-02"],
-    ])
     expect(insights.topItems.map((item) => item.name)).toEqual(["コシヒカリ5kg", "牛乳", "結束スパゲッティ"])
     expect(insights.topSharePercent).toBe(97)
   })
@@ -284,7 +280,6 @@ describe("buildLineInsights", () => {
     )
 
     expect(insights.repeats).toEqual([])
-    expect(insights.priceGaps).toEqual([])
     expect(insights.topSharePercent).toBeNull()
   })
 
@@ -293,9 +288,8 @@ describe("buildLineInsights", () => {
 
     expect(html).toContain("明細があるレシートは 4件 / 5件")
     expect(html).toContain("牛乳を2回")
-    expect(html).toContain("3/18 業務スーパー")
-    expect(html).toContain("3/20 イオン")
     expect(html).toContain("上位3品で、明細の金額の 97%")
+    expect(html).not.toContain("単価の差")
     expect(html).not.toContain("健康")
     expect(html).not.toContain("良さそう")
   })
@@ -326,10 +320,32 @@ describe("buildLineInsights", () => {
         sources: ["農協牛乳 1L", "明治おいしい牛乳"],
       }),
     ])
-    expect(insights.priceGaps[0]).toMatchObject({ name: "牛乳", gap: 20 })
     const html = renderToStaticMarkup(createElement(LineInsightsPanel, { insights }))
     expect(html).toContain("牛乳を2回")
     expect(html).toContain("農協牛乳 1L、明治おいしい牛乳")
+    expect(html).not.toContain("単価の差")
+  })
+
+  it("shows two printed names and counts the rest", () => {
+    const html = renderToStaticMarkup(createElement(LineInsightsPanel, {
+      insights: {
+        receiptCount: 4,
+        receiptsWithItems: 4,
+        lineTotal: 400,
+        namedItemCount: 1,
+        topSharePercent: null,
+        topItems: [],
+        repeats: [{
+          name: "乾物",
+          receiptCount: 4,
+          quantity: 4,
+          amount: 400,
+          sources: ["カットわかめ", "大根", "豆腐", "高野豆腐"],
+        }],
+      },
+    }))
+    expect(html).toContain("カットわかめ、大根、ほか2品")
+    expect(html).not.toContain("高野豆腐")
   })
 })
 
