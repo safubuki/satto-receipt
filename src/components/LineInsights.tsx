@@ -66,9 +66,12 @@ export const LineInsightsPanel = ({ insights }: { insights: LineInsights }) => {
         ) : (
           <ul className="mt-1 space-y-1">
             {insights.repeats.map((item) => (
-              <li key={item.name} className="flex items-baseline justify-between gap-3">
-                <span className="min-w-0">{item.name}</span>
-                <span className="shrink-0 text-white">{item.receiptCount}回</span>
+              <li key={item.name}>
+                <div className="flex items-start justify-between gap-3">
+                  <span className="min-w-0">{item.name}</span>
+                  <span className="shrink-0 text-white">{item.receiptCount}回</span>
+                </div>
+                <SourceNames name={item.name} sources={item.sources} />
               </li>
             ))}
           </ul>
