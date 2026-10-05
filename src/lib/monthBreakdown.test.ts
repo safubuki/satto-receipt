@@ -2,7 +2,7 @@ import { createElement } from "react"
 import { renderToStaticMarkup } from "react-dom/server"
 import { describe, expect, it } from "vitest"
 import { CategoryBreakdown } from "../components/CategoryBreakdown"
-import { buildMonthInsightPrompt } from "./geminiOcr"
+import { buildMonthInsightPrompt, describeGeminiError, withBusyRetry } from "./geminiOcr"
 import { buildMonthBreakdown, collectMonthFoods, percentShares } from "./monthBreakdown"
 
 const yen = (value: number) =>
@@ -167,6 +167,42 @@ describe("buildMonthInsightPrompt", () => {
 
     expect(prompt).toContain("明細がなければお金だけ")
     expect(prompt).toContain("明細: なし")
+  })
+})
+
+describe("describeGeminiError", () => {
+  const busy = new Error(
+    '{"error":{"code":503,"message":"This model is currently experiencing high demand. Spikes in demand are usually temporary. Please try again later.","status":"UNAVAILABLE"}}',
+  )
+
+  it("turns a busy 3.8 response into a short Japanese message", () => {
+    expect(describeGeminiError(busy).message).toBe("Gemini が混み合っています。しばらくしてから、もう一度押してください。")
+  })
+
+  it("retries a busy model twice, then gives up in Japanese", async () => {
+    const waits: number[] = []
+    let calls = 0
+    await expect(
+      withBusyRetry(async () => {
+        calls += 1
+        throw busy
+      }, async (ms) => {
+        waits.push(ms)
+      }),
+    ).rejects.toThrow("Gemini が混み合っています。しばらくしてから、もう一度押してください。")
+    expect(calls).toBe(3)
+    expect(waits).toEqual([1000, 2000])
+  })
+
+  it("does not retry an invalid API key", async () => {
+    let calls = 0
+    await expect(
+      withBusyRetry(async () => {
+        calls += 1
+        throw new Error("401 API_KEY_INVALID")
+      }),
+    ).rejects.toThrow("APIキーが無効です。正しいGemini APIキーを入力してください。")
+    expect(calls).toBe(1)
   })
 })
 

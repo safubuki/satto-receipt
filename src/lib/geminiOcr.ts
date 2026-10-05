@@ -294,28 +294,31 @@ export const analyzeReceiptWithGemini = async (
     if (error instanceof Error && error.message.startsWith("レシート")) {
       throw error
     }
-    // APIエラーのハンドリング
-    const errorMessage = error instanceof Error ? error.message : String(error)
-    
-    if (errorMessage.includes('API_KEY_INVALID') || errorMessage.includes('401')) {
-      throw new Error('APIキーが無効です。正しいGemini APIキーを入力してください。')
-    }
-    if (errorMessage.includes('PERMISSION_DENIED') || errorMessage.includes('403')) {
-      throw new Error('APIキーに権限がありません。Gemini APIが有効化されているか確認してください。')
-    }
-    if (errorMessage.includes('RESOURCE_EXHAUSTED') || errorMessage.includes('429')) {
-      throw new Error('APIの利用制限に達しました。しばらく待ってから再試行してください。')
-    }
-    
-    throw new Error(`Gemini API エラー: ${errorMessage}`)
+    throw describeGeminiError(error)
   }
 }
 
-const describeApiError = (error: unknown): Error => {
-  if (error instanceof Error && (error.message.startsWith("レシート") || error.message.startsWith("APIキー") || error.message.startsWith("Gemini"))) {
-    return error
+const errorText = (error: unknown) => (error instanceof Error ? error.message : String(error))
+
+/** 3.8 Flash が混雑しているときの 503。しばらくすると戻ることが多い。 */
+export const isModelBusyError = (error: unknown) => {
+  const message = errorText(error)
+  return message.includes('"code":503') || message.includes("UNAVAILABLE") || message.includes("high demand")
+}
+
+const alreadyDescribed = (message: string) =>
+  message.startsWith("レシート") ||
+  message.startsWith("APIキー") ||
+  message.startsWith("APIの") ||
+  message.startsWith("まとめ") ||
+  message.startsWith("Gemini が混み合っています")
+
+export const describeGeminiError = (error: unknown): Error => {
+  if (isModelBusyError(error)) {
+    return new Error("Gemini が混み合っています。しばらくしてから、もう一度押してください。")
   }
-  const errorMessage = error instanceof Error ? error.message : String(error)
+  const errorMessage = errorText(error)
+  if (alreadyDescribed(errorMessage)) return error instanceof Error ? error : new Error(errorMessage)
   if (errorMessage.includes("API_KEY_INVALID") || errorMessage.includes("401")) {
     return new Error("APIキーが無効です。正しいGemini APIキーを入力してください。")
   }
@@ -326,6 +329,29 @@ const describeApiError = (error: unknown): Error => {
     return new Error("APIの利用制限に達しました。しばらく待ってから再試行してください。")
   }
   return new Error(`Gemini API エラー: ${errorMessage}`)
+}
+
+const wait = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms))
+
+/** 混雑のときだけ、1秒後と2秒後に同じ呼び出しをやり直す。 */
+export const withBusyRetry = async <T>(
+  action: () => Promise<T>,
+  pause: (ms: number) => Promise<void> = wait,
+): Promise<T> => {
+  let lastError: unknown
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    try {
+      return await action()
+    } catch (error) {
+      lastError = error
+      if (attempt < 2 && isModelBusyError(error)) {
+        await pause(1000 * (attempt + 1))
+        continue
+      }
+      throw describeGeminiError(error)
+    }
+  }
+  throw describeGeminiError(lastError)
 }
 
 const signed = (value: number) => `${value > 0 ? "+" : ""}${value}`
@@ -406,7 +432,7 @@ export const summarizeMonth = async (
   const ai = new GoogleGenAI({ apiKey })
   const prompt = buildMonthInsightPrompt(input, model)
 
-  try {
+  return withBusyRetry(async () => {
     const response = await ai.models.generateContent({
       model,
       contents: [{ role: "user", parts: [{ text: prompt }] }],
@@ -418,7 +444,5 @@ export const summarizeMonth = async (
     const text = (response.text || "").trim()
     if (!text) throw new Error("まとめの文章を受け取れませんでした。")
     return text
-  } catch (error) {
-    throw describeApiError(error)
-  }
+  })
 }

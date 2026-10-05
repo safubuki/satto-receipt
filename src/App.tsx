@@ -974,6 +974,7 @@ function App() {
     const monthFoods = collectMonthFoods(monthReceipts, selectedMonth)
     setInsightLoading(true)
     setInsightError(null)
+    setMonthInsight(null)
     try {
       const text = await summarizeMonth({
         month: formatMonthLabel(selectedMonth),
