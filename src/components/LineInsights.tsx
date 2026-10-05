@@ -41,7 +41,7 @@ export const LineInsightsPanel = ({ insights }: { insights: LineInsights }) => {
       </p>
       {insights.topItems.length > 0 && (
         <section>
-          <h3 className="font-semibold text-white">購入金額が大きい商品</h3>
+          <h3 className="text-base font-semibold text-white">購入金額が大きい商品</h3>
           {insights.topSharePercent !== null && (
             <p className="mt-1">上位{insights.topItems.length}品で、明細の金額の {insights.topSharePercent}% です。</p>
           )}
@@ -59,7 +59,7 @@ export const LineInsightsPanel = ({ insights }: { insights: LineInsights }) => {
         </section>
       )}
       <section>
-        <h3 className="font-semibold text-white">繰り返し購入している商品</h3>
+        <h3 className="text-base font-semibold text-white">繰り返し購入している商品</h3>
         <p className="mt-1 text-xs text-slate-400">別の買い物で買った回数です。</p>
         {insights.repeats.length === 0 ? (
           <p className="mt-1">繰り返し購入している商品は、この月の明細にはありません。</p>

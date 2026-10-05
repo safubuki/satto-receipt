@@ -39,7 +39,7 @@ export const Dialog = ({
         onClick={(event) => event.stopPropagation()}
       >
         <div className="flex items-center justify-between gap-3 px-5 pt-4">
-          <h3 id={titleId} className="text-lg font-bold text-white">
+          <h3 id={titleId} className="text-base font-semibold text-white">
             {title}
           </h3>
           <button

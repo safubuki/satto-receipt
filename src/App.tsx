@@ -1035,7 +1035,7 @@ function App() {
             <UnlockPanel onUnlock={handleUnlock} unlocking={unlocking} error={unlockError} isFirstTime={isFirstTime} onReset={handleReset} />
           </div>
           <div className="rounded-3xl border border-white/10 bg-white/5 p-5 sm:max-w-sm">
-            <p className="text-sm text-slate-200">この端末だけで開きます</p>
+            <p className="text-base font-semibold text-white">この端末だけで開きます</p>
             <ul className="mt-3 list-disc space-y-2 pl-4 text-sm text-slate-400">
               <li>パスフレーズを忘れると復元できません。</li>
               <li>データは IndexedDB に残り、CSV でバックアップできます。</li>
@@ -1053,7 +1053,7 @@ function App() {
               <div className="space-y-4 rounded-3xl border border-white/10 bg-white/5 p-4 sm:p-6">
                 <div className="flex flex-wrap items-start justify-between gap-2">
                   <div>
-                    <h2 className="text-lg font-semibold text-white sm:text-xl">撮影 / アップロード</h2>
+                    <h2 className="text-base font-semibold text-white">撮影 / アップロード</h2>
                     <p className="text-sm text-slate-400">画像から店名・日付・合計・明細を読み取ります。</p>
                   </div>
                   <div className="flex flex-wrap gap-2">
@@ -1144,7 +1144,7 @@ function App() {
 
               <div className="rounded-3xl border border-white/10 bg-white/5 p-4 sm:p-6">
                 <div className="mb-4 flex items-center justify-between gap-2">
-                  <h2 className="text-lg font-semibold text-white sm:text-xl">支出の入力</h2>
+                  <h2 className="text-base font-semibold text-white">支出の入力</h2>
                   {hasDraftData && (
                     <button type="button" onClick={clearDraft} className="text-sm text-slate-400 underline">
                       入力をクリア
@@ -1169,7 +1169,7 @@ function App() {
                   <button type="button" aria-label="前の月" onClick={goToPrevMonth} disabled={!hasPrevMonth} className="ui-btn ui-btn-secondary grid h-11 w-11 place-items-center rounded-full disabled:opacity-30">
                     &lt;
                   </button>
-                  <p className="font-bold text-white">{formatMonthLabel(selectedMonth)}</p>
+                  <p className="text-base font-semibold text-white">{formatMonthLabel(selectedMonth)}</p>
                   <button type="button" aria-label="次の月" onClick={goToNextMonth} disabled={!hasNextMonth} className="ui-btn ui-btn-secondary grid h-11 w-11 place-items-center rounded-full disabled:opacity-30">
                     &gt;
                   </button>
@@ -1297,7 +1297,7 @@ function App() {
 
             <section className="order-3 min-w-0 rounded-3xl border border-white/10 bg-white/5 p-4 sm:p-6 lg:order-none lg:col-span-2 lg:col-start-1 lg:row-start-3">
               <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                <h2 className="text-lg font-semibold text-white">{formatMonthLabel(selectedMonth)}の支出</h2>
+                <h2 className="text-base font-semibold text-white">{formatMonthLabel(selectedMonth)}の支出</h2>
                 <div className="flex flex-col gap-2 sm:flex-row">
                   <input
                     className="ui-field rounded-full px-3 py-2 text-sm"
