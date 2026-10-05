@@ -10,7 +10,7 @@ import type { Category, LineItem, Receipt, Vault } from "./lib/types"
 import { importCsvToReceipts } from "./lib/csvImport"
 import { ReceiptFields, type ReceiptFormValue } from "./components/ReceiptFields"
 import { Dialog } from "./components/Dialog"
-import { updateInstalledApp } from "./lib/pwaUpdate"
+import { clearUpdateCompleteNotice, readUpdateCompleteNotice, updateInstalledApp } from "./lib/pwaUpdate"
 
 import "./index.css"
 
@@ -28,6 +28,7 @@ type AppNotice = {
   message: string
   confirmLabel?: string
   danger?: boolean
+  updateComplete?: boolean
 }
 
 const defaultCategories: Category[] = [
@@ -187,7 +188,7 @@ function App() {
   const [apiKeyInput, setApiKeyInput] = useState("")
   const [apiKeyError, setApiKeyError] = useState<string | null>(null)
   const [pwaUpdating, setPwaUpdating] = useState(false)
-  const [notice, setNotice] = useState<AppNotice | null>(null)
+  const [notice, setNotice] = useState<AppNotice | null>(readUpdateCompleteNotice)
   const noticeResolver = useRef<((value: boolean) => void) | null>(null)
 
   useEffect(() => {
@@ -357,6 +358,7 @@ function App() {
   }
 
   const closeNotice = (value: boolean) => {
+    if (notice?.updateComplete) clearUpdateCompleteNotice()
     const resolve = noticeResolver.current
     noticeResolver.current = null
     setNotice(null)
