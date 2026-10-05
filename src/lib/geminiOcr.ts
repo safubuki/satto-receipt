@@ -6,6 +6,7 @@
  */
 
 import { GoogleGenAI, type ThinkingConfig } from "@google/genai"
+import type { ItemGroup } from "./monthBreakdown"
 
 export type GeminiModelId = "gemini-3.5-flash-lite" | "gemini-3.8-flash"
 
@@ -311,6 +312,7 @@ const alreadyDescribed = (message: string) =>
   message.startsWith("APIキー") ||
   message.startsWith("APIの") ||
   message.startsWith("まとめ") ||
+  message.startsWith("品名を分類") ||
   message.startsWith("Gemini が混み合っています")
 
 export const describeGeminiError = (error: unknown): Error => {
@@ -352,6 +354,73 @@ export const withBusyRetry = async <T>(
     }
   }
   throw describeGeminiError(lastError)
+}
+
+/** 品名の表記ゆれをまとめるだけ。回数や金額の計算はさせない。 */
+export const buildItemGroupPrompt = (names: readonly string[]): string => `あなたはレシート明細の品名をまとめる係です。下の品名はレシートに印字された文字列です。
+同じ種類の商品は一つのグループにしてください。ブランドや容量や産地の表記が違っても、種類が同じなら同じグループです。牛乳と豆乳のように別の種類なら分けてください。
+各グループに短い種類名を付けてください。種類名の例は牛乳、米、パスタです。
+品名は一文字も変えず、必ずどれか一つのグループに入れてください。一覧にない品名は入れないでください。
+説明、助言、健康やお金のコメントは書かないでください。次の形のJSONだけを返してください。
+{"groups":[{"label":"牛乳","names":["明治おいしい牛乳","農協牛乳 1L"]}]}
+
+品名:
+${names.map((name, index) => `${index + 1}. ${name}`).join("\n")}`
+
+export const parseItemGroups = (text: string): ItemGroup[] => {
+  const trimmed = text.trim().replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/, "")
+  const start = trimmed.indexOf("{")
+  const end = trimmed.lastIndexOf("}")
+  if (start < 0 || end <= start) {
+    throw new Error("品名を分類できませんでした。もう一度押してください。")
+  }
+  let parsed: unknown
+  try {
+    parsed = JSON.parse(trimmed.slice(start, end + 1))
+  } catch {
+    throw new Error("品名を分類できませんでした。もう一度押してください。")
+  }
+  const groups = (parsed as { groups?: unknown }).groups
+  if (!Array.isArray(groups)) {
+    throw new Error("品名を分類できませんでした。もう一度押してください。")
+  }
+  return groups.flatMap((group) => {
+    if (!group || typeof group !== "object") return []
+    const record = group as { label?: unknown; names?: unknown }
+    const label = typeof record.label === "string" ? record.label.trim() : ""
+    const names = Array.isArray(record.names) ? record.names.filter((name): name is string => typeof name === "string") : []
+    if (!label || names.length === 0) return []
+    return [{ label, names }]
+  })
+}
+
+/** 選んでいるモデルで品名を種類ごとにまとめる。金額や店名は送らない。 */
+export const classifyItemNames = async (
+  names: readonly string[],
+  model: GeminiModelId = getGeminiModel(),
+): Promise<ItemGroup[]> => {
+  if (names.length === 0) return []
+  const apiKey = getApiKey()
+  if (!apiKey) {
+    throw new Error("APIキーが設定されていません。設定画面からGemini APIキーを入力してください。")
+  }
+  const ai = new GoogleGenAI({ apiKey })
+  const prompt = buildItemGroupPrompt(names)
+  const text = await withBusyRetry(async () => {
+    const response = await ai.models.generateContent({
+      model,
+      contents: [{ role: "user", parts: [{ text: prompt }] }],
+      config: {
+        maxOutputTokens: 4096,
+        responseMimeType: "application/json",
+        thinkingConfig: thinkingFor(model),
+      },
+    })
+    const body = (response.text || "").trim()
+    if (!body) throw new Error("品名を分類できませんでした。もう一度押してください。")
+    return body
+  })
+  return parseItemGroups(text)
 }
 
 const signed = (value: number) => `${value > 0 ? "+" : ""}${value}`

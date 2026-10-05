@@ -2,8 +2,9 @@ import { createElement } from "react"
 import { renderToStaticMarkup } from "react-dom/server"
 import { describe, expect, it } from "vitest"
 import { CategoryBreakdown } from "../components/CategoryBreakdown"
-import { buildMonthInsightPrompt, describeGeminiError, withBusyRetry } from "./geminiOcr"
-import { buildMonthBreakdown, collectMonthFoods, percentShares } from "./monthBreakdown"
+import { buildItemGroupPrompt, buildMonthInsightPrompt, describeGeminiError, parseItemGroups, withBusyRetry } from "./geminiOcr"
+import { LineInsightsPanel } from "../components/LineInsights"
+import { buildLineInsights, buildMonthBreakdown, collectMonthFoods, collectMonthItemNames, itemLabelMap, percentShares } from "./monthBreakdown"
 
 const yen = (value: number) =>
   new Intl.NumberFormat("ja-JP", {
@@ -203,6 +204,156 @@ describe("describeGeminiError", () => {
       }),
     ).rejects.toThrow("APIキーが無効です。正しいGemini APIキーを入力してください。")
     expect(calls).toBe(1)
+  })
+})
+
+describe("buildLineInsights", () => {
+  const march = [
+    {
+      id: "a",
+      visitedAt: "2026-03-02",
+      total: 2380,
+      storeName: "イオン",
+      lineItems: [
+        { name: "牛乳", price: 200, quantity: 2 },
+        { name: "コシヒカリ5kg", price: 1980, quantity: 1 },
+      ],
+    },
+    {
+      id: "b",
+      visitedAt: "2026-03-18",
+      total: 308,
+      storeName: "業務スーパー",
+      lineItems: [
+        { name: " 牛乳 ", price: 180, quantity: 1 },
+        { name: "結束スパゲッティ", price: 128, quantity: 1 },
+      ],
+    },
+    {
+      id: "c",
+      visitedAt: "2026-03-20",
+      total: 316,
+      storeName: "イオン",
+      lineItems: [{ name: "結束スパゲッティ", price: 158, quantity: 2 }],
+    },
+    {
+      id: "d",
+      visitedAt: "2026-03-21",
+      total: 100,
+      storeName: "コンビニ",
+      lineItems: [{ name: "お茶", price: 100, quantity: 1 }],
+    },
+    {
+      id: "e",
+      visitedAt: "2026-02-01",
+      total: 999,
+      storeName: "イオン",
+      lineItems: [{ name: "牛乳", price: 999, quantity: 1 }],
+    },
+    {
+      id: "f",
+      visitedAt: "2026-03-22",
+      total: 500,
+      storeName: "店",
+      lineItems: [],
+    },
+  ]
+
+  it("finds repeats, price gaps, and spend concentration across the month", () => {
+    const insights = buildLineInsights(march, "2026-03")
+
+    expect(insights.receiptCount).toBe(5)
+    expect(insights.receiptsWithItems).toBe(4)
+    expect(insights.lineTotal).toBe(3104)
+    expect(insights.repeats.map((item) => [item.name, item.receiptCount, item.quantity, item.amount])).toEqual([
+      ["牛乳", 2, 3, 580],
+      ["結束スパゲッティ", 2, 3, 444],
+    ])
+    expect(insights.priceGaps.map((gap) => [gap.name, gap.gap, gap.low.store, gap.high.visitedAt])).toEqual([
+      ["結束スパゲッティ", 30, "業務スーパー", "2026-03-20"],
+      ["牛乳", 20, "業務スーパー", "2026-03-02"],
+    ])
+    expect(insights.topItems.map((item) => item.name)).toEqual(["コシヒカリ5kg", "牛乳", "結束スパゲッティ"])
+    expect(insights.topSharePercent).toBe(97)
+  })
+
+  it("says nothing repeats when each item appears on one receipt", () => {
+    const insights = buildLineInsights(
+      [{ id: "only", visitedAt: "2026-04-01", total: 300, storeName: "店", lineItems: [{ name: "パン", price: 300, quantity: 1 }] }],
+      "2026-04",
+    )
+
+    expect(insights.repeats).toEqual([])
+    expect(insights.priceGaps).toEqual([])
+    expect(insights.topSharePercent).toBeNull()
+  })
+
+  it("renders the accumulated facts without advice", () => {
+    const html = renderToStaticMarkup(createElement(LineInsightsPanel, { insights: buildLineInsights(march, "2026-03") }))
+
+    expect(html).toContain("明細があるレシートは 4件 / 5件")
+    expect(html).toContain("牛乳を2回")
+    expect(html).toContain("3/18 業務スーパー")
+    expect(html).toContain("3/20 イオン")
+    expect(html).toContain("上位3品で、明細の金額の 97%")
+    expect(html).not.toContain("健康")
+    expect(html).not.toContain("良さそう")
+  })
+
+  it("uses the same totals after different names are classified as one item", () => {
+    const names = ["明治おいしい牛乳", "農協牛乳 1L", "結束スパゲッティ"]
+    const labels = itemLabelMap(names, [
+      { label: "牛乳", names: ["明治おいしい牛乳", "農協牛乳 1L", "一覧にない品"] },
+      { label: "飲料", names: ["明治おいしい牛乳"] },
+    ])
+    const insights = buildLineInsights(
+      [
+        { id: "a", visitedAt: "2026-05-01", total: 200, storeName: "A店", lineItems: [{ name: "明治おいしい牛乳", price: 200, quantity: 1 }] },
+        { id: "b", visitedAt: "2026-05-10", total: 180, storeName: "B店", lineItems: [{ name: "農協牛乳 1L", price: 180, quantity: 1 }] },
+        { id: "c", visitedAt: "2026-05-11", total: 160, storeName: "C店", lineItems: [{ name: "結束スパゲッティ", price: 160, quantity: 1 }] },
+      ],
+      "2026-05",
+      labels,
+    )
+
+    expect(labels.has("結束スパゲッティ")).toBe(false)
+    expect(insights.repeats).toEqual([
+      expect.objectContaining({
+        name: "牛乳",
+        receiptCount: 2,
+        quantity: 2,
+        amount: 380,
+        sources: ["農協牛乳 1L", "明治おいしい牛乳"],
+      }),
+    ])
+    expect(insights.priceGaps[0]).toMatchObject({ name: "牛乳", gap: 20 })
+    const html = renderToStaticMarkup(createElement(LineInsightsPanel, { insights }))
+    expect(html).toContain("牛乳を2回")
+    expect(html).toContain("農協牛乳 1L、明治おいしい牛乳")
+  })
+})
+
+describe("item grouping", () => {
+  it("asks only for groups and keeps the printed names", () => {
+    const prompt = buildItemGroupPrompt(["明治おいしい牛乳", "農協牛乳 1L"])
+    expect(prompt).toContain("1. 明治おいしい牛乳")
+    expect(prompt).toContain("2. 農協牛乳 1L")
+    expect(prompt).toContain("説明、助言、健康やお金のコメントは書かない")
+    expect(prompt).not.toContain("提案を1つ")
+  })
+
+  it("reads groups from a JSON object and ignores a broken reply", () => {
+    expect(parseItemGroups('説明です\n```json\n{"groups":[{"label":"牛乳","names":["明治おいしい牛乳"]}]}\n```')).toEqual([
+      { label: "牛乳", names: ["明治おいしい牛乳"] },
+    ])
+    expect(() => parseItemGroups("まとめられません")).toThrow("品名を分類できませんでした")
+  })
+
+  it("collects the month's printed names without prices or stores", () => {
+    expect(collectMonthItemNames([
+      { visitedAt: "2026-05-01", total: 1, lineItems: [{ name: " 牛乳 ", price: 100, quantity: 1 }, { name: "牛乳", price: 120, quantity: 1 }] },
+      { visitedAt: "2026-04-01", total: 1, lineItems: [{ name: "先月のパン", price: 100, quantity: 1 }] },
+    ], "2026-05")).toEqual(["牛乳"])
   })
 })
 

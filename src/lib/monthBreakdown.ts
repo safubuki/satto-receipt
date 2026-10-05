@@ -85,6 +85,203 @@ export const collectMonthFoods = (
   }
 }
 
+export type ItemGroup = {
+  label: string
+  names: string[]
+}
+
+export type RepeatedItem = {
+  name: string
+  receiptCount: number
+  quantity: number
+  amount: number
+  /** このグループに入った、レシート上の表記。 */
+  sources: string[]
+}
+
+export type PricePoint = {
+  unitPrice: number
+  store: string
+  visitedAt: string
+}
+
+export type PriceGap = {
+  name: string
+  low: PricePoint
+  high: PricePoint
+  gap: number
+  sources: string[]
+}
+
+export type SpendRank = {
+  name: string
+  amount: number
+  quantity: number
+  sources: string[]
+}
+
+/** 1か月分の明細を突き合わせて初めて言えること。アドバイス文は作らない。 */
+export type LineInsights = {
+  receiptCount: number
+  receiptsWithItems: number
+  lineTotal: number
+  namedItemCount: number
+  topItems: SpendRank[]
+  /** 表示している上位品が、明細金額に占める割合。品目が上位より多いときだけ意味がある。 */
+  topSharePercent: number | null
+  repeats: RepeatedItem[]
+  priceGaps: PriceGap[]
+}
+
+const itemName = (name: string | undefined) => name?.trim().replace(/\s+/g, " ") ?? ""
+
+const shortMoney = (value: number) => Math.round(value)
+
+const NAME_LIMIT = 200
+
+/** その月の明細に出た品名。分類へ渡す一覧で、表記のゆれはまだまとめていない。 */
+export const collectMonthItemNames = (
+  receipts: readonly SpendReceipt[],
+  month: string,
+): string[] => {
+  const names = new Set<string>()
+  for (const receipt of receipts) {
+    if (!(receipt.visitedAt ?? "").startsWith(month)) continue
+    for (const item of receipt.lineItems ?? []) {
+      const name = itemName(item.name)
+      if (name) names.add(name)
+    }
+  }
+  return Array.from(names).sort((a, b) => a.localeCompare(b, "ja")).slice(0, NAME_LIMIT)
+}
+
+/** モデルの分類を、実在する品名だけに適用する。同じ品名が複数グループにあれば先のグループを使う。 */
+export const itemLabelMap = (names: readonly string[], groups: readonly ItemGroup[]): Map<string, string> => {
+  const known = new Set(names.map((name) => itemName(name)).filter(Boolean))
+  const labels = new Map<string, string>()
+  for (const group of groups) {
+    const members = group.names.map((name) => itemName(name)).filter((name) => known.has(name))
+    const label = itemName(group.label) || members[0]
+    if (!label) continue
+    for (const name of members) {
+      if (!labels.has(name)) labels.set(name, label)
+    }
+  }
+  return labels
+}
+
+export const buildLineInsights = (
+  receipts: readonly (SpendReceipt & { id?: string; storeName?: string })[],
+  month: string,
+  labelMap?: ReadonlyMap<string, string>,
+): LineInsights => {
+  const inMonth = receipts.filter((receipt) => (receipt.visitedAt ?? "").startsWith(month))
+  type Observation = {
+    receiptId: string
+    name: string
+    quantity: number
+    unitPrice: number
+    amount: number
+    store: string
+    visitedAt: string
+  }
+  const observations: Observation[] = []
+  let receiptsWithItems = 0
+
+  inMonth.forEach((receipt, index) => {
+    const named = (receipt.lineItems ?? []).filter((item) => itemName(item.name))
+    if (named.length === 0) return
+    receiptsWithItems += 1
+    const receiptId = receipt.id || `${receipt.visitedAt ?? ""}-${index}`
+    const store = receipt.storeName?.trim() || "店名なし"
+    const visitedAt = receipt.visitedAt ?? ""
+    for (const item of named) {
+      const quantity = Number(item.quantity) || 1
+      const unitPrice = Number.isFinite(item.price) ? Number(item.price) : 0
+      observations.push({
+        receiptId,
+        name: itemName(item.name),
+        quantity,
+        unitPrice,
+        amount: shortMoney(unitPrice * quantity),
+        store,
+        visitedAt,
+      })
+    }
+  })
+
+  const labels = labelMap ?? new Map<string, string>()
+  const byName = new Map<string, { rows: Observation[]; sources: Set<string> }>()
+  for (const observation of observations) {
+    const label = labels.get(observation.name) || observation.name
+    const bucket = byName.get(label) ?? { rows: [], sources: new Set<string>() }
+    bucket.rows.push(observation)
+    bucket.sources.add(observation.name)
+    byName.set(label, bucket)
+  }
+
+  const sourcesOf = (sources: Set<string>) => Array.from(sources).sort((a, b) => a.localeCompare(b, "ja"))
+
+  const repeats = Array.from(byName.entries())
+    .map(([name, bucket]) => ({
+      name,
+      receiptCount: new Set(bucket.rows.map((row) => row.receiptId)).size,
+      quantity: bucket.rows.reduce((sum, row) => sum + row.quantity, 0),
+      amount: bucket.rows.reduce((sum, row) => sum + row.amount, 0),
+      sources: sourcesOf(bucket.sources),
+    }))
+    .filter((item) => item.receiptCount >= 2)
+    .sort((a, b) => b.receiptCount - a.receiptCount || b.amount - a.amount || a.name.localeCompare(b.name, "ja"))
+    .slice(0, 5)
+
+  const priceGaps = Array.from(byName.entries())
+    .map(([name, bucket]) => {
+      const priced = bucket.rows
+        .filter((row) => row.unitPrice > 0)
+        .sort((a, b) => a.unitPrice - b.unitPrice || a.visitedAt.localeCompare(b.visitedAt) || a.store.localeCompare(b.store, "ja"))
+      const low = priced[0]
+      const high = priced[priced.length - 1]
+      if (!low || !high || low.unitPrice === high.unitPrice) return null
+      return {
+        name,
+        low: { unitPrice: low.unitPrice, store: low.store, visitedAt: low.visitedAt },
+        high: { unitPrice: high.unitPrice, store: high.store, visitedAt: high.visitedAt },
+        gap: high.unitPrice - low.unitPrice,
+        sources: sourcesOf(bucket.sources),
+      }
+    })
+    .filter((gap): gap is PriceGap => gap !== null)
+    .sort((a, b) => b.gap - a.gap || a.name.localeCompare(b.name, "ja"))
+    .slice(0, 5)
+
+  const ranked = Array.from(byName.entries())
+    .map(([name, bucket]) => ({
+      name,
+      amount: bucket.rows.reduce((sum, row) => sum + row.amount, 0),
+      quantity: bucket.rows.reduce((sum, row) => sum + row.quantity, 0),
+      sources: sourcesOf(bucket.sources),
+    }))
+    .filter((item) => item.amount > 0)
+    .sort((a, b) => b.amount - a.amount || a.name.localeCompare(b.name, "ja"))
+  const lineTotal = ranked.reduce((sum, item) => sum + item.amount, 0)
+  const topItems = ranked.slice(0, 3)
+  const topAmount = topItems.reduce((sum, item) => sum + item.amount, 0)
+  const topSharePercent = ranked.length > topItems.length && lineTotal > 0
+    ? Math.round((topAmount / lineTotal) * 100)
+    : null
+
+  return {
+    receiptCount: inMonth.length,
+    receiptsWithItems,
+    lineTotal,
+    namedItemCount: byName.size,
+    topItems,
+    topSharePercent,
+    repeats,
+    priceGaps,
+  }
+}
+
 const EMPTY_NAME = "未分類"
 
 const bucket = () => ({ total: 0, count: 0 })
