@@ -1063,6 +1063,7 @@ function App() {
         ? "読み取りが終わるまでお待ちください"
         : "保存する内容を入力してください"
   const saveButtonClass = `footer-save-btn ui-btn ui-btn-quiet disabled:opacity-40 ${saveReady ? "footer-save-ready" : ""}`
+  const cancelButtonClass = "footer-cancel-lit ui-btn ui-btn-quiet"
 
   const displayedReceipts = useMemo(
     () => (filteredReceipts.length > visibleCount ? filteredReceipts.slice(0, visibleCount) : filteredReceipts),
@@ -1154,6 +1155,7 @@ function App() {
   const iconUrl = `${import.meta.env.BASE_URL}turtle_icon_receipt.png`
   const captureButtonLabel = isProcessing ? "認識中" : holdingCapture ? "確認中" : cameraPaused ? "再撮影" : "撮影"
   const captureDisabled = !cameraActive || isProcessing || holdingCapture
+  const recognitionDone = Boolean(capturedImage) && cameraPaused && !holdingCapture && !isProcessing && !cameraError
 
   return (
     <div className="min-h-screen bg-fog text-sand">
@@ -1321,22 +1323,24 @@ function App() {
                   open={expenseOpen}
                   onToggle={() => setExpenseOpen((open) => !open)}
                   headerClassName={!isMobile || expenseOpen ? "mb-4" : ""}
-                  trailing={hasDraftData ? (
-                    <button type="button" onClick={clearDraft} className="shrink-0 text-sm text-slate-400 underline">
-                      入力をクリア
-                    </button>
-                  ) : undefined}
                 >
                 <ReceiptFields value={draft} categories={categories} onChange={setDraft} onAddCategory={(name) => void handleAddCategory(name)} />
-                <button
-                  type="button"
-                  onClick={() => void handleSaveReceipt()}
-                  disabled={!canSaveReceipt}
-                  title={saveButtonTitle}
-                  className={`${saveButtonClass} mt-4 w-full py-3 text-sm`}
-                >
-                  保存する
-                </button>
+                <div className={`mt-4 grid gap-2 ${hasDraftData ? "grid-cols-2" : "grid-cols-1"}`}>
+                  {hasDraftData && (
+                    <button type="button" onClick={clearDraft} className={`${cancelButtonClass} w-full py-3 text-sm`}>
+                      取り消す
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => void handleSaveReceipt()}
+                    disabled={!canSaveReceipt}
+                    title={saveButtonTitle}
+                    className={`${saveButtonClass} w-full py-3 text-sm`}
+                  >
+                    保存する
+                  </button>
+                </div>
                 </MobileDisclosure>
               </div>
             </section>
@@ -1593,13 +1597,24 @@ function App() {
                 </button>
               </p>
             )}
-            <div className="mx-auto grid max-w-lg grid-cols-[minmax(5rem,1fr)_minmax(0,2fr)_minmax(5rem,1fr)] items-center gap-2">
-              <button type="button" onClick={() => void (cameraActive ? stopCamera() : startCamera())} className="footer-btn ui-btn ui-btn-secondary h-10 min-w-0 whitespace-nowrap px-2 text-xs">
-                {cameraActive ? "カメラOFF" : "カメラON"}
-              </button>
+            <div className={`mx-auto grid max-w-lg items-center gap-2 ${hasDraftData && !recognitionDone ? "grid-cols-[minmax(4.5rem,1fr)_minmax(0,1.4fr)_minmax(4.5rem,1fr)_minmax(4.5rem,1fr)]" : "grid-cols-[minmax(5rem,1fr)_minmax(0,2fr)_minmax(5rem,1fr)]"}`}>
+              {recognitionDone ? (
+                <button type="button" onClick={clearDraft} className={`footer-btn ${cancelButtonClass} h-10 min-w-0 whitespace-nowrap px-2 text-xs`}>
+                  取り消す
+                </button>
+              ) : (
+                <button type="button" onClick={() => void (cameraActive ? stopCamera() : startCamera())} className="footer-btn ui-btn ui-btn-secondary h-10 min-w-0 whitespace-nowrap px-2 text-xs">
+                  {cameraActive ? "カメラOFF" : "カメラON"}
+                </button>
+              )}
               <button type="button" onClick={() => void captureFromCamera()} disabled={captureDisabled} className="footer-btn ui-btn ui-btn-primary h-11 min-w-0 whitespace-nowrap text-sm disabled:opacity-100">
                 {captureButtonLabel}
               </button>
+              {hasDraftData && !recognitionDone && (
+                <button type="button" onClick={clearDraft} className={`footer-btn ${cancelButtonClass} h-10 min-w-0 whitespace-nowrap px-2 text-xs`}>
+                  取り消す
+                </button>
+              )}
               <button type="button" onClick={() => void handleSaveReceipt()} disabled={!canSaveReceipt} title={saveButtonTitle} className={`footer-btn ${saveButtonClass} h-10 min-w-0 whitespace-nowrap px-2 text-xs`}>
                 保存
               </button>
