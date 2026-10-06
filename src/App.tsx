@@ -34,6 +34,7 @@ type AppNotice = {
   cancelLabel?: string
   danger?: boolean
   updateComplete?: boolean
+  imageData?: string
 }
 
 const defaultCategories: Category[] = [
@@ -183,12 +184,14 @@ function App() {
   const videoRef = useRef<HTMLVideoElement | null>(null)
   const streamRef = useRef<MediaStream | null>(null)
   const cameraSession = useRef(0)
+  const captureLock = useRef(false)
   const autoLoginStarted = useRef(false)
   const [cameraActive, setCameraActive] = useState(false)
   const [cameraError, setCameraError] = useState<string | null>(null)
   const [cameraReady, setCameraReady] = useState(false)
   const [cameraPaused, setCameraPaused] = useState(false)
   const [capturedImage, setCapturedImage] = useState<string | null>(null)
+  const [holdingCapture, setHoldingCapture] = useState(false)
   const [isProcessing, setIsProcessing] = useState(false)
   const [savingReceipt, setSavingReceipt] = useState(false)
   const receiptSaveInFlight = useRef(false)
@@ -375,7 +378,7 @@ function App() {
     resolve?.(value)
   }
 
-  const askConfirm = (message: string, options?: { title?: string; confirmLabel?: string; cancelLabel?: string; danger?: boolean }) =>
+  const askConfirm = (message: string, options?: { title?: string; confirmLabel?: string; cancelLabel?: string; danger?: boolean; imageData?: string }) =>
     new Promise<boolean>((resolve) => {
       if (noticeResolver.current) noticeResolver.current(false)
       noticeResolver.current = resolve
@@ -385,6 +388,7 @@ function App() {
         confirmLabel: options?.confirmLabel ?? "続ける",
         cancelLabel: options?.cancelLabel,
         danger: options?.danger,
+        imageData: options?.imageData,
       })
     })
 
@@ -755,6 +759,7 @@ function App() {
     setCameraReady(false)
     setCameraPaused(false)
     setCapturedImage(null)
+    setHoldingCapture(false)
   }
 
   // カメラを一時停止
@@ -772,6 +777,7 @@ function App() {
       setCameraPaused(false)
       setCapturedImage(null)
     }
+    setHoldingCapture(false)
   }
 
   useEffect(() => {
@@ -782,16 +788,10 @@ function App() {
 
 
   const captureFromCamera = async () => {
+    if (captureLock.current) return
     if (cameraPaused) {
       resumeCamera()
       return
-    }
-    if (hasUnsavedDraft(draft)) {
-      const confirmed = await askConfirm("未保存の入力があります。上書きしますか？", {
-        title: "入力の上書き",
-        confirmLabel: "上書きする",
-      })
-      if (!confirmed) return
     }
     if (!videoRef.current) {
       setCameraError("カメラが初期化されていません。起動し直してください。")
@@ -801,41 +801,68 @@ function App() {
       setCameraError("カメラ映像が準備できていません。数秒待つか再起動してください。")
       return
     }
-    
+
     const video = videoRef.current
     const session = cameraSession.current
-    
-    // 1. カメラを一時停止（撮影した瞬間を固定）
-    pauseCamera()
-    setIsProcessing(true)
-    
-    // 2. キャンバスで撮影
-    const canvas = document.createElement("canvas")
-    canvas.width = video.videoWidth
-    canvas.height = video.videoHeight
-    const ctx = canvas.getContext("2d")
-    if (ctx) ctx.drawImage(video, 0, 0, canvas.width, canvas.height)
-    
-    // 3. 撮影画像を保存（プレビュー用）
-    const previewDataUrl = canvas.toDataURL("image/jpeg", 0.8)
-    setCapturedImage(previewDataUrl)
-    
-    const blob = await new Promise<Blob | null>((resolve) =>
-      canvas.toBlob((b) => resolve(b), "image/jpeg", 0.8),
-    )
-    if (!blob) {
-      setIsProcessing(false)
-      if (cameraSession.current === session) resumeCamera()
-      return
-    }
-    
-    const file = new File([blob], `capture-${Date.now()}.jpg`, { type: "image/jpeg" })
-    
-    // 4. OCR処理。スマホは結果を確認できるよう停止したままにする。
+    const replaceExisting = hasUnsavedDraft(draft)
+    captureLock.current = true
+
     try {
+      // 確認ダイアログより先に、押した瞬間のフレームを仮保存する。
+      pauseCamera()
+      setCameraError(null)
+
+      const canvas = document.createElement("canvas")
+      canvas.width = video.videoWidth
+      canvas.height = video.videoHeight
+      const ctx = canvas.getContext("2d")
+      if (!ctx || canvas.width === 0 || canvas.height === 0) {
+        setCameraError("カメラ映像が取得できません。数秒待つか再起動してください。")
+        resumeCamera()
+        return
+      }
+      ctx.drawImage(video, 0, 0, canvas.width, canvas.height)
+
+      const previewDataUrl = canvas.toDataURL("image/jpeg", 0.8)
+      setCapturedImage(previewDataUrl)
+      if (replaceExisting) setHoldingCapture(true)
+      else setIsProcessing(true)
+
+      const blob = await new Promise<Blob | null>((resolve) =>
+        canvas.toBlob((b) => resolve(b), "image/jpeg", 0.8),
+      )
+      if (!blob || cameraSession.current !== session) {
+        if (cameraSession.current === session) resumeCamera()
+        return
+      }
+
+      const file = new File([blob], `capture-${Date.now()}.jpg`, { type: "image/jpeg" })
+
+      if (replaceExisting) {
+        const confirmed = await askConfirm("未保存の入力があります。上書きすると、この画像で読み取ります。キャンセルすると、この画像は破棄します。", {
+          title: "入力の上書き",
+          confirmLabel: "上書きする",
+          imageData: previewDataUrl,
+        })
+        if (!confirmed || cameraSession.current !== session) {
+          if (cameraSession.current === session) resumeCamera()
+          return
+        }
+        setHoldingCapture(false)
+        setIsProcessing(true)
+      }
+
       const recognized = await handleOcr(file, undefined, true)
       if (!recognized && cameraSession.current === session) resumeCamera()
+    } catch (error) {
+      console.error(error)
+      if (cameraSession.current === session) {
+        setCameraError("撮影に失敗しました。もう一度撮影してください。")
+        resumeCamera()
+      }
     } finally {
+      captureLock.current = false
+      setHoldingCapture(false)
       setIsProcessing(false)
     }
   }
@@ -995,6 +1022,8 @@ function App() {
   }
 
   const iconUrl = `${import.meta.env.BASE_URL}turtle_icon_receipt.png`
+  const captureButtonLabel = isProcessing ? "認識中" : holdingCapture ? "確認中" : cameraPaused ? "再撮影" : "撮影"
+  const captureDisabled = !cameraActive || isProcessing || holdingCapture
 
   return (
     <div className="min-h-screen bg-fog text-sand">
@@ -1099,10 +1128,10 @@ function App() {
                     <button
                       type="button"
                       onClick={() => void captureFromCamera()}
-                      disabled={!cameraActive || isProcessing}
+                      disabled={captureDisabled}
                       className="ui-btn ui-btn-primary px-3 py-2 text-sm disabled:opacity-100"
                     >
-                      {isProcessing ? "認識中" : cameraPaused ? "再撮影" : "撮影"}
+                      {captureButtonLabel}
                     </button>
                   </div>
                 </div>
@@ -1115,15 +1144,17 @@ function App() {
                     {capturedImage && cameraPaused && (
                       <div className="absolute inset-0 z-10">
                         <img src={capturedImage} alt="撮影したレシート" className="h-full w-full object-cover" />
-                        <div className="absolute inset-0 flex items-center justify-center bg-black/50 px-6 text-center">
-                          {isProcessing ? (
-                            <p className="text-2xl font-bold text-white">認識中...</p>
-                          ) : cameraError ? (
-                            <p className="text-base font-bold text-red-200">{cameraError}</p>
-                          ) : (
-                            <p className="text-2xl font-bold text-mint">認識完了</p>
-                          )}
-                        </div>
+                        {!holdingCapture && (
+                          <div className="absolute inset-0 flex items-center justify-center bg-black/50 px-6 text-center">
+                            {isProcessing ? (
+                              <p className="text-2xl font-bold text-white">認識中...</p>
+                            ) : cameraError ? (
+                              <p className="text-base font-bold text-red-200">{cameraError}</p>
+                            ) : (
+                              <p className="text-2xl font-bold text-mint">認識完了</p>
+                            )}
+                          </div>
+                        )}
                       </div>
                     )}
                     <video
@@ -1405,8 +1436,8 @@ function App() {
               <button type="button" onClick={() => void (cameraActive ? stopCamera() : startCamera())} className="footer-btn ui-btn ui-btn-secondary h-10 min-w-0 whitespace-nowrap px-2 text-xs">
                 {cameraActive ? "カメラOFF" : "カメラON"}
               </button>
-              <button type="button" onClick={() => void captureFromCamera()} disabled={!cameraActive || isProcessing} className="footer-btn ui-btn ui-btn-primary h-11 min-w-0 whitespace-nowrap text-sm disabled:opacity-100">
-                {isProcessing ? "認識中" : cameraPaused ? "再撮影" : "撮影"}
+              <button type="button" onClick={() => void captureFromCamera()} disabled={captureDisabled} className="footer-btn ui-btn ui-btn-primary h-11 min-w-0 whitespace-nowrap text-sm disabled:opacity-100">
+                {captureButtonLabel}
               </button>
               <button type="button" onClick={() => void handleSaveReceipt()} disabled={!canSaveReceipt} title={savingReceipt ? "保存処理中です" : canSaveReceipt ? "入力内容を保存できます" : isProcessing || ocrProgress !== null ? "読み取りが終わるまでお待ちください" : "保存する内容を入力してください"} className={`footer-btn footer-save-btn ui-btn ui-btn-quiet h-10 min-w-0 whitespace-nowrap px-2 text-xs disabled:opacity-40 ${canSaveReceipt && !cameraError ? "footer-save-ready" : ""}`}>
                 保存
@@ -1521,6 +1552,9 @@ function App() {
             </button>
           )
         }>
+          {notice.imageData && (
+            <img src={notice.imageData} alt="仮保存したレシート" className="mb-3 max-h-[40vh] w-full rounded-xl bg-black object-contain" />
+          )}
           <p className="whitespace-pre-wrap break-words text-sm leading-relaxed text-slate-300">{notice.message}</p>
         </Dialog>
       )}
