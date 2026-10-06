@@ -1054,6 +1054,15 @@ function App() {
   // ドラフトに未保存データがあるか
   const hasDraftData = useMemo(() => hasUnsavedDraft(draft), [draft])
   const canSaveReceipt = hasDraftData && !isProcessing && ocrProgress === null && !savingReceipt
+  const saveReady = canSaveReceipt && !cameraError
+  const saveButtonTitle = savingReceipt
+    ? "保存処理中です"
+    : canSaveReceipt
+      ? "入力内容を保存できます"
+      : isProcessing || ocrProgress !== null
+        ? "読み取りが終わるまでお待ちください"
+        : "保存する内容を入力してください"
+  const saveButtonClass = `footer-save-btn ui-btn ui-btn-quiet disabled:opacity-40 ${saveReady ? "footer-save-ready" : ""}`
 
   const displayedReceipts = useMemo(
     () => (filteredReceipts.length > visibleCount ? filteredReceipts.slice(0, visibleCount) : filteredReceipts),
@@ -1323,7 +1332,8 @@ function App() {
                   type="button"
                   onClick={() => void handleSaveReceipt()}
                   disabled={!canSaveReceipt}
-                  className="ui-btn ui-btn-primary mt-4 hidden w-full py-3 text-sm disabled:opacity-100 lg:block"
+                  title={saveButtonTitle}
+                  className={`${saveButtonClass} mt-4 w-full py-3 text-sm`}
                 >
                   保存する
                 </button>
@@ -1590,7 +1600,7 @@ function App() {
               <button type="button" onClick={() => void captureFromCamera()} disabled={captureDisabled} className="footer-btn ui-btn ui-btn-primary h-11 min-w-0 whitespace-nowrap text-sm disabled:opacity-100">
                 {captureButtonLabel}
               </button>
-              <button type="button" onClick={() => void handleSaveReceipt()} disabled={!canSaveReceipt} title={savingReceipt ? "保存処理中です" : canSaveReceipt ? "入力内容を保存できます" : isProcessing || ocrProgress !== null ? "読み取りが終わるまでお待ちください" : "保存する内容を入力してください"} className={`footer-btn footer-save-btn ui-btn ui-btn-quiet h-10 min-w-0 whitespace-nowrap px-2 text-xs disabled:opacity-40 ${canSaveReceipt && !cameraError ? "footer-save-ready" : ""}`}>
+              <button type="button" onClick={() => void handleSaveReceipt()} disabled={!canSaveReceipt} title={saveButtonTitle} className={`footer-btn ${saveButtonClass} h-10 min-w-0 whitespace-nowrap px-2 text-xs`}>
                 保存
               </button>
             </div>
