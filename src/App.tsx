@@ -14,7 +14,7 @@ import { LineInsightsPanel } from "./components/LineInsights"
 import { ReceiptFields, type ReceiptFormValue } from "./components/ReceiptFields"
 import { Dialog } from "./components/Dialog"
 import { buildLineInsights, buildMonthBreakdown, collectMonthItemNames, itemLabelMap, type LineInsights } from "./lib/monthBreakdown"
-import { clearUpdateCompleteNotice, readUpdateCompleteNotice, updateInstalledApp } from "./lib/pwaUpdate"
+import { applyAppUpdate, blurActiveElement, checkAppUpdate, clearUpdateCompleteNotice, holdTextFocus, readUpdateCompleteNotice } from "./lib/pwaUpdate"
 
 import "./index.css"
 
@@ -132,6 +132,75 @@ const Pill = ({ children }: { children: ReactNode }) => (
   </span>
 )
 
+const MOBILE_QUERY = "(max-width: 767px)"
+
+const useIsMobile = () => {
+  const [mobile, setMobile] = useState(() => window.matchMedia(MOBILE_QUERY).matches)
+  useEffect(() => {
+    const media = window.matchMedia(MOBILE_QUERY)
+    const onChange = () => setMobile(media.matches)
+    media.addEventListener("change", onChange)
+    return () => media.removeEventListener("change", onChange)
+  }, [])
+  return mobile
+}
+
+const Chevron = ({ open }: { open: boolean }) => (
+  <svg viewBox="0 0 20 20" aria-hidden="true" className={`h-5 w-5 shrink-0 text-slate-300 transition-transform ${open ? "rotate-180" : ""}`}>
+    <path d="M5 7.5 10 12.5 15 7.5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+  </svg>
+)
+
+const MobileDisclosure = ({
+  title,
+  heading = "h2",
+  mobile,
+  open,
+  onToggle,
+  trailing,
+  headerClassName = "",
+  children,
+}: {
+  title: string
+  heading?: "h2" | "h3"
+  mobile: boolean
+  open: boolean
+  onToggle: () => void
+  trailing?: ReactNode
+  headerClassName?: string
+  children: ReactNode
+}) => {
+  const Heading = heading
+  const expanded = !mobile || open
+  return (
+    <>
+      {mobile ? (
+        <div className={`flex items-center gap-2 ${headerClassName}`}>
+          <button
+            type="button"
+            aria-expanded={open}
+            onClick={onToggle}
+            className="flex min-w-0 flex-1 items-center justify-between gap-3 py-1 text-left"
+          >
+            <span className="min-w-0 text-base font-semibold leading-snug text-white">{title}</span>
+            <Chevron open={open} />
+          </button>
+          {expanded && trailing}
+        </div>
+      ) : (
+        <div className={`flex items-start justify-between gap-2 ${headerClassName}`}>
+          <Heading className="text-base font-semibold text-white">{title}</Heading>
+          {trailing}
+        </div>
+      )}
+      {expanded && children}
+    </>
+  )
+}
+
+const disclosureCardClass = (collapsed: boolean, expandedClass: string) =>
+  `rounded-3xl border border-white/10 bg-white/5 ${collapsed ? "px-4 py-2" : expandedClass}`
+
 const toLineItems = (items: ReceiptDraft["lineItems"]): LineItem[] =>
   items
     .filter((item) => item.name.trim() || Number(item.price))
@@ -202,6 +271,13 @@ function App() {
   const [apiKeyError, setApiKeyError] = useState<string | null>(null)
   const [pwaUpdating, setPwaUpdating] = useState(false)
   const [notice, setNotice] = useState<AppNotice | null>(readUpdateCompleteNotice)
+  const isMobile = useIsMobile()
+  const [captureOpen, setCaptureOpen] = useState(false)
+  const [expenseOpen, setExpenseOpen] = useState(false)
+  const [expenseFromAi, setExpenseFromAi] = useState(false)
+  const [filesOpen, setFilesOpen] = useState(false)
+  const [modelOpen, setModelOpen] = useState(false)
+  const expenseSectionRef = useRef<HTMLDivElement | null>(null)
   const noticeResolver = useRef<((value: boolean) => void) | null>(null)
 
   useEffect(() => {
@@ -366,6 +442,11 @@ function App() {
     setOcrProgress(null)
     setLastUploadedName(null)
     setDraft(initialDraft())
+    setCaptureOpen(false)
+    setExpenseOpen(false)
+    setExpenseFromAi(false)
+    setFilesOpen(false)
+    setModelOpen(false)
     // 注意: ログアウトでは記憶を消さない（明示的にログアウトしても次回は自動ログインできる）
     // 記憶を消すのはデータ初期化時のみ
   }
@@ -400,19 +481,33 @@ function App() {
     })
 
   const handleAppUpdate = async () => {
-    if (session && hasUnsavedDraft(draft)) {
-      const confirmed = await askConfirm("未保存の入力は消えます。アプリを更新して読み込み直しますか？", {
-        title: "アプリを更新",
-        confirmLabel: "更新する",
-      })
-      if (!confirmed) return
-    }
+    const releaseFocus = holdTextFocus()
     setPwaUpdating(true)
     try {
-      await updateInstalledApp()
+      const status = await checkAppUpdate()
+      if (status === "current") {
+        setPwaUpdating(false)
+        await showNotice("最新です。", "アプリ更新")
+        return
+      }
+      if (session && hasUnsavedDraft(draft)) {
+        setPwaUpdating(false)
+        const confirmed = await askConfirm("未保存の入力は消えます。アプリを更新して読み込み直しますか？", {
+          title: "アプリを更新",
+          confirmLabel: "更新する",
+        })
+        if (!confirmed) return
+        setPwaUpdating(true)
+      }
+      await applyAppUpdate()
     } catch {
       setPwaUpdating(false)
       await showNotice("更新を確認できませんでした。通信できる場所でもう一度押してください。", "更新できませんでした")
+    } finally {
+      releaseFocus()
+      blurActiveElement()
+      window.setTimeout(blurActiveElement, 0)
+      window.setTimeout(blurActiveElement, 300)
     }
   }
 
@@ -510,6 +605,12 @@ function App() {
           imageData: preview,
         })
       }
+      setExpenseFromAi(true)
+      setExpenseOpen(true)
+      window.setTimeout(() => {
+        if (!window.matchMedia(MOBILE_QUERY).matches) return
+        expenseSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" })
+      }, 80)
       return true
     } catch (error) {
       console.error("OCR error:", error)
@@ -526,6 +627,9 @@ function App() {
     setOcrText("")
     setOcrProgress(null)
     setLastUploadedName(null)
+    setExpenseFromAi(false)
+    setExpenseOpen(false)
+    setCaptureOpen(false)
     stopCamera()
   }
 
@@ -582,6 +686,9 @@ function App() {
       setOcrText("")
       setOcrProgress(null)
       setLastUploadedName(null)
+      setExpenseFromAi(false)
+      setExpenseOpen(false)
+      setCaptureOpen(false)
       stopCamera()
     } finally {
       receiptSaveInFlight.current = false
@@ -745,6 +852,7 @@ function App() {
         }
       }, 3000)
     } catch {
+      setCaptureOpen(true)
       setCameraError("カメラを起動できませんでした。権限・他アプリ使用中・デバイス有無を確認してください。")
     }
   }
@@ -785,6 +893,19 @@ function App() {
       stopCamera()
     }
   }, [])
+
+  useEffect(() => {
+    if (cameraActive) setCaptureOpen(true)
+  }, [cameraActive])
+
+  useEffect(() => {
+    if (!notice?.updateComplete) return
+    blurActiveElement()
+    const timers = [0, 50, 250, 800].map((delay) => window.setTimeout(blurActiveElement, delay))
+    return () => {
+      timers.forEach((timer) => window.clearTimeout(timer))
+    }
+  }, [notice?.updateComplete, session])
 
 
   const captureFromCamera = async () => {
@@ -1061,7 +1182,7 @@ function App() {
       {!session ? (
         <div className="mx-auto flex w-full max-w-3xl flex-col gap-4 px-4 py-8 lg:flex-row">
           <div className="flex-1 rounded-3xl border border-white/10 bg-white/5 p-5 sm:p-8">
-            <UnlockPanel onUnlock={handleUnlock} unlocking={unlocking} error={unlockError} isFirstTime={isFirstTime} onReset={handleReset} />
+            <UnlockPanel onUnlock={handleUnlock} unlocking={unlocking} error={unlockError} isFirstTime={isFirstTime} onReset={handleReset} autoFocus={!notice?.updateComplete} />
           </div>
           <div className="rounded-3xl border border-white/10 bg-white/5 p-5 sm:max-w-sm">
             <p className="text-base font-semibold text-white">この端末だけで開きます</p>
@@ -1079,17 +1200,27 @@ function App() {
         <>
           <div className="mx-auto grid w-full max-w-6xl gap-4 px-4 py-4 pb-28 lg:grid-cols-[minmax(0,1.6fr)_22rem] lg:pb-8">
             <section className={`${cameraActive ? "order-1" : "order-2"} space-y-4 lg:order-none lg:col-start-1 lg:row-start-1`}>
-              <div className="space-y-4 rounded-3xl border border-white/10 bg-white/5 p-4 sm:p-6">
-                <div className="flex flex-wrap items-start justify-between gap-2">
-                  <div>
-                    <h2 className="text-base font-semibold text-white">撮影 / アップロード</h2>
-                    <p className="text-sm text-slate-400">画像から店名・日付・合計・明細を読み取ります。</p>
-                  </div>
+              <div className={`space-y-4 ${disclosureCardClass(isMobile && !(captureOpen || cameraActive), "p-4 sm:p-6")}`}>
+                <MobileDisclosure
+                  title="レシート画像のアップロード"
+                  mobile={isMobile}
+                  open={captureOpen || cameraActive}
+                  onToggle={() => {
+                    if (cameraActive) {
+                      stopCamera()
+                      setCaptureOpen(false)
+                      return
+                    }
+                    setCaptureOpen((open) => !open)
+                  }}
+                >
+                <p className="text-sm text-slate-400">画像から店名・日付・合計・明細を読み取ります。</p>
+                {(lastUploadedName || ocrProgress !== null) && (
                   <div className="flex flex-wrap gap-2">
                     {lastUploadedName && <Pill>{lastUploadedName}</Pill>}
                     {ocrProgress !== null && <Pill>読み取り {Math.round(ocrProgress * 100)}%</Pill>}
                   </div>
-                </div>
+                )}
                 {ocrProgress !== null && (
                   <div className="h-2 overflow-hidden rounded-full bg-white/10">
                     <div className="h-full bg-mint" style={{ width: `${Math.round(ocrProgress * 100)}%` }} />
@@ -1171,17 +1302,22 @@ function App() {
                   <img src={draft.imageData} alt="読み取り画像" className="max-h-80 w-full rounded-2xl object-contain" />
                 )}
                 {ocrText && <p className="text-sm text-slate-400">読み取りメモ: {ocrText}</p>}
+                </MobileDisclosure>
               </div>
 
-              <div className="rounded-3xl border border-white/10 bg-white/5 p-4 sm:p-6">
-                <div className="mb-4 flex items-center justify-between gap-2">
-                  <h2 className="text-base font-semibold text-white">支出の入力</h2>
-                  {hasDraftData && (
-                    <button type="button" onClick={clearDraft} className="text-sm text-slate-400 underline">
+              <div ref={expenseSectionRef} className={`scroll-mt-20 ${disclosureCardClass(isMobile && !expenseOpen, "p-4 sm:p-6")}`}>
+                <MobileDisclosure
+                  title={expenseFromAi ? "支出の入力" : "支出の入力（手動で入力する場合）"}
+                  mobile={isMobile}
+                  open={expenseOpen}
+                  onToggle={() => setExpenseOpen((open) => !open)}
+                  headerClassName={!isMobile || expenseOpen ? "mb-4" : ""}
+                  trailing={hasDraftData ? (
+                    <button type="button" onClick={clearDraft} className="shrink-0 text-sm text-slate-400 underline">
                       入力をクリア
                     </button>
-                  )}
-                </div>
+                  ) : undefined}
+                >
                 <ReceiptFields value={draft} categories={categories} onChange={setDraft} onAddCategory={(name) => void handleAddCategory(name)} />
                 <button
                   type="button"
@@ -1191,6 +1327,7 @@ function App() {
                 >
                   保存する
                 </button>
+                </MobileDisclosure>
               </div>
             </section>
 
@@ -1258,8 +1395,14 @@ function App() {
                 ))}
               </div>
 
-              <div className="rounded-3xl border border-white/10 bg-white/5 p-4">
-                <h3 className="text-base font-semibold text-white">ファイルの保存・削除</h3>
+              <div className={disclosureCardClass(isMobile && !filesOpen, "p-4")}>
+                <MobileDisclosure
+                  title="データバックアップ・レシート画像削除"
+                  heading="h3"
+                  mobile={isMobile}
+                  open={filesOpen}
+                  onToggle={() => setFilesOpen((open) => !open)}
+                >
                 <p className="mt-3 text-sm text-slate-400">支出データ</p>
                 <div className="mt-2 grid grid-cols-2 gap-2">
                   <button type="button" onClick={handleExport} className="ui-btn ui-btn-secondary py-2.5 text-sm">CSVを保存</button>
@@ -1282,10 +1425,17 @@ function App() {
                 <button type="button" onClick={() => void handleCleanupImages()} className="ui-btn ui-btn-quiet mt-2 w-full py-2.5 text-sm">
                   保存済み画像を削除
                 </button>
+                </MobileDisclosure>
               </div>
 
-              <div className="rounded-3xl border border-white/10 bg-white/5 p-4 text-sm">
-                <h3 className="text-base font-semibold text-white">AIモデルの設定</h3>
+              <div className={`${disclosureCardClass(isMobile && !modelOpen, "p-4")} text-sm`}>
+                <MobileDisclosure
+                  title="AIモデルの設定"
+                  heading="h3"
+                  mobile={isMobile}
+                  open={modelOpen}
+                  onToggle={() => setModelOpen((open) => !open)}
+                >
                 <div className="mt-3 flex items-center justify-between gap-2">
                   <div>
                     <p className="font-semibold text-white">{geminiModel === "gemini-3.8-flash" ? "Gemini 3.8 Flash" : "Gemini 3.5 Flash-Lite"}</p>
@@ -1323,6 +1473,7 @@ function App() {
                   </button>
                 </div>
                 <p className="mt-2 text-xs text-slate-500">ONのとき、画像は Google に送られます。</p>
+                </MobileDisclosure>
               </div>
             </aside>
 
@@ -1568,12 +1719,14 @@ const UnlockPanel = ({
   error,
   isFirstTime,
   onReset,
+  autoFocus = true,
 }: {
   onUnlock: (passphrase: string, rememberMe: boolean) => void
   unlocking: boolean
   error: string | null
   isFirstTime: boolean
   onReset: () => void
+  autoFocus?: boolean
 }) => {
   const savedPassphrase = getSavedPassphrase()
   const [value, setValue] = useState(savedPassphrase ?? "")
@@ -1595,7 +1748,7 @@ const UnlockPanel = ({
         パスフレーズ
         <input
           type="password"
-          autoFocus
+          autoFocus={autoFocus}
           className="ui-field mt-1 px-3 py-3 text-base"
           value={value}
           onChange={(event) => setValue(event.target.value)}
