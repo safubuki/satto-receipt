@@ -775,7 +775,8 @@ function App() {
     const id = crypto.randomUUID()
     // 縮小できない画像でも束には入れ、読み取りの結果で失敗を見せる。
     const thumb = await compressImage(file, 240, 0.7).catch(() => "")
-    updateBatch((shots) => [...shots, { id, file, thumb, status: "reading" }])
+    // 撮りながら確かめられるよう、新しいものをカメラに近い先頭へ置く。
+    updateBatch((shots) => [{ id, file, thumb, status: "reading" }, ...shots])
     readBatchShot(id, file)
   }
 
@@ -1387,7 +1388,8 @@ function App() {
     ? !cameraActive || savingReceipt
     : !cameraActive || isProcessing || holdingCapture
   const recognitionDone = !batchMode && Boolean(capturedImage) && cameraPaused && !holdingCapture && !isProcessing && !cameraError
-  const showCancel = batchMode ? batch.length > 0 : hasDraftData && !recognitionDone
+  // まとめてでは下部に取り消すを出さない。撮影ボタンを広く保ち、取り消しは一覧の×か取り消すで行う。
+  const showCancel = !batchMode && hasDraftData && !recognitionDone
   const footerSaveDisabled = batchMode ? batch.length === 0 || savingReceipt : !canSaveReceipt
   const footerSaveClass = batchMode
     ? `footer-save-btn ui-btn ui-btn-quiet disabled:opacity-40 ${batch.length > 0 && batchReading === 0 && !savingReceipt ? "footer-save-ready" : ""}`
@@ -1479,8 +1481,8 @@ function App() {
         </div>
       ) : (
         <>
-          <div className="mx-auto grid w-full max-w-6xl gap-4 px-4 py-4 pb-40 lg:grid-cols-[minmax(0,1.6fr)_22rem] lg:pb-8">
-            <section className={`${captureFirst ? "order-1" : "order-2"} space-y-4 lg:order-none lg:col-start-1 lg:row-start-1`}>
+          <div className="mx-auto grid w-full max-w-6xl grid-cols-1 gap-4 px-4 py-4 pb-40 lg:grid-cols-[minmax(0,1.6fr)_22rem] lg:pb-8">
+            <section className={`${captureFirst ? "order-1" : "order-2"} min-w-0 space-y-4 lg:order-none lg:col-start-1 lg:row-start-1`}>
               {showCaptureCard && (
               <div className="space-y-4 rounded-3xl border border-white/10 bg-white/5 p-4 sm:p-6">
                 <div className="flex flex-wrap items-center justify-between gap-2">
@@ -1541,7 +1543,7 @@ function App() {
                             {isProcessing ? (
                               <p className="text-2xl font-bold text-white">認識中...</p>
                             ) : cameraError ? (
-                              <p className="text-base font-bold text-red-200">{cameraError}</p>
+                              <p className="text-base font-bold text-red-200 [overflow-wrap:anywhere]">{cameraError}</p>
                             ) : (
                               <p className="text-2xl font-bold text-mint">認識完了</p>
                             )}
@@ -1568,7 +1570,7 @@ function App() {
                     />
                   </div>
                 )}
-                {cameraError && (batchMode || !cameraPaused) && <p className="text-sm text-red-200">{cameraError}</p>}
+                {cameraError && (batchMode || !cameraPaused) && <p className="text-sm text-red-200 [overflow-wrap:anywhere]">{cameraError}</p>}
                 {!batchMode && !cameraActive && draft.imageData && (
                   <img src={draft.imageData} alt="読み取り画像" className="max-h-80 w-full rounded-2xl object-contain" />
                 )}
@@ -1585,16 +1587,16 @@ function App() {
                       {batch.map((shot, index) => (
                         <li key={shot.id} className="flex items-center gap-3 rounded-2xl border border-white/10 bg-black/20 p-2">
                           {shot.thumb ? (
-                            <img src={shot.thumb} alt={`${index + 1}件目`} className="h-14 w-11 shrink-0 rounded-lg bg-black object-cover" />
+                            <img src={shot.thumb} alt={`${batch.length - index}件目`} className="h-14 w-11 shrink-0 rounded-lg bg-black object-cover" />
                           ) : (
-                            <div className="grid h-14 w-11 shrink-0 place-items-center rounded-lg bg-black text-xs text-slate-500">{index + 1}</div>
+                            <div className="grid h-14 w-11 shrink-0 place-items-center rounded-lg bg-black text-xs text-slate-500">{batch.length - index}</div>
                           )}
                           <div className="min-w-0 flex-1">
                             {shot.status === "reading" && <p className="text-sm text-slate-300">読み取り中...</p>}
                             {shot.status === "error" && (
                               <>
                                 <p className="text-sm text-red-200">読み取れませんでした</p>
-                                <p className="truncate text-xs text-slate-500" title={shot.error}>{shot.error}</p>
+                                <p className="line-clamp-2 text-xs text-slate-500 [overflow-wrap:anywhere]" title={shot.error}>{shot.error}</p>
                               </>
                             )}
                             {shot.status === "done" && shot.draft && (
@@ -1617,7 +1619,7 @@ function App() {
                           )}
                           <button
                             type="button"
-                            aria-label={`${index + 1}件目を外す`}
+                            aria-label={`${batch.length - index}件目を外す`}
                             onClick={() => removeBatchShot(shot.id)}
                             disabled={savingReceipt}
                             className="grid h-9 w-9 shrink-0 place-items-center rounded-full text-slate-400 hover:bg-white/10 disabled:opacity-40"
@@ -1676,7 +1678,7 @@ function App() {
               )}
             </section>
 
-            <aside className={`${captureFirst ? "order-2" : "order-1"} space-y-4 lg:order-none lg:col-start-2 lg:row-span-2 lg:row-start-1`}>
+            <aside className={`${captureFirst ? "order-2" : "order-1"} min-w-0 space-y-4 lg:order-none lg:col-start-2 lg:row-span-2 lg:row-start-1`}>
               <div className="rounded-3xl border border-white/10 bg-white/5 p-4">
                 <div className="flex items-center justify-between">
                   <button type="button" aria-label="前の月" onClick={goToPrevMonth} disabled={!hasPrevMonth} className="ui-btn ui-btn-secondary grid h-11 w-11 place-items-center rounded-full disabled:opacity-30">

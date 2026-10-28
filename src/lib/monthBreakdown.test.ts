@@ -2,7 +2,7 @@ import { createElement } from "react"
 import { renderToStaticMarkup } from "react-dom/server"
 import { describe, expect, it } from "vitest"
 import { CategoryBreakdown } from "../components/CategoryBreakdown"
-import { buildItemGroupPrompt, buildMonthInsightPrompt, describeGeminiError, parseItemGroups, withBusyRetry } from "./geminiOcr"
+import { buildItemGroupPrompt, buildMonthInsightPrompt, describeGeminiError, parseItemGroups, shortErrorDetail, withBusyRetry } from "./geminiOcr"
 import { LineInsightsPanel } from "../components/LineInsights"
 import { buildLineInsights, buildMonthBreakdown, collectMonthFoods, collectMonthItemNames, itemLabelMap, percentShares } from "./monthBreakdown"
 
@@ -204,6 +204,14 @@ describe("describeGeminiError", () => {
       }),
     ).rejects.toThrow("APIキーが無効です。正しいGemini APIキーを入力してください。")
     expect(calls).toBe(1)
+  })
+})
+
+describe("shortErrorDetail", () => {
+  it("pulls the message out of a raw JSON error and keeps it short", () => {
+    const raw = `{"error":{"code":400,"message":"Request contains an invalid argument.","status":"INVALID_ARGUMENT"}}`
+    expect(shortErrorDetail(raw)).toBe("Request contains an invalid argument.")
+    expect(shortErrorDetail("x".repeat(500))).toHaveLength(121)
   })
 })
 

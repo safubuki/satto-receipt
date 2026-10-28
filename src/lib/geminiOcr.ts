@@ -330,7 +330,16 @@ export const describeGeminiError = (error: unknown): Error => {
   if (errorMessage.includes("RESOURCE_EXHAUSTED") || errorMessage.includes("429")) {
     return new Error("APIの利用制限に達しました。しばらく待ってから再試行してください。")
   }
-  return new Error(`Gemini API エラー: ${errorMessage}`)
+  return new Error(`Gemini API エラー: ${shortErrorDetail(errorMessage)}`)
+}
+
+const DETAIL_LIMIT = 120
+
+/** SDK のエラーは JSON 丸ごとのことがある。中の説明文だけを、画面に収まる長さで出す。 */
+export const shortErrorDetail = (message: string): string => {
+  const inner = message.match(/"message"\s*:\s*"((?:[^"\\]|\\.)*)"/)?.[1]
+  const detail = (inner ?? message).replace(/\\n/g, " ").replace(/\s+/g, " ").trim()
+  return detail.length > DETAIL_LIMIT ? `${detail.slice(0, DETAIL_LIMIT)}…` : detail
 }
 
 const wait = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms))
