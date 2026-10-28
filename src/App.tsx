@@ -8,7 +8,8 @@ import { formatLocalDate, formatLocalMonth, shiftMonth } from "./lib/date"
 import { clearVault, loadVault, saveVault } from "./lib/db"
 import type { Category, LineItem, Receipt, Vault } from "./lib/types"
 import { importCsvToReceipts } from "./lib/csvImport"
-import { findDuplicateReceipts } from "./lib/duplicateReceipts"
+import { countBatchDuplicates, findDuplicateReceipts } from "./lib/duplicateReceipts"
+import { GOODS_TYPES, goodsShares } from "./lib/goods"
 import { CategoryBreakdown } from "./components/CategoryBreakdown"
 import { LineInsightsPanel } from "./components/LineInsights"
 import { ReceiptFields, type ReceiptFormValue } from "./components/ReceiptFields"
@@ -25,6 +26,36 @@ type Session = {
 
 type ReceiptDraft = ReceiptFormValue & {
   imageData?: string
+}
+
+type CaptureMode = "single" | "batch"
+
+/** まとめて登録で撮った1枚。読み取りは裏で進み、保存ボタンで一度に登録する。 */
+type BatchShot = {
+  id: string
+  file: File
+  thumb: string
+  status: "reading" | "done" | "error"
+  draft?: ReceiptDraft
+  error?: string
+}
+
+const CAPTURE_MODE_KEY = "capture_mode"
+
+const readCaptureMode = (): CaptureMode => {
+  try {
+    return localStorage.getItem(CAPTURE_MODE_KEY) === "batch" ? "batch" : "single"
+  } catch {
+    return "single"
+  }
+}
+
+const storeCaptureMode = (mode: CaptureMode) => {
+  try {
+    localStorage.setItem(CAPTURE_MODE_KEY, mode)
+  } catch {
+    // 保存できなくても、この画面の選択は state で保持する
+  }
 }
 
 type AppNotice = {
@@ -48,6 +79,8 @@ const defaultCategories: Category[] = [
   { id: "entertainment", name: "娯楽", color: "#8b5cf6" },
   { id: "other", name: "その他", color: "#94a3b8" },
 ]
+
+const goodsColors: ReadonlyMap<string, string> = new Map(GOODS_TYPES.map((type) => [type.name, type.color]))
 
 const createVault = (): Vault => ({
   receipts: [],
@@ -212,6 +245,23 @@ const toLineItems = (items: ReceiptDraft["lineItems"]): LineItem[] =>
       quantity: Number(item.quantity) || 1,
     }))
 
+const draftTotal = (draft: ReceiptDraft) => Number(String(draft.total).replace(/,/g, "")) || 0
+
+const draftToReceipt = (draft: ReceiptDraft, keepImage: boolean, now: string): Receipt => ({
+  id: crypto.randomUUID(),
+  storeName: draft.storeName || "無題のレシート",
+  visitedAt: draft.visitedAt || formatLocalDate(),
+  total: draftTotal(draft),
+  category: draft.category,
+  note: draft.note || undefined,
+  imageData: keepImage ? draft.imageData : undefined,
+  lineItems: toLineItems(draft.lineItems),
+  isNomikai: draft.isNomikai || false,
+  isJibara: draft.isJibara || false,
+  createdAt: now,
+  updatedAt: now,
+})
+
 const formatMonthLabel = (month: string) => {
   const [year, monthNumber] = month.split("-")
   return `${year}年${Number(monthNumber)}月`
@@ -272,12 +322,23 @@ function App() {
   const [pwaUpdating, setPwaUpdating] = useState(false)
   const [notice, setNotice] = useState<AppNotice | null>(readUpdateCompleteNotice)
   const isMobile = useIsMobile()
-  const [captureOpen, setCaptureOpen] = useState(false)
   const [expenseOpen, setExpenseOpen] = useState(false)
   const [expenseFromAi, setExpenseFromAi] = useState(false)
-  const [filesOpen, setFilesOpen] = useState(false)
-  const [modelOpen, setModelOpen] = useState(false)
+  const [menuOpen, setMenuOpen] = useState(false)
+  const [captureMode, setCaptureMode] = useState<CaptureMode>(readCaptureMode)
+  const [batch, setBatch] = useState<BatchShot[]>([])
+  const batchRef = useRef<BatchShot[]>([])
+  const batchJobs = useRef(new Map<string, Promise<void>>())
+  const [shotFlash, setShotFlash] = useState(0)
+  // まとめて保存した直後のレシート。一覧で手元のレシートと見比べる目印にする。
+  const [savedBatch, setSavedBatch] = useState<Set<string> | null>(null)
   const expenseSectionRef = useRef<HTMLDivElement | null>(null)
+  const listSectionRef = useRef<HTMLElement | null>(null)
+  const sessionRef = useRef<Session | null>(null)
+
+  useEffect(() => {
+    sessionRef.current = session
+  }, [session])
   const noticeResolver = useRef<((value: boolean) => void) | null>(null)
 
   useEffect(() => {
@@ -442,11 +503,13 @@ function App() {
     setOcrProgress(null)
     setLastUploadedName(null)
     setDraft(initialDraft())
-    setCaptureOpen(false)
     setExpenseOpen(false)
     setExpenseFromAi(false)
-    setFilesOpen(false)
-    setModelOpen(false)
+    setMenuOpen(false)
+    batchJobs.current.clear()
+    batchRef.current = []
+    setBatch([])
+    setSavedBatch(null)
     // 注意: ログアウトでは記憶を消さない（明示的にログアウトしても次回は自動ログインできる）
     // 記憶を消すのはデータ初期化時のみ
   }
@@ -490,7 +553,7 @@ function App() {
         await showNotice("いまの版が最新です。このまま使えます。", "アプリ更新")
         return
       }
-      if (session && hasUnsavedDraft(draft)) {
+      if (session && (hasUnsavedDraft(draft) || batchRef.current.length > 0)) {
         setPwaUpdating(false)
         const confirmed = await askConfirm("未保存の入力は消えます。アプリを更新して読み込み直しますか？", {
           title: "アプリを更新",
@@ -541,6 +604,62 @@ function App() {
     setLastUploadedName(null)
   }
 
+  // 画像1枚を読み取って入力欄の形にする。1件ずつでも、まとめてでも同じ処理を使う。
+  const readReceipt = async (file: File, onProgress?: (progress: number) => void): Promise<{ draft: ReceiptDraft; text: string }> => {
+    const preview = await compressImage(file)
+
+    // Gemini APIを使うか、従来のOCRを使うか
+    if (useGemini && hasApiKey()) {
+      const result = await analyzeReceiptWithGemini(file, onProgress)
+
+      // AIが判定したカテゴリを設定（存在する場合）
+      let selectedCategory = categories[0]?.name ?? "その他"
+      if (result.category) {
+        const found = categories.find(c => c.name === result.category)
+        if (found) {
+          selectedCategory = found.name
+        }
+      }
+
+      const stamp = Date.now()
+      const lineItemDrafts: ReceiptDraft["lineItems"] = (result.items || []).map((item: { name: string; price: number; quantity?: number; category?: string }, idx: number) => ({
+        id: `item-${idx}-${stamp}`,
+        name: item.name,
+        category: item.category || selectedCategory,
+        price: String(item.price),
+        quantity: String(item.quantity || 1),
+      }))
+
+      return {
+        text: result.rawText,
+        draft: {
+          ...initialDraft(),
+          storeName: result.storeName || "",
+          visitedAt: result.date && isValidDate(result.date) ? result.date : formatLocalDate(),
+          total: result.total || "",
+          category: selectedCategory,
+          note: result.highlight || "",
+          isNomikai: result.isNomikai,
+          imageData: preview,
+          lineItems: lineItemDrafts,
+        },
+      }
+    }
+
+    // 従来のTesseract OCR
+    const text = await runOcr(file, onProgress)
+    const parsed = parseReceiptText(text)
+    return {
+      text,
+      draft: {
+        ...initialDraft(),
+        storeName: parsed.store ?? "",
+        total: parsed.total ?? "",
+        imageData: preview,
+      },
+    }
+  }
+
   const handleOcr = async (file: File, input?: HTMLInputElement, alreadyConfirmed = false) => {
     if (!alreadyConfirmed && hasUnsavedDraft(draft)) {
       const confirmed = await askConfirm("未保存の入力があります。上書きしますか？", {
@@ -557,54 +676,9 @@ function App() {
     setOcrProgress(0)
     setLastUploadedName(file.name)
     try {
-      const preview = await compressImage(file)
-      
-      // Gemini APIを使うか、従来のOCRを使うか
-      if (useGemini && hasApiKey()) {
-        // Gemini API
-        const result = await analyzeReceiptWithGemini(file, setOcrProgress)
-        setOcrText(result.rawText)
-        
-        // AIが判定したカテゴリを設定（存在する場合）
-        let selectedCategory = categories[0]?.name ?? "その他"
-        if (result.category) {
-          const found = categories.find(c => c.name === result.category)
-          if (found) {
-            selectedCategory = found.name
-          }
-        }
-        
-        const lineItemDrafts: ReceiptDraft["lineItems"] = (result.items || []).map((item: { name: string; price: number; quantity?: number; category?: string }, idx: number) => ({
-          id: `item-${idx}-${Date.now()}`,
-          name: item.name,
-          category: item.category || selectedCategory,
-          price: String(item.price),
-          quantity: String(item.quantity || 1),
-        }))
-        
-        setDraft({
-          ...initialDraft(),
-          storeName: result.storeName || "",
-          visitedAt: result.date && isValidDate(result.date) ? result.date : formatLocalDate(),
-          total: result.total || "",
-          category: selectedCategory,
-          note: result.highlight || "",
-          isNomikai: result.isNomikai,
-          imageData: preview,
-          lineItems: lineItemDrafts,
-        })
-      } else {
-        // 従来のTesseract OCR
-        const text = await runOcr(file, setOcrProgress)
-        setOcrText(text)
-        const parsed = parseReceiptText(text)
-        setDraft({
-          ...initialDraft(),
-          storeName: parsed.store ?? "",
-          total: parsed.total ?? "",
-          imageData: preview,
-        })
-      }
+      const result = await readReceipt(file, setOcrProgress)
+      setOcrText(result.text)
+      setDraft(result.draft)
       setExpenseFromAi(true)
       setExpenseOpen(true)
       window.setTimeout(() => {
@@ -629,7 +703,6 @@ function App() {
     setLastUploadedName(null)
     setExpenseFromAi(false)
     setExpenseOpen(false)
-    setCaptureOpen(false)
     stopCamera()
   }
 
@@ -639,25 +712,7 @@ function App() {
     setSavingReceipt(true)
 
     try {
-      // ドラフトの品目データをLineItem形式に変換
-      const lineItems = toLineItems(draft.lineItems)
-      const computedTotal = Number(String(draft.total).replace(/,/g, "")) || 0
-      const now = new Date().toISOString()
-
-      const receipt: Receipt = {
-        id: crypto.randomUUID(),
-        storeName: draft.storeName || "無題のレシート",
-        visitedAt: draft.visitedAt || formatLocalDate(),
-        total: computedTotal,
-        category: draft.category,
-        note: draft.note || undefined,
-        imageData: saveImage ? draft.imageData : undefined,
-        lineItems,
-        isNomikai: draft.isNomikai || false,
-        isJibara: draft.isJibara || false,
-        createdAt: now,
-        updatedAt: now,
-      }
+      const receipt = draftToReceipt(draft, saveImage, new Date().toISOString())
 
       const duplicates = findDuplicateReceipts(session.vault.receipts, {
         storeName: draft.storeName,
@@ -688,12 +743,144 @@ function App() {
       setLastUploadedName(null)
       setExpenseFromAi(false)
       setExpenseOpen(false)
-      setCaptureOpen(false)
       stopCamera()
     } finally {
       receiptSaveInFlight.current = false
       setSavingReceipt(false)
     }
+  }
+
+  const updateBatch = (update: (shots: BatchShot[]) => BatchShot[]) => {
+    batchRef.current = update(batchRef.current)
+    setBatch(batchRef.current)
+  }
+
+  const readBatchShot = (id: string, file: File) => {
+    const job = readReceipt(file)
+      .then((result) => {
+        updateBatch((shots) => shots.map((shot) => (shot.id === id ? { ...shot, status: "done", draft: result.draft, error: undefined } : shot)))
+      })
+      .catch((error: unknown) => {
+        console.error("OCR error:", error)
+        const message = error instanceof Error ? error.message : "読み取れませんでした。"
+        updateBatch((shots) => shots.map((shot) => (shot.id === id ? { ...shot, status: "error", error: message } : shot)))
+      })
+      .finally(() => {
+        if (batchJobs.current.get(id) === job) batchJobs.current.delete(id)
+      })
+    batchJobs.current.set(id, job)
+  }
+
+  const addBatchShot = async (file: File) => {
+    const id = crypto.randomUUID()
+    // 縮小できない画像でも束には入れ、読み取りの結果で失敗を見せる。
+    const thumb = await compressImage(file, 240, 0.7).catch(() => "")
+    updateBatch((shots) => [...shots, { id, file, thumb, status: "reading" }])
+    readBatchShot(id, file)
+  }
+
+  const retryBatchShot = (shot: BatchShot) => {
+    updateBatch((shots) => shots.map((entry) => (entry.id === shot.id ? { ...entry, status: "reading", error: undefined } : entry)))
+    readBatchShot(shot.id, shot.file)
+  }
+
+  const removeBatchShot = (id: string) => {
+    batchJobs.current.delete(id)
+    updateBatch((shots) => shots.filter((shot) => shot.id !== id))
+  }
+
+  const discardBatch = async () => {
+    if (!batchRef.current.length) return
+    const confirmed = await askConfirm(`撮影した${batchRef.current.length}件を保存せずに破棄します。`, {
+      title: "まとめて取り消す",
+      confirmLabel: "破棄する",
+      danger: true,
+    })
+    if (!confirmed) return
+    batchJobs.current.clear()
+    updateBatch(() => [])
+  }
+
+  const handleSaveBatch = async () => {
+    if (!session || receiptSaveInFlight.current || !batchRef.current.length) return
+    receiptSaveInFlight.current = true
+    setSavingReceipt(true)
+
+    try {
+      // 最後に撮った分の読み取りが終わるまで待ってから保存する。
+      await Promise.allSettled(Array.from(batchJobs.current.values()))
+      // 待っている間に一覧で編集・削除されていても、それを上書きしないよう最新の内容に足す。
+      const current = sessionRef.current ?? session
+      const shots = batchRef.current
+      const ready = shots.filter((shot): shot is BatchShot & { draft: ReceiptDraft } => shot.status === "done" && Boolean(shot.draft))
+      if (!ready.length) {
+        await showNotice("読み取れたレシートがありません。撮り直すか、取り消してください。", "保存できません")
+        return
+      }
+
+      const failed = shots.length - ready.length
+      const duplicates = countBatchDuplicates(
+        current.vault.receipts,
+        ready.map(({ draft: shotDraft }) => ({ storeName: shotDraft.storeName, visitedAt: shotDraft.visitedAt, total: draftTotal(shotDraft) })),
+      )
+      const warnings = [
+        failed > 0 ? `読み取れなかった${failed}件は保存しません。` : "",
+        duplicates > 0 ? `${duplicates}件は、同じ店名・日付・合計のレシートがすでにあります。` : "",
+      ].filter(Boolean)
+      if (warnings.length) {
+        const confirmed = await askConfirm(`${ready.length}件を保存します。\n\n${warnings.join("\n")}`, {
+          title: "まとめて保存",
+          confirmLabel: `${ready.length}件を保存`,
+          cancelLabel: "戻る",
+        })
+        if (!confirmed) return
+      }
+
+      const now = new Date().toISOString()
+      const receipts = ready.map((shot) => draftToReceipt(shot.draft, saveImage, now))
+      await persistVault({
+        ...current.vault,
+        receipts: [...receipts, ...current.vault.receipts],
+      }, current.key)
+
+      batchJobs.current.clear()
+      updateBatch(() => [])
+      stopCamera()
+      setSavedBatch(new Set(receipts.map((receipt) => receipt.id)))
+      // 一覧で金額を見比べられるよう、保存した月を開く。
+      const months = new Set(receipts.map((receipt) => receipt.visitedAt.slice(0, 7)))
+      const [month] = Array.from(months)
+      if (months.size === 1 && month && month <= formatLocalMonth()) {
+        setSelectedMonth(month)
+        setVisibleCount(Math.max(20, receipts.length))
+      }
+      setFilters({ query: "", category: "all" })
+      window.setTimeout(() => {
+        listSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" })
+      }, 80)
+    } finally {
+      receiptSaveInFlight.current = false
+      setSavingReceipt(false)
+    }
+  }
+
+  const changeCaptureMode = (mode: CaptureMode) => {
+    setCaptureMode(mode)
+    storeCaptureMode(mode)
+    setCameraError(null)
+    if (cameraPaused) resumeCamera()
+  }
+
+  const handlePickImages = (files: FileList | null, input: HTMLInputElement) => {
+    const picked = Array.from(files ?? [])
+    setMenuOpen(false)
+    if (!picked.length) return
+    if (captureMode === "batch") {
+      picked.forEach((file) => void addBatchShot(file))
+      input.value = ""
+      return
+    }
+    void handleOcr(picked[0], input)
   }
 
   const handleDeleteReceipt = async (id: string) => {
@@ -852,7 +1039,6 @@ function App() {
         }
       }, 3000)
     } catch {
-      setCaptureOpen(true)
       setCameraError("カメラを起動できませんでした。権限・他アプリ使用中・デバイス有無を確認してください。")
     }
   }
@@ -895,10 +1081,6 @@ function App() {
   }, [])
 
   useEffect(() => {
-    if (cameraActive) setCaptureOpen(true)
-  }, [cameraActive])
-
-  useEffect(() => {
     if (!notice?.updateComplete) return
     blurActiveElement()
     const timers = [0, 50, 250, 800].map((delay) => window.setTimeout(blurActiveElement, delay))
@@ -908,8 +1090,48 @@ function App() {
   }, [notice?.updateComplete, session])
 
 
+  // まとめて登録: カメラは止めずに1枚を束へ足し、読み取りは裏で進める。
+  const captureToBatch = async () => {
+    const video = videoRef.current
+    if (!video || !cameraReady) {
+      setCameraError("カメラ映像が準備できていません。数秒待つか再起動してください。")
+      return
+    }
+    captureLock.current = true
+    try {
+      const canvas = document.createElement("canvas")
+      canvas.width = video.videoWidth
+      canvas.height = video.videoHeight
+      const ctx = canvas.getContext("2d")
+      if (!ctx || canvas.width === 0 || canvas.height === 0) {
+        setCameraError("カメラ映像が取得できません。数秒待つか再起動してください。")
+        return
+      }
+      ctx.drawImage(video, 0, 0, canvas.width, canvas.height)
+      setCameraError(null)
+      setShotFlash((count) => count + 1)
+      const blob = await new Promise<Blob | null>((resolve) =>
+        canvas.toBlob((b) => resolve(b), "image/jpeg", 0.8),
+      )
+      if (!blob) {
+        setCameraError("撮影に失敗しました。もう一度撮影してください。")
+        return
+      }
+      await addBatchShot(new File([blob], `capture-${Date.now()}.jpg`, { type: "image/jpeg" }))
+    } catch (error) {
+      console.error(error)
+      setCameraError("撮影に失敗しました。もう一度撮影してください。")
+    } finally {
+      captureLock.current = false
+    }
+  }
+
   const captureFromCamera = async () => {
     if (captureLock.current) return
+    if (captureMode === "batch") {
+      await captureToBatch()
+      return
+    }
     if (cameraPaused) {
       resumeCamera()
       return
@@ -1096,13 +1318,8 @@ function App() {
   }, [session])
 
   const monthBreakdown = useMemo(
-    () => buildMonthBreakdown(session?.vault.receipts ?? [], selectedMonth),
+    () => buildMonthBreakdown(session?.vault.receipts ?? [], selectedMonth, goodsShares),
     [session, selectedMonth],
-  )
-
-  const categoryColors = useMemo(
-    () => new Map(categories.map((category) => [category.name, category.color])),
-    [categories],
   )
 
   const lineInsights = useMemo(
@@ -1153,9 +1370,61 @@ function App() {
   }
 
   const iconUrl = `${import.meta.env.BASE_URL}turtle_icon_receipt.png`
-  const captureButtonLabel = isProcessing ? "認識中" : holdingCapture ? "確認中" : cameraPaused ? "再撮影" : "撮影"
-  const captureDisabled = !cameraActive || isProcessing || holdingCapture
-  const recognitionDone = Boolean(capturedImage) && cameraPaused && !holdingCapture && !isProcessing && !cameraError
+  const batchMode = captureMode === "batch"
+  const batchReading = batch.filter((shot) => shot.status === "reading").length
+  const batchFailed = batch.filter((shot) => shot.status === "error").length
+  const batchTotal = batch.reduce((sum, shot) => sum + (shot.draft ? draftTotal(shot.draft) : 0), 0)
+  const batchSummary = batch.length === 0
+    ? "続けて撮って、最後に保存"
+    : batchReading > 0
+      ? `${batch.length}件 · 読み取り中 ${batchReading}`
+      : `${batch.length}件 · ${formatCurrency(batchTotal)}`
+  const modeLocked = hasDraftData || batch.length > 0 || isProcessing || holdingCapture || savingReceipt
+  const captureButtonLabel = batchMode
+    ? "撮影"
+    : isProcessing ? "認識中" : holdingCapture ? "確認中" : cameraPaused ? "再撮影" : "撮影"
+  const captureDisabled = batchMode
+    ? !cameraActive || savingReceipt
+    : !cameraActive || isProcessing || holdingCapture
+  const recognitionDone = !batchMode && Boolean(capturedImage) && cameraPaused && !holdingCapture && !isProcessing && !cameraError
+  const showCancel = batchMode ? batch.length > 0 : hasDraftData && !recognitionDone
+  const footerSaveDisabled = batchMode ? batch.length === 0 || savingReceipt : !canSaveReceipt
+  const footerSaveClass = batchMode
+    ? `footer-save-btn ui-btn ui-btn-quiet disabled:opacity-40 ${batch.length > 0 && batchReading === 0 && !savingReceipt ? "footer-save-ready" : ""}`
+    : saveButtonClass
+  const footerSaveLabel = savingReceipt ? "保存中" : batchMode && batch.length > 0 ? `${batch.length}件保存` : "保存"
+  const showCaptureCard = !isMobile || cameraActive || batch.length > 0 || ocrProgress !== null || Boolean(cameraError) || Boolean(draft.imageData)
+  const captureFirst = cameraActive || batch.length > 0
+  const savedBatchReceipts = savedBatch ? (session?.vault.receipts ?? []).filter((receipt) => savedBatch.has(receipt.id)) : []
+  const pickImageInput = (className: string) => (
+    <label className={className}>
+      {batchMode ? "画像を選ぶ（複数可）" : "画像を選ぶ"}
+      <input
+        type="file"
+        accept="image/*"
+        multiple={batchMode}
+        className="hidden"
+        onChange={(event) => handlePickImages(event.target.files, event.target)}
+      />
+    </label>
+  )
+  const modeSwitch = (className = "") => (
+    <div role="group" aria-label="登録のしかた" className={`grid grid-cols-2 gap-1 rounded-xl bg-black/40 p-1 ${className}`}>
+      {([["single", "1件ずつ"], ["batch", "まとめて"]] as const).map(([mode, label]) => (
+        <button
+          key={mode}
+          type="button"
+          aria-pressed={captureMode === mode}
+          disabled={modeLocked && captureMode !== mode}
+          title={modeLocked && captureMode !== mode ? "保存か取り消しのあとで切り替えられます" : undefined}
+          onClick={() => changeCaptureMode(mode)}
+          className={`whitespace-nowrap rounded-lg px-3 py-1.5 text-xs font-bold disabled:opacity-40 ${captureMode === mode ? "bg-mint text-fog shadow" : "text-slate-300 hover:bg-white/5"}`}
+        >
+          {label}
+        </button>
+      ))}
+    </div>
+  )
 
   return (
     <div className="min-h-screen bg-fog text-sand">
@@ -1180,10 +1449,11 @@ function App() {
               </button>
               <button
                 type="button"
-                onClick={() => void handleLock()}
+                aria-haspopup="dialog"
+                onClick={() => setMenuOpen(true)}
                 className="ui-btn ui-btn-quiet h-9 whitespace-nowrap px-3 text-xs"
               >
-                ログアウト
+                メニュー
               </button>
             </div>
           )}
@@ -1209,30 +1479,26 @@ function App() {
         </div>
       ) : (
         <>
-          <div className="mx-auto grid w-full max-w-6xl gap-4 px-4 py-4 pb-28 lg:grid-cols-[minmax(0,1.6fr)_22rem] lg:pb-8">
-            <section className={`${cameraActive ? "order-1" : "order-2"} space-y-4 lg:order-none lg:col-start-1 lg:row-start-1`}>
-              <div className={`space-y-4 ${disclosureCardClass(isMobile && !(captureOpen || cameraActive), "p-4 sm:p-6")}`}>
-                <MobileDisclosure
-                  title="レシート画像のアップロード"
-                  mobile={isMobile}
-                  open={captureOpen || cameraActive}
-                  onToggle={() => {
-                    if (cameraActive) {
-                      stopCamera()
-                      setCaptureOpen(false)
-                      return
-                    }
-                    setCaptureOpen((open) => !open)
-                  }}
-                >
-                <p className="text-sm text-slate-400">画像から店名・日付・合計・明細を読み取ります。</p>
-                {(lastUploadedName || ocrProgress !== null) && (
+          <div className="mx-auto grid w-full max-w-6xl gap-4 px-4 py-4 pb-40 lg:grid-cols-[minmax(0,1.6fr)_22rem] lg:pb-8">
+            <section className={`${captureFirst ? "order-1" : "order-2"} space-y-4 lg:order-none lg:col-start-1 lg:row-start-1`}>
+              {showCaptureCard && (
+              <div className="space-y-4 rounded-3xl border border-white/10 bg-white/5 p-4 sm:p-6">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <h2 className="text-base font-semibold text-white">レシートの読み取り</h2>
+                  {modeSwitch("hidden lg:grid")}
+                </div>
+                <p className="hidden text-sm text-slate-400 lg:block">
+                  {batchMode
+                    ? "続けて撮影し、最後にまとめて保存します。金額は保存したあと一覧で見比べてください。"
+                    : "1枚ずつ読み取り、内容を確かめてから保存します。"}
+                </p>
+                {!batchMode && (lastUploadedName || ocrProgress !== null) && (
                   <div className="flex flex-wrap gap-2">
                     {lastUploadedName && <Pill>{lastUploadedName}</Pill>}
                     {ocrProgress !== null && <Pill>読み取り {Math.round(ocrProgress * 100)}%</Pill>}
                   </div>
                 )}
-                {ocrProgress !== null && (
+                {!batchMode && ocrProgress !== null && (
                   <div className="h-2 overflow-hidden rounded-full bg-white/10">
                     <div className="h-full bg-mint" style={{ width: `${Math.round(ocrProgress * 100)}%` }} />
                   </div>
@@ -1245,21 +1511,9 @@ function App() {
                     </button>
                   </p>
                 )}
-                <div className="grid gap-3 lg:grid-cols-2">
-                  <label className="ui-btn ui-btn-quiet w-full cursor-pointer border-dashed px-3 py-3 text-sm">
-                    画像を選ぶ
-                    <input
-                      type="file"
-                      accept="image/*"
-                      className="hidden"
-                      onChange={(event) => {
-                        const file = event.target.files?.[0]
-                        if (!file) return
-                        void handleOcr(file, event.target)
-                      }}
-                    />
-                  </label>
-                  <div className="hidden grid-cols-2 gap-2 lg:grid">
+                <div className="hidden gap-3 lg:grid lg:grid-cols-2">
+                  {pickImageInput("ui-btn ui-btn-quiet w-full cursor-pointer border-dashed px-3 py-3 text-sm")}
+                  <div className="grid grid-cols-2 gap-2">
                     <button
                       type="button"
                       onClick={() => void (cameraActive ? stopCamera() : startCamera())}
@@ -1277,13 +1531,9 @@ function App() {
                     </button>
                   </div>
                 </div>
-                <label className="flex items-center gap-2 text-sm text-slate-300">
-                  <input type="checkbox" checked={saveImage} onChange={(event) => setSaveImage(event.target.checked)} />
-                  画像も保存する（長辺1280px）
-                </label>
                 {cameraActive && (
                   <div className="relative overflow-hidden rounded-2xl border border-mint/30 bg-black">
-                    {capturedImage && cameraPaused && (
+                    {!batchMode && capturedImage && cameraPaused && (
                       <div className="absolute inset-0 z-10">
                         <img src={capturedImage} alt="撮影したレシート" className="h-full w-full object-cover" />
                         {!holdingCapture && (
@@ -1299,6 +1549,16 @@ function App() {
                         )}
                       </div>
                     )}
+                    {batchMode && shotFlash > 0 && (
+                      <div key={shotFlash} className="shot-flash pointer-events-none absolute inset-0 z-10 flex items-center justify-center">
+                        <p className="rounded-full bg-black/60 px-4 py-2 text-lg font-bold text-mint">撮影しました</p>
+                      </div>
+                    )}
+                    {batchMode && (
+                      <p className="absolute left-3 top-3 z-10 rounded-full bg-black/60 px-3 py-1 text-xs font-bold text-white">
+                        まとめて · {batchSummary}
+                      </p>
+                    )}
                     <video
                       ref={setVideoRef}
                       className="aspect-[3/4] w-full object-cover sm:aspect-video"
@@ -1308,14 +1568,84 @@ function App() {
                     />
                   </div>
                 )}
-                {cameraError && !cameraPaused && <p className="text-sm text-red-200">{cameraError}</p>}
-                {!cameraActive && draft.imageData && (
+                {cameraError && (batchMode || !cameraPaused) && <p className="text-sm text-red-200">{cameraError}</p>}
+                {!batchMode && !cameraActive && draft.imageData && (
                   <img src={draft.imageData} alt="読み取り画像" className="max-h-80 w-full rounded-2xl object-contain" />
                 )}
-                {ocrText && <p className="text-sm text-slate-400">読み取りメモ: {ocrText}</p>}
-                </MobileDisclosure>
+                {!batchMode && ocrText && <p className="text-sm text-slate-400">読み取りメモ: {ocrText}</p>}
+                {batchMode && batch.length > 0 && (
+                  <div>
+                    <div className="flex items-baseline justify-between gap-2 text-sm">
+                      <p className="font-semibold text-white">撮影した {batch.length}件</p>
+                      <p className="text-slate-300">
+                        {batchReading > 0 ? `読み取り中 ${batchReading}件` : `合計 ${formatCurrency(batchTotal)}`}
+                      </p>
+                    </div>
+                    <ul className="mt-2 space-y-2">
+                      {batch.map((shot, index) => (
+                        <li key={shot.id} className="flex items-center gap-3 rounded-2xl border border-white/10 bg-black/20 p-2">
+                          {shot.thumb ? (
+                            <img src={shot.thumb} alt={`${index + 1}件目`} className="h-14 w-11 shrink-0 rounded-lg bg-black object-cover" />
+                          ) : (
+                            <div className="grid h-14 w-11 shrink-0 place-items-center rounded-lg bg-black text-xs text-slate-500">{index + 1}</div>
+                          )}
+                          <div className="min-w-0 flex-1">
+                            {shot.status === "reading" && <p className="text-sm text-slate-300">読み取り中...</p>}
+                            {shot.status === "error" && (
+                              <>
+                                <p className="text-sm text-red-200">読み取れませんでした</p>
+                                <p className="truncate text-xs text-slate-500" title={shot.error}>{shot.error}</p>
+                              </>
+                            )}
+                            {shot.status === "done" && shot.draft && (
+                              <>
+                                <p className="truncate text-sm font-semibold text-white">{shot.draft.storeName || "店名なし"}</p>
+                                <p className="text-xs text-slate-400">
+                                  {shot.draft.visitedAt}
+                                  {shot.draft.lineItems.length > 0 ? ` · 明細${shot.draft.lineItems.length}` : ""}
+                                </p>
+                              </>
+                            )}
+                          </div>
+                          {shot.status === "done" && shot.draft && (
+                            <p className="shrink-0 font-bold text-mint">{formatCurrency(draftTotal(shot.draft))}</p>
+                          )}
+                          {shot.status === "error" && (
+                            <button type="button" onClick={() => retryBatchShot(shot)} className="ui-btn ui-btn-quiet shrink-0 px-2 py-1.5 text-xs">
+                              再読込
+                            </button>
+                          )}
+                          <button
+                            type="button"
+                            aria-label={`${index + 1}件目を外す`}
+                            onClick={() => removeBatchShot(shot.id)}
+                            disabled={savingReceipt}
+                            className="grid h-9 w-9 shrink-0 place-items-center rounded-full text-slate-400 hover:bg-white/10 disabled:opacity-40"
+                          >
+                            <svg viewBox="0 0 24 24" className="h-4 w-4" aria-hidden="true">
+                              <path d="M6 6l12 12M18 6L6 18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+                            </svg>
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
+                    {batchFailed > 0 && (
+                      <p className="mt-2 text-xs leading-relaxed text-red-200">読み取れなかった{batchFailed}件は、再読込するか外してください。そのままでも保存のときに除きます。</p>
+                    )}
+                    <div className="mt-3 grid grid-cols-2 gap-2">
+                      <button type="button" onClick={() => void discardBatch()} disabled={savingReceipt} className={`${cancelButtonClass} w-full py-3 text-sm`}>
+                        取り消す
+                      </button>
+                      <button type="button" onClick={() => void handleSaveBatch()} disabled={footerSaveDisabled} className={`${footerSaveClass} w-full py-3 text-sm`}>
+                        {savingReceipt ? "保存中" : `${batch.length}件を保存`}
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
+              )}
 
+              {!batchMode && (
               <div ref={expenseSectionRef} className={`scroll-mt-20 ${disclosureCardClass(isMobile && !expenseOpen, "p-4 sm:p-6")}`}>
                 <MobileDisclosure
                   title={expenseFromAi ? "支出の入力" : "支出の入力（手動で入力する場合）"}
@@ -1343,9 +1673,10 @@ function App() {
                 </div>
                 </MobileDisclosure>
               </div>
+              )}
             </section>
 
-            <aside className={`${cameraActive ? "order-2" : "order-1"} space-y-4 lg:order-none lg:col-start-2 lg:row-span-2 lg:row-start-1`}>
+            <aside className={`${captureFirst ? "order-2" : "order-1"} space-y-4 lg:order-none lg:col-start-2 lg:row-span-2 lg:row-start-1`}>
               <div className="rounded-3xl border border-white/10 bg-white/5 p-4">
                 <div className="flex items-center justify-between">
                   <button type="button" aria-label="前の月" onClick={goToPrevMonth} disabled={!hasPrevMonth} className="ui-btn ui-btn-secondary grid h-11 w-11 place-items-center rounded-full disabled:opacity-30">
@@ -1361,32 +1692,41 @@ function App() {
                   <div className="rounded-xl bg-amber-400/10 p-3 text-amber-200">🍺 {formatCurrency(selectedMonthNomikai)}</div>
                   <div className="rounded-xl bg-rose-400/10 p-3 text-rose-200">👛 {formatCurrency(selectedMonthJibara)}</div>
                 </div>
-                <button
-                  type="button"
-                  aria-expanded={showCategoryBreakdown}
-                  aria-controls="category-breakdown"
-                  onClick={() => setShowCategoryBreakdown((open) => !open)}
-                  className={`ui-btn ui-btn-secondary mt-3 w-full py-2.5 text-sm ${showCategoryBreakdown ? "border-mint text-mint" : ""}`}
-                >
-                  {showCategoryBreakdown ? "円グラフを閉じる" : "ジャンルの円グラフ"}
-                </button>
-                {showCategoryBreakdown && <CategoryBreakdown breakdown={monthBreakdown} colors={categoryColors} />}
-                <button
-                  type="button"
-                  aria-expanded={showLineInsights}
-                  aria-controls="line-insights"
-                  onClick={() => void handleLineInsights()}
-                  disabled={lineInsightLoading}
-                  className={`ui-btn ui-btn-secondary mt-3 w-full py-2.5 text-sm ${showLineInsights ? "border-mint text-mint" : ""}`}
-                >
-                  {lineInsightLoading ? "品名をまとめています..." : showLineInsights ? "明細のまとめを閉じる" : "明細から分かること"}
-                </button>
-                <p className="mt-2 text-xs text-slate-500">同じ品にまとめるため、品名だけを Google に送ります。金額、店名、レシート画像は送りません。</p>
+                <div className="mt-3 grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    aria-expanded={showCategoryBreakdown}
+                    aria-controls="category-breakdown"
+                    onClick={() => setShowCategoryBreakdown((open) => !open)}
+                    className={`ui-btn ui-btn-secondary w-full py-2.5 text-sm ${showCategoryBreakdown ? "border-mint text-mint" : ""}`}
+                  >
+                    円グラフ
+                  </button>
+                  <button
+                    type="button"
+                    aria-expanded={showLineInsights}
+                    aria-controls="line-insights"
+                    onClick={() => void handleLineInsights()}
+                    disabled={lineInsightLoading}
+                    title="同じ品にまとめるため、品名だけを Google に送ります。"
+                    className={`ui-btn ui-btn-secondary w-full py-2.5 text-sm ${showLineInsights ? "border-mint text-mint" : ""}`}
+                  >
+                    {lineInsightLoading ? "分析中..." : "明細分析"}
+                  </button>
+                </div>
+                {showCategoryBreakdown && (
+                  <CategoryBreakdown
+                    breakdown={monthBreakdown}
+                    colors={goodsColors}
+                    caption="明細の品目で分けています。明細がないレシートは店の種類から決めています。"
+                  />
+                )}
                 {lineInsightError && <p className="mt-2 text-sm text-red-200">{lineInsightError}</p>}
                 {showLineInsights && lineInsightNote && <p className="mt-2 text-xs text-slate-400">{lineInsightNote}</p>}
                 {showLineInsights && !lineInsightLoading && (
                   <LineInsightsPanel insights={groupedInsights?.key === lineInsightKey ? groupedInsights.insights : lineInsights} />
                 )}
+                {showLineInsights && <p className="mt-2 text-xs text-slate-500">明細分析では品名だけを Google に送ります。金額、店名、画像は送りません。</p>}
               </div>
 
               <div className="rounded-3xl border border-white/10 bg-white/5 p-4 text-sm">
@@ -1408,90 +1748,9 @@ function App() {
                   </button>
                 ))}
               </div>
-
-              <div className={disclosureCardClass(isMobile && !filesOpen, "p-4")}>
-                <MobileDisclosure
-                  title="データバックアップ・レシート画像削除"
-                  heading="h3"
-                  mobile={isMobile}
-                  open={filesOpen}
-                  onToggle={() => setFilesOpen((open) => !open)}
-                >
-                <p className="mt-3 text-sm text-slate-400">支出データ</p>
-                <div className="mt-2 grid grid-cols-2 gap-2">
-                  <button type="button" onClick={handleExport} className="ui-btn ui-btn-secondary py-2.5 text-sm">CSVを保存</button>
-                  <label className="ui-btn ui-btn-secondary w-full cursor-pointer py-2.5 text-sm">
-                    CSVを読込
-                    <input
-                      type="file"
-                      accept=".csv,text/csv"
-                      className="hidden"
-                      onChange={(event) => {
-                        const file = event.target.files?.[0]
-                        if (!file) return
-                        void handleImportCsv(file)
-                        event.target.value = ""
-                      }}
-                    />
-                  </label>
-                </div>
-                <p className="mt-4 text-sm text-slate-400">レシート画像</p>
-                <button type="button" onClick={() => void handleCleanupImages()} className="ui-btn ui-btn-quiet mt-2 w-full py-2.5 text-sm">
-                  保存済み画像を削除
-                </button>
-                </MobileDisclosure>
-              </div>
-
-              <div className={`${disclosureCardClass(isMobile && !modelOpen, "p-4")} text-sm`}>
-                <MobileDisclosure
-                  title="AIモデルの設定"
-                  heading="h3"
-                  mobile={isMobile}
-                  open={modelOpen}
-                  onToggle={() => setModelOpen((open) => !open)}
-                >
-                <div className="mt-3 flex items-center justify-between gap-2">
-                  <div>
-                    <p className="font-semibold text-white">{geminiModel === "gemini-3.8-flash" ? "Gemini 3.8 Flash" : "Gemini 3.5 Flash-Lite"}</p>
-                    <p className="text-xs text-slate-400">{hasApiKey() ? "APIキー設定済み" : "APIキー未設定"}</p>
-                  </div>
-                  <div className="flex gap-2">
-                    <button type="button" aria-pressed={useGemini} onClick={() => setUseGemini((value) => !value)} className={`ui-toggle px-3 py-1 text-xs ${useGemini ? "border-mint bg-mint text-fog" : ""}`}>
-                      {useGemini ? "ON" : "OFF"}
-                    </button>
-                    <button type="button" onClick={() => setShowApiKeyModal(true)} className="ui-btn ui-btn-quiet px-3 py-1 text-xs">設定</button>
-                  </div>
-                </div>
-                <div className="mt-3 grid grid-cols-2 gap-1 rounded-xl bg-black/40 p-1" role="group" aria-label="読み取りモデル">
-                  <button
-                    type="button"
-                    aria-pressed={geminiModel === "gemini-3.5-flash-lite"}
-                    onClick={() => {
-                      saveGeminiModel("gemini-3.5-flash-lite")
-                      setGeminiModel("gemini-3.5-flash-lite")
-                    }}
-                    className={`rounded-lg px-2 py-2 text-xs font-bold ${geminiModel === "gemini-3.5-flash-lite" ? "bg-mint text-fog shadow" : "text-slate-300 hover:bg-white/5"}`}
-                  >
-                    3.5 Flash-Lite
-                  </button>
-                  <button
-                    type="button"
-                    aria-pressed={geminiModel === "gemini-3.8-flash"}
-                    onClick={() => {
-                      saveGeminiModel("gemini-3.8-flash")
-                      setGeminiModel("gemini-3.8-flash")
-                    }}
-                    className={`rounded-lg px-2 py-2 text-xs font-bold ${geminiModel === "gemini-3.8-flash" ? "bg-mint text-fog shadow" : "text-slate-300 hover:bg-white/5"}`}
-                  >
-                    3.8 Flash
-                  </button>
-                </div>
-                <p className="mt-2 text-xs text-slate-500">ONのとき、画像は Google に送られます。</p>
-                </MobileDisclosure>
-              </div>
             </aside>
 
-            <section className="order-3 min-w-0 rounded-3xl border border-white/10 bg-white/5 p-4 sm:p-6 lg:order-none lg:col-span-2 lg:col-start-1 lg:row-start-3">
+            <section ref={listSectionRef} className="order-3 min-w-0 scroll-mt-20 rounded-3xl border border-white/10 bg-white/5 p-4 sm:p-6 lg:order-none lg:col-span-2 lg:col-start-1 lg:row-start-3">
               <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <h2 className="text-base font-semibold text-white">{formatMonthLabel(selectedMonth)}の支出</h2>
                 <div className="flex flex-col gap-2 sm:flex-row">
@@ -1516,12 +1775,25 @@ function App() {
                   </select>
                 </div>
               </div>
+              {savedBatchReceipts.length > 0 && (
+                <div className="mt-4 flex items-center justify-between gap-3 rounded-2xl border border-mint/50 bg-mint/10 px-3 py-2">
+                  <p className="min-w-0 text-sm text-white">
+                    まとめて保存した <span className="font-bold">{savedBatchReceipts.length}件</span>
+                    <span className="ml-2 font-bold text-mint">{formatCurrency(savedBatchReceipts.reduce((sum, receipt) => sum + receipt.total, 0))}</span>
+                    <span className="block text-xs text-slate-300">手元のレシートと金額を見比べてください。違っていたら編集で直せます。</span>
+                  </p>
+                  <button type="button" onClick={() => setSavedBatch(null)} className="ui-btn ui-btn-quiet shrink-0 px-3 py-1.5 text-xs">
+                    確認した
+                  </button>
+                </div>
+              )}
               <div className="mt-4 space-y-3">
                 {filteredReceipts.length === 0 && <p className="text-sm text-slate-400">この月の支出はありません。</p>}
                 {displayedReceipts.map((receipt) => {
                   const open = openReceiptIds.has(receipt.id)
+                  const justSaved = savedBatch?.has(receipt.id) ?? false
                   return (
-                    <article key={receipt.id} className="rounded-2xl border border-white/10 bg-white/5 p-3 sm:p-4">
+                    <article key={receipt.id} className={`rounded-2xl border p-3 sm:p-4 ${justSaved ? "border-mint/60 bg-mint/5" : "border-white/10 bg-white/5"}`}>
                       <div className="flex items-start justify-between gap-3">
                         <button type="button" aria-expanded={open} className="min-w-0 flex-1 text-left" onClick={() => setOpenReceiptIds((prev) => {
                           const next = new Set(prev)
@@ -1597,7 +1869,13 @@ function App() {
                 </button>
               </p>
             )}
-            <div className={`mx-auto grid max-w-lg items-center gap-2 ${hasDraftData && !recognitionDone ? "grid-cols-[minmax(4.5rem,1fr)_minmax(0,1.4fr)_minmax(4.5rem,1fr)_minmax(4.5rem,1fr)]" : "grid-cols-[minmax(5rem,1fr)_minmax(0,2fr)_minmax(5rem,1fr)]"}`}>
+            <div className="mx-auto mb-2 flex max-w-lg items-center justify-between gap-3">
+              {modeSwitch("shrink-0")}
+              <p className="min-w-0 truncate text-right text-xs text-slate-400">
+                {batchMode ? batchSummary : "1枚ずつ確かめて保存"}
+              </p>
+            </div>
+            <div className={`mx-auto grid max-w-lg items-center gap-2 ${showCancel ? "grid-cols-[minmax(4.5rem,1fr)_minmax(0,1.4fr)_minmax(4.5rem,1fr)_minmax(4.5rem,1fr)]" : "grid-cols-[minmax(5rem,1fr)_minmax(0,2fr)_minmax(5rem,1fr)]"}`}>
               {recognitionDone ? (
                 <button type="button" onClick={clearDraft} className={`footer-btn ${cancelButtonClass} h-10 min-w-0 whitespace-nowrap px-2 text-xs`}>
                   取り消す
@@ -1610,17 +1888,128 @@ function App() {
               <button type="button" onClick={() => void captureFromCamera()} disabled={captureDisabled} className="footer-btn ui-btn ui-btn-primary h-11 min-w-0 whitespace-nowrap text-sm disabled:opacity-100">
                 {captureButtonLabel}
               </button>
-              {hasDraftData && !recognitionDone && (
-                <button type="button" onClick={clearDraft} className={`footer-btn ${cancelButtonClass} h-10 min-w-0 whitespace-nowrap px-2 text-xs`}>
+              {showCancel && (
+                <button type="button" onClick={() => void (batchMode ? discardBatch() : clearDraft())} disabled={savingReceipt} className={`footer-btn ${cancelButtonClass} h-10 min-w-0 whitespace-nowrap px-2 text-xs`}>
                   取り消す
                 </button>
               )}
-              <button type="button" onClick={() => void handleSaveReceipt()} disabled={!canSaveReceipt} title={saveButtonTitle} className={`footer-btn ${saveButtonClass} h-10 min-w-0 whitespace-nowrap px-2 text-xs`}>
-                保存
+              <button
+                type="button"
+                onClick={() => void (batchMode ? handleSaveBatch() : handleSaveReceipt())}
+                disabled={footerSaveDisabled}
+                title={batchMode ? "撮影した分をまとめて保存します" : saveButtonTitle}
+                className={`footer-btn ${footerSaveClass} h-10 min-w-0 whitespace-nowrap px-2 text-xs`}
+              >
+                {footerSaveLabel}
               </button>
             </div>
           </div>
         </>
+      )}
+
+      {session && menuOpen && (
+        <Dialog title="メニュー" onClose={() => setMenuOpen(false)}>
+          <div className="space-y-5 text-sm">
+            <section>
+              <h4 className="font-semibold text-white">レシート画像から読み取る</h4>
+              <p className="mt-1 text-xs text-slate-400">
+                {batchMode ? "まとめてモードです。複数の画像を選ぶと、全部を読み取って保存待ちにします。" : "画像から店名・日付・合計・明細を読み取ります。"}
+              </p>
+              {pickImageInput("ui-btn ui-btn-secondary mt-2 w-full cursor-pointer py-2.5 text-sm")}
+              <label className="mt-3 flex items-center gap-2 text-slate-300">
+                <input type="checkbox" checked={saveImage} onChange={(event) => setSaveImage(event.target.checked)} />
+                画像も保存する（長辺1280px）
+              </label>
+            </section>
+
+            <section className="border-t border-white/10 pt-4">
+              <h4 className="font-semibold text-white">AIモデル</h4>
+              <div className="mt-2 flex items-center justify-between gap-2">
+                <div>
+                  <p className="font-semibold text-white">{geminiModel === "gemini-3.8-flash" ? "Gemini 3.8 Flash" : "Gemini 3.5 Flash-Lite"}</p>
+                  <p className="text-xs text-slate-400">{hasApiKey() ? "APIキー設定済み" : "APIキー未設定"}</p>
+                </div>
+                <div className="flex gap-2">
+                  <button type="button" aria-pressed={useGemini} onClick={() => setUseGemini((value) => !value)} className={`ui-toggle px-3 py-1 text-xs ${useGemini ? "border-mint bg-mint text-fog" : ""}`}>
+                    {useGemini ? "ON" : "OFF"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setMenuOpen(false)
+                      setShowApiKeyModal(true)
+                    }}
+                    className="ui-btn ui-btn-quiet px-3 py-1 text-xs"
+                  >
+                    キー設定
+                  </button>
+                </div>
+              </div>
+              <div className="mt-3 grid grid-cols-2 gap-1 rounded-xl bg-black/40 p-1" role="group" aria-label="読み取りモデル">
+                {([["gemini-3.5-flash-lite", "3.5 Flash-Lite"], ["gemini-3.8-flash", "3.8 Flash"]] as const).map(([model, label]) => (
+                  <button
+                    key={model}
+                    type="button"
+                    aria-pressed={geminiModel === model}
+                    onClick={() => {
+                      saveGeminiModel(model)
+                      setGeminiModel(model)
+                    }}
+                    className={`rounded-lg px-2 py-2 text-xs font-bold ${geminiModel === model ? "bg-mint text-fog shadow" : "text-slate-300 hover:bg-white/5"}`}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+              <p className="mt-2 text-xs text-slate-500">ONのとき、画像は Google に送られます。</p>
+            </section>
+
+            <section className="border-t border-white/10 pt-4">
+              <h4 className="font-semibold text-white">データのバックアップ</h4>
+              <div className="mt-2 grid grid-cols-2 gap-2">
+                <button type="button" onClick={handleExport} className="ui-btn ui-btn-secondary py-2.5 text-sm">CSVを保存</button>
+                <label className="ui-btn ui-btn-secondary w-full cursor-pointer py-2.5 text-sm">
+                  CSVを読込
+                  <input
+                    type="file"
+                    accept=".csv,text/csv"
+                    className="hidden"
+                    onChange={(event) => {
+                      const file = event.target.files?.[0]
+                      event.target.value = ""
+                      if (!file) return
+                      setMenuOpen(false)
+                      void handleImportCsv(file)
+                    }}
+                  />
+                </label>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setMenuOpen(false)
+                  void handleCleanupImages()
+                }}
+                className="ui-btn ui-btn-quiet mt-2 w-full py-2.5 text-sm"
+              >
+                保存済みのレシート画像を削除
+              </button>
+            </section>
+
+            <section className="border-t border-white/10 pt-4">
+              <button
+                type="button"
+                onClick={() => {
+                  setMenuOpen(false)
+                  void handleLock()
+                }}
+                className="ui-btn ui-btn-quiet w-full py-2.5 text-sm"
+              >
+                ログアウト
+              </button>
+            </section>
+          </div>
+        </Dialog>
       )}
 
       {showApiKeyModal && (

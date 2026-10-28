@@ -36,9 +36,11 @@ const sliceNote = (slice: SpendSlice, hasPrevious: boolean) => {
 export const CategoryBreakdown = ({
   breakdown,
   colors,
+  caption,
 }: {
   breakdown: MonthBreakdown
   colors: ReadonlyMap<string, string>
+  caption?: string
 }) => {
   const headline = !breakdown.hasPrevious
     ? "先月の支出はありません。"
@@ -99,6 +101,7 @@ export const CategoryBreakdown = ({
           先月にあって今月はないもの: {breakdown.dropped.slice(0, 2).map((row) => `${row.name} ${yen(row.previousTotal)}`).join("、")}
         </p>
       )}
+      {caption && <p className="mt-2 text-xs leading-relaxed text-slate-500">{caption}</p>}
     </div>
   )
 }

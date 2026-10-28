@@ -186,7 +186,7 @@ export const analyzeReceiptWithGemini = async (
   "isNomikai": "居酒屋・バー・飲み会など飲酒を伴う飲食なら true。スーパーで酒を買っただけなら false",
   "highlight": "買った内容を20文字以内で。例: 牛乳と惣菜",
   "items": [
-    {"name": "商品名", "price": 税込単価, "quantity": 数量, "category": "食品, 飲料, 日用品, 医薬品, 衣類, 雑貨, サービス, その他"}
+    {"name": "商品名", "price": 税込単価, "quantity": 数量, "category": "食品, 日用品, 医薬品, 衣料品, 家電・雑貨, 娯楽・サービス, その他 のいずれか。飲み物とお酒は食品"}
   ]
 }
 

@@ -193,3 +193,39 @@ select.ui-field {
     0 0 0 1px rgba(160, 64, 64, 0.16),
     0 0 28px 10px rgba(150, 52, 52, 0.32);
 }
+
+/* まとめて撮影: カメラを止めずに、撮れたことだけを一瞬見せる */
+.shot-flash {
+  animation: shot-flash 0.9s ease-out forwards;
+}
+
+@keyframes shot-flash {
+  0% {
+    opacity: 1;
+    background-color: rgba(255, 255, 255, 0.55);
+  }
+  25% {
+    opacity: 1;
+    background-color: rgba(0, 0, 0, 0);
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .shot-flash {
+    animation-duration: 0.6s;
+    animation-name: shot-flash-calm;
+  }
+
+  @keyframes shot-flash-calm {
+    0%,
+    70% {
+      opacity: 1;
+    }
+    100% {
+      opacity: 0;
+    }
+  }
+}

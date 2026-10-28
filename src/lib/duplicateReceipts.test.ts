@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import { findDuplicateReceipts } from "./duplicateReceipts"
+import { countBatchDuplicates, findDuplicateReceipts } from "./duplicateReceipts"
 import type { Receipt } from "./types"
 
 const sample = (patch: Partial<Receipt> = {}): Receipt => ({
@@ -68,5 +68,19 @@ describe("possible duplicate receipts", () => {
   it("also detects a repeated refund receipt", () => {
     const saved = sample({ total: -1234 })
     expect(findDuplicateReceipts([saved], sample({ total: -1234 }))).toEqual([saved])
+  })
+})
+
+describe("batch duplicates", () => {
+  it("counts shots that match a saved receipt or an earlier shot in the same batch", () => {
+    const shot = { storeName: "セブン-イレブン 京橋店", visitedAt: "2026-10-01", total: 1234 }
+    expect(countBatchDuplicates([], [shot, { ...shot, total: 500 }])).toBe(0)
+    expect(countBatchDuplicates([], [shot, shot])).toBe(1)
+    expect(countBatchDuplicates([sample()], [shot, { ...shot, total: 500 }])).toBe(1)
+  })
+
+  it("does not count shots whose store name could not be read", () => {
+    const unread = { storeName: "", visitedAt: "2026-10-01", total: 1234 }
+    expect(countBatchDuplicates([], [unread, unread])).toBe(0)
   })
 })

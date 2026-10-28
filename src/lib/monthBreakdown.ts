@@ -37,15 +37,23 @@ export type MonthBreakdown = {
   dropped: SpendChange[]
 }
 
-type SpendReceipt = {
+export type SpendReceipt = {
   visitedAt?: string
   total: number
   category?: string
+  isNomikai?: boolean
   lineItems?: readonly {
     name?: string
+    category?: string
     price?: number
     quantity?: number
   }[]
+}
+
+/** 1枚のレシートを、どの分類にいくら入れるか。 */
+export type SpendShare = {
+  name: string
+  amount: number
 }
 
 export type MonthFood = {
@@ -283,7 +291,15 @@ const categoryName = (category: string | undefined) => {
   return name ? name : EMPTY_NAME
 }
 
-export const buildMonthBreakdown = (receipts: readonly SpendReceipt[], month: string): MonthBreakdown => {
+const byStoreCategory = (receipt: SpendReceipt): SpendShare[] => [
+  { name: categoryName(receipt.category), amount: Number.isFinite(receipt.total) ? receipt.total : 0 },
+]
+
+export const buildMonthBreakdown = (
+  receipts: readonly SpendReceipt[],
+  month: string,
+  sharesOf: (receipt: SpendReceipt) => SpendShare[] = byStoreCategory,
+): MonthBreakdown => {
   const previousMonth = shiftMonth(month, -1)
   const current = new Map<string, { total: number; count: number }>()
   const previous = new Map<string, { total: number; count: number }>()
@@ -292,22 +308,24 @@ export const buildMonthBreakdown = (receipts: readonly SpendReceipt[], month: st
   let previousTotal = 0
   let previousCount = 0
 
+  const add = (rows: Map<string, { total: number; count: number }>, receipt: SpendReceipt) => {
+    for (const share of sharesOf(receipt)) {
+      const row = rows.get(share.name) ?? bucket()
+      row.total += share.amount
+      row.count += 1
+      rows.set(share.name, row)
+    }
+  }
+
   for (const receipt of receipts) {
     const visitedAt = receipt.visitedAt ?? ""
     const amount = Number.isFinite(receipt.total) ? receipt.total : 0
-    const name = categoryName(receipt.category)
     if (visitedAt.startsWith(month)) {
-      const row = current.get(name) ?? bucket()
-      row.total += amount
-      row.count += 1
-      current.set(name, row)
+      add(current, receipt)
       total += amount
       count += 1
     } else if (visitedAt.startsWith(previousMonth)) {
-      const row = previous.get(name) ?? bucket()
-      row.total += amount
-      row.count += 1
-      previous.set(name, row)
+      add(previous, receipt)
       previousTotal += amount
       previousCount += 1
     }

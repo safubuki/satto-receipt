@@ -24,3 +24,17 @@ export const findDuplicateReceipts = (
     normalizeStoreName(receipt.storeName) === storeName,
   )
 }
+
+/** まとめて保存する候補のうち、保存済みか、同じ束の前のものと重なる件数。 */
+export const countBatchDuplicates = (
+  saved: readonly Receipt[],
+  candidates: readonly ReceiptIdentity[],
+): number => {
+  const seen: Receipt[] = [...saved]
+  let count = 0
+  for (const candidate of candidates) {
+    if (findDuplicateReceipts(seen, candidate).length) count += 1
+    seen.push({ ...candidate, id: "", lineItems: [], createdAt: "", updatedAt: "" })
+  }
+  return count
+}
