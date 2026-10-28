@@ -487,7 +487,7 @@ function App() {
       const status = await checkAppUpdate()
       if (status === "current") {
         setPwaUpdating(false)
-        await showNotice("最新です。", "アプリ更新")
+        await showNotice("いまの版が最新です。このまま使えます。", "アプリ更新")
         return
       }
       if (session && hasUnsavedDraft(draft)) {
@@ -502,7 +502,7 @@ function App() {
       await applyAppUpdate()
     } catch {
       setPwaUpdating(false)
-      await showNotice("更新を確認できませんでした。通信できる場所でもう一度押してください。", "更新できませんでした")
+      await showNotice("通信できる場所で、もう一度押してみてください。", "更新を確認できませんでした")
     } finally {
       releaseFocus()
       blurActiveElement()

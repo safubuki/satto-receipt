@@ -140,7 +140,7 @@ describe("app update check", () => {
     expect(reload).toHaveBeenCalledOnce()
     expect(readUpdateCompleteNotice()).toEqual({
       title: "アップデートしました",
-      message: "最新版にアップデートしました。",
+      message: "最新の版になりました。このまま使えます。",
       updateComplete: true,
     })
   })

@@ -10,7 +10,7 @@ export type AppUpdateCheck = "current" | "ready"
 
 const updateCompleteNotice = (): UpdateCompleteNotice => ({
   title: "アップデートしました",
-  message: "最新版にアップデートしました。",
+  message: "最新の版になりました。このまま使えます。",
   updateComplete: true,
 })
 
