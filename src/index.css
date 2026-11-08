@@ -137,6 +137,21 @@ select.ui-field {
   border-style: solid;
 }
 
+/* 押した状態は塗りつぶして、ひと目でオンだと分かるようにする */
+.ui-toggle-nomikai[aria-pressed="true"] {
+  background: #fbbf24;
+  border-color: #fde68a;
+  color: #0b1224;
+  box-shadow: 0 0 0 3px rgba(251, 191, 36, 0.3), 0 6px 16px rgba(251, 191, 36, 0.25);
+}
+
+.ui-toggle-jibara[aria-pressed="true"] {
+  background: #fb7185;
+  border-color: #fecdd3;
+  color: #fff;
+  box-shadow: 0 0 0 3px rgba(251, 113, 133, 0.3), 0 6px 16px rgba(251, 113, 133, 0.25);
+}
+
 /* iPhone safe area対応 */
 .safe-area-pb {
   padding-bottom: 20px; /* フォールバック（セーフエリアがない端末用） */
